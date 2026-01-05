@@ -1,0 +1,5 @@
+# Created at 2026-01-03T18:57:46.252
+Boot Manifest-JAR contains absolute paths in classpath 'D:\_WTL Projects\Yash ERP\Yash_Enterprises_ERP_Backend_30-12-25-\target\test-classes'
+Hint: <argLine>-Djdk.net.URLClassPath.disableClassPathURLCheck=true</argLine>
+'other' has different root
+
