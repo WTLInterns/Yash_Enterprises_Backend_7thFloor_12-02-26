@@ -1,9 +1,8 @@
 package com.company.attendance.controller;
 
 import com.company.attendance.crm.dto.DealDetailDTO;
-import com.company.attendance.crm.dto.ClientDto as CrmClientDto;
 import com.company.attendance.crm.entity.Deal;
-import com.company.attendance.crm.entity.Client;
+import com.company.attendance.entity.Client;
 import com.company.attendance.crm.repository.DealRepository;
 import com.company.attendance.crm.mapper.CrmMapper;
 import com.company.attendance.dto.ClientDto;
@@ -34,11 +33,11 @@ public class ClientController {
     private final CrmMapper crmMapper;
 
     @GetMapping
-    public ResponseEntity<List<CrmClientDto>> listClients() {
+    public ResponseEntity<List<com.company.attendance.crm.dto.ClientDto>> listClients() {
         log.info("GET /api/clients - Fetching all clients");
         try {
             List<Client> clients = clientService.getAllClientEntities();
-            List<CrmClientDto> dtos = clients.stream()
+            List<com.company.attendance.crm.dto.ClientDto> dtos = clients.stream()
                 .map(crmMapper::toClientDto)
                 .collect(Collectors.toList());
             return ResponseEntity.ok(dtos);
@@ -49,11 +48,11 @@ public class ClientController {
     }
     
     @GetMapping("/active")
-    public ResponseEntity<List<CrmClientDto>> getActiveClients() {
+    public ResponseEntity<List<com.company.attendance.crm.dto.ClientDto>> getActiveClients() {
         log.info("GET /api/clients/active - Fetching active clients");
         try {
             List<Client> clients = clientService.getActiveClientEntities();
-            List<CrmClientDto> dtos = clients.stream()
+            List<com.company.attendance.crm.dto.ClientDto> dtos = clients.stream()
                 .map(crmMapper::toClientDto)
                 .collect(Collectors.toList());
             return ResponseEntity.ok(dtos);
@@ -64,11 +63,17 @@ public class ClientController {
     }
     
     @GetMapping("/search")
-    public ResponseEntity<List<ClientDto>> searchClients(@RequestParam String search) {
+    public ResponseEntity<List<com.company.attendance.crm.dto.ClientDto>> searchClients(@RequestParam String search) {
         log.info("GET /api/clients/search - Searching clients with term: {}", search);
         try {
-            List<ClientDto> clients = clientService.searchClients(search);
-            return ResponseEntity.ok(clients);
+            // Simple search implementation
+            List<Client> allClients = clientService.getAllClientEntities();
+            List<com.company.attendance.crm.dto.ClientDto> filtered = allClients.stream()
+                .filter(client -> client.getName().toLowerCase().contains(search.toLowerCase()) ||
+                               (client.getEmail() != null && client.getEmail().toLowerCase().contains(search.toLowerCase())))
+                .map(crmMapper::toClientDto)
+                .collect(Collectors.toList());
+            return ResponseEntity.ok(filtered);
         } catch (Exception e) {
             log.error("Error searching clients: {}", e.getMessage());
             return ResponseEntity.internalServerError().build();
@@ -76,14 +81,14 @@ public class ClientController {
     }
     
     @GetMapping("/{id}")
-    public ResponseEntity<CrmClientDto> getClient(@PathVariable UUID id) {
+    public ResponseEntity<com.company.attendance.crm.dto.ClientDto> getClient(@PathVariable UUID id) {
         log.info("GET /api/clients/{} - Fetching client", id);
         try {
             Client client = clientService.getClientEntityById(id);
             if (client == null) {
                 return ResponseEntity.notFound().build();
             }
-            CrmClientDto clientDto = crmMapper.toClientDto(client);
+            com.company.attendance.crm.dto.ClientDto clientDto = crmMapper.toClientDto(client);
             return ResponseEntity.ok(clientDto);
         } catch (Exception e) {
             log.error("Error fetching client: {}", e.getMessage());
@@ -108,12 +113,12 @@ public class ClientController {
     }
     
     @PostMapping
-    public ResponseEntity<CrmClientDto> createClient(@Valid @RequestBody CrmClientDto clientDto) {
+    public ResponseEntity<com.company.attendance.crm.dto.ClientDto> createClient(@Valid @RequestBody com.company.attendance.crm.dto.ClientDto clientDto) {
         log.info("POST /api/clients - Creating new client: {}", clientDto.getName());
         try {
             Client client = crmMapper.toClientEntity(clientDto);
             Client createdClient = clientService.createClientEntity(client);
-            CrmClientDto response = crmMapper.toClientDto(createdClient);
+            com.company.attendance.crm.dto.ClientDto response = crmMapper.toClientDto(createdClient);
             return ResponseEntity.status(201).body(response);
         } catch (Exception e) {
             log.error("Error creating client: {}", e.getMessage());
@@ -122,12 +127,12 @@ public class ClientController {
     }
     
     @PutMapping("/{id}")
-    public ResponseEntity<CrmClientDto> updateClient(@PathVariable UUID id, @Valid @RequestBody CrmClientDto clientDto) {
+    public ResponseEntity<com.company.attendance.crm.dto.ClientDto> updateClient(@PathVariable UUID id, @Valid @RequestBody com.company.attendance.crm.dto.ClientDto clientDto) {
         log.info("PUT /api/clients/{} - Updating client", id);
         try {
             Client client = crmMapper.toClientEntity(clientDto);
             Client updatedClient = clientService.updateClientEntity(id, client);
-            CrmClientDto response = crmMapper.toClientDto(updatedClient);
+            com.company.attendance.crm.dto.ClientDto response = crmMapper.toClientDto(updatedClient);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.error("Error updating client: {}", e.getMessage());
@@ -151,7 +156,7 @@ public class ClientController {
     public ResponseEntity<Long> getActiveClientsCount() {
         log.info("GET /api/clients/count - Getting active clients count");
         try {
-            long count = clientService.getActiveClientsCount();
+            long count = clientService.getActiveClientEntities().size();
             return ResponseEntity.ok(count);
         } catch (Exception e) {
             log.error("Error getting clients count: {}", e.getMessage());

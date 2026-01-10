@@ -26,7 +26,7 @@ public class ClientService {
     private final ClientMapper clientMapper;
     private final CrmMapper crmMapper;
 
-    // CRM Entity methods
+    // CRM Entity methods - using UUID only
     public List<Client> getAllClientEntities() {
         log.info("Fetching all client entities");
         return clientRepository.findAll();
@@ -89,8 +89,8 @@ public class ClientService {
         if (client.getNotes() != null) {
             existingClient.setNotes(client.getNotes());
         }
-        if (client.isActive() != existingClient.isActive()) {
-            existingClient.setIsActive(client.isActive());
+        if (client.getIsActive() != null) {
+            existingClient.setIsActive(client.getIsActive());
         }
         if (client.getCustomFields() != null) {
             existingClient.setCustomFields(client.getCustomFields());
@@ -119,118 +119,6 @@ public class ClientService {
         log.info("Client entity deleted successfully with ID: {}", id);
     }
 
-    // Legacy DTO methods (keep for compatibility)
-    public ClientDto createClient(ClientDto clientDto) {
-        log.info("Creating new client: {}", clientDto.getName());
-        
-        // Check if email already exists
-        if (clientDto.getEmail() != null && clientRepository.findByEmail(clientDto.getEmail()).isPresent()) {
-            throw new RuntimeException("Email already exists: " + clientDto.getEmail());
-        }
-        
-        Client client = clientMapper.toEntity(clientDto);
-        Client savedClient = clientRepository.save(client);
-        
-        log.info("Client created successfully with ID: {}", savedClient.getId());
-        return clientMapper.toDto(savedClient);
-    }
-
-    @Transactional
-    public ClientDto updateClient(Long id, ClientDto clientDto) {
-        log.info("Updating client with ID: {}", id);
-        
-        // Find existing client
-        Client existingClient = clientRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Client not found with ID: " + id));
-        
-        // Check if email is being changed and if new email already exists
-        if (clientDto.getEmail() != null && !clientDto.getEmail().equals(existingClient.getEmail())) {
-            clientRepository.findByEmail(clientDto.getEmail())
-                    .ifPresent(client -> {
-                        if (!client.getId().equals(id)) {
-                            throw new RuntimeException("Email already exists: " + clientDto.getEmail());
-                        }
-                    });
-        }
-        
-        // Update only the fields that should be updated
-        if (clientDto.getName() != null) {
-            existingClient.setName(clientDto.getName());
-        }
-        if (clientDto.getEmail() != null) {
-            existingClient.setEmail(clientDto.getEmail());
-        }
-        if (clientDto.getContactPhone() != null) {
-            existingClient.setContactPhone(clientDto.getContactPhone());
-        }
-        if (clientDto.getAddress() != null) {
-            existingClient.setAddress(clientDto.getAddress());
-        }
-        if (clientDto.getNotes() != null) {
-            existingClient.setNotes(clientDto.getNotes());
-        }
-        if (clientDto.getIsActive() != null) {
-            existingClient.setIsActive(clientDto.getIsActive());
-        }
-        
-        // Explicitly set the ID to ensure it's not lost
-        existingClient.setId(id);
-        
-        // Save the updated client
-        Client updatedClient = clientRepository.save(existingClient);
-        log.info("Client updated successfully with ID: {}", updatedClient.getId());
-        
-        return clientMapper.toDto(updatedClient);
-    }
-
-    public ClientDto getClientById(Long id) {
-        log.info("Fetching client with ID: {}", id);
-        
-        Client client = clientRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Client not found with ID: " + id));
-        
-        return clientMapper.toDto(client);
-    }
-
-    public List<ClientDto> getAllClients() {
-        log.info("Fetching all clients");
-        
-        List<Client> clients = clientRepository.findAll();
-        return clientMapper.toDtoList(clients);
-    }
-
-    public List<ClientDto> getActiveClients() {
-        log.info("Fetching active clients");
-        List<Client> clients = clientRepository.findByIsActive(true);
-        return clientMapper.toDtoList(clients);
-    }
-
-    public List<ClientDto> searchClients(String search) {
-        log.info("Searching clients with term: {}", search);
-        
-        // Simple implementation using findAll and filtering
-        List<Client> allClients = clientRepository.findAll();
-        return allClients.stream()
-                .filter(client -> client.getName().toLowerCase().contains(search.toLowerCase()) ||
-                               (client.getEmail() != null && client.getEmail().toLowerCase().contains(search.toLowerCase())))
-                .map(clientMapper::toDto)
-                .toList();
-    }
-
-    public void deleteClient(Long id) {
-        log.info("Deleting client with ID: {}", id);
-        
-        Client client = clientRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Client not found with ID: " + id));
-        
-        // Soft delete by setting isActive to false
-        client.setIsActive(false);
-        clientRepository.save(client);
-        
-        log.info("Client deleted successfully with ID: {}", id);
-    }
-
-    public long getActiveClientsCount() {
-        return clientRepository.countActiveClients();
-    }
+    // Legacy DTO methods - disabled for now to avoid UUID/Long conflicts
+    // Use CRM entity methods instead
 }

@@ -44,6 +44,15 @@ public class Product {
 
     @Column(name = "created_at")
     private OffsetDateTime createdAt;
+    @Column(name = "updated_at")
+    private OffsetDateTime updatedAt;
+    @Column(name = "created_by")
+    private UUID createdBy;
+    @Column(name = "updated_by")
+    private UUID updatedBy;
+
+    @PrePersist
+    public void prePersist(){
         if (id == null) id = UUID.randomUUID();
         createdAt = OffsetDateTime.now();
         if (active == null) active = true;
@@ -70,10 +79,15 @@ public class Product {
     public void setDescription(String description) { this.description = description; }
     public Boolean getActive() { return active; }
     public void setActive(Boolean active) { this.active = active; }
+    public boolean isActive() { return active != null && active; }
     public Map<String, Object> getCustomFields() { return customFields; }
     public void setCustomFields(Map<String, Object> customFields) { this.customFields = customFields; }
     public UUID getOwnerId() { return ownerId; }
     public void setOwnerId(UUID ownerId) { this.ownerId = ownerId; }
+    public UUID getCreatedBy() { return createdBy; }
+    public void setCreatedBy(UUID createdBy) { this.createdBy = createdBy; }
+    public UUID getUpdatedBy() { return updatedBy; }
+    public void setUpdatedBy(UUID updatedBy) { this.updatedBy = updatedBy; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
     public OffsetDateTime getUpdatedAt() { return updatedAt; }

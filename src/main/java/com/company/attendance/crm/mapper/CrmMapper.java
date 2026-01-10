@@ -4,10 +4,12 @@ import com.company.attendance.crm.dto.BankDto;
 import com.company.attendance.crm.dto.ClientDto;
 import com.company.attendance.crm.dto.ProductDto;
 import com.company.attendance.crm.entity.Bank;
-import com.company.attendance.crm.entity.Client;
 import com.company.attendance.crm.entity.Product;
+import com.company.attendance.entity.Client;
+import com.company.attendance.crm.service.BankService;
 import org.springframework.stereotype.Component;
 
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -31,28 +33,14 @@ public class CrmMapper {
         dto.setActive(bank.isActive());
         
         // Audit fields
-        dto.setCreatedAt(bank.getCreatedAt());
-        dto.setUpdatedAt(bank.getUpdatedAt());
+        dto.setCreatedAt(bank.getCreatedAt() != null ? bank.getCreatedAt().toInstant() : null);
+        dto.setUpdatedAt(bank.getUpdatedAt() != null ? bank.getUpdatedAt().toInstant() : null);
         dto.setCreatedBy(bank.getCreatedBy());
         dto.setUpdatedBy(bank.getUpdatedBy());
         dto.setOwnerId(bank.getOwnerId());
         
-        // Custom fields - convert from JSON string if needed
-        if (bank.getCustomFields() != null) {
-            if (bank.getCustomFields() instanceof String) {
-                // If stored as JSON string, parse it
-                try {
-                    // For now, return empty map - you can implement JSON parsing if needed
-                    dto.setCustomFields(new HashMap<>());
-                } catch (Exception e) {
-                    dto.setCustomFields(new HashMap<>());
-                }
-            } else {
-                dto.setCustomFields((Map<String, Object>) bank.getCustomFields());
-            }
-        } else {
-            dto.setCustomFields(new HashMap<>());
-        }
+        // Custom fields - temporarily disabled
+        dto.setCustomFields(new HashMap<>());
         
         return dto;
     }
@@ -66,31 +54,19 @@ public class CrmMapper {
         dto.setProductCode(product.getProductCode());
         dto.setDescription(product.getDescription());
         dto.setProductCategory(product.getProductCategory());
-        dto.setUnitPrice(product.getUnitPrice());
+        dto.setUnitPrice(product.getUnitPrice() != null ? product.getUnitPrice().doubleValue() : null);
         dto.setCategoryId(product.getCategoryId());
         dto.setActive(product.isActive());
         
         // Audit fields
-        dto.setCreatedAt(product.getCreatedAt());
-        dto.setUpdatedAt(product.getUpdatedAt());
+        dto.setCreatedAt(product.getCreatedAt() != null ? product.getCreatedAt().toInstant() : null);
+        dto.setUpdatedAt(product.getUpdatedAt() != null ? product.getUpdatedAt().toInstant() : null);
         dto.setCreatedBy(product.getCreatedBy());
         dto.setUpdatedBy(product.getUpdatedBy());
         dto.setOwnerId(product.getOwnerId());
         
-        // Custom fields
-        if (product.getCustomFields() != null) {
-            if (product.getCustomFields() instanceof String) {
-                try {
-                    dto.setCustomFields(new HashMap<>());
-                } catch (Exception e) {
-                    dto.setCustomFields(new HashMap<>());
-                }
-            } else {
-                dto.setCustomFields((Map<String, Object>) product.getCustomFields());
-            }
-        } else {
-            dto.setCustomFields(new HashMap<>());
-        }
+        // Custom fields - temporarily disabled
+        dto.setCustomFields(new HashMap<>());
         
         return dto;
     }
@@ -105,29 +81,17 @@ public class CrmMapper {
         dto.setContactPhone(client.getContactPhone());
         dto.setAddress(client.getAddress());
         dto.setNotes(client.getNotes());
-        dto.setActive(client.isActive());
+        dto.setActive(client.getIsActive());
         
         // Audit fields
-        dto.setCreatedAt(client.getCreatedAt());
-        dto.setUpdatedAt(client.getUpdatedAt());
+        dto.setCreatedAt(client.getCreatedAt() != null ? client.getCreatedAt().toInstant(ZoneOffset.UTC) : null);
+        dto.setUpdatedAt(client.getUpdatedAt() != null ? client.getUpdatedAt().toInstant(ZoneOffset.UTC) : null);
         dto.setCreatedBy(client.getCreatedBy());
         dto.setUpdatedBy(client.getUpdatedBy());
         dto.setOwnerId(client.getOwnerId());
         
-        // Custom fields
-        if (client.getCustomFields() != null) {
-            if (client.getCustomFields() instanceof String) {
-                try {
-                    dto.setCustomFields(new HashMap<>());
-                } catch (Exception e) {
-                    dto.setCustomFields(new HashMap<>());
-                }
-            } else {
-                dto.setCustomFields((Map<String, Object>) client.getCustomFields());
-            }
-        } else {
-            dto.setCustomFields(new HashMap<>());
-        }
+        // Custom fields - temporarily disabled
+        dto.setCustomFields(new HashMap<>());
         
         return dto;
     }
@@ -166,7 +130,7 @@ public class CrmMapper {
         product.setProductCode(dto.getProductCode());
         product.setDescription(dto.getDescription());
         product.setProductCategory(dto.getProductCategory());
-        product.setUnitPrice(dto.getUnitPrice());
+        product.setUnitPrice(dto.getUnitPrice() != null ? java.math.BigDecimal.valueOf(dto.getUnitPrice()) : null);
         product.setCategoryId(dto.getCategoryId());
         product.setActive(dto.isActive());
         product.setOwnerId(dto.getOwnerId());
@@ -189,7 +153,7 @@ public class CrmMapper {
         client.setContactPhone(dto.getContactPhone());
         client.setAddress(dto.getAddress());
         client.setNotes(dto.getNotes());
-        client.setActive(dto.isActive());
+        client.setIsActive(dto.isActive());
         client.setOwnerId(dto.getOwnerId());
         
         // Custom fields

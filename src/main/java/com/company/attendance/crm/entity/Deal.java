@@ -62,11 +62,15 @@ public class Deal {
     @Column(name = "modified_at")
     private OffsetDateTime modifiedAt;
 
+    @Column(name = "active")
+    private Boolean active = true;
+
     @PrePersist
     public void prePersist() {
         if (id == null) id = UUID.randomUUID();
         if (createdAt == null) createdAt = OffsetDateTime.now();
         if (stage == null) stage = DealStage.LEAD;
+        if (active == null) active = true;
     }
 
     @PreUpdate
@@ -77,6 +81,9 @@ public class Deal {
     // getters and setters
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
+    public Boolean getActive() { return active; }
+    public void setActive(Boolean active) { this.active = active; }
+    public boolean isActive() { return active != null && active; }
 
     public Long getClientId() { return clientId; }
     public void setClientId(Long clientId) { this.clientId = clientId; }

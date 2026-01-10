@@ -4,6 +4,7 @@ import com.company.attendance.dto.CaseDto;
 import com.company.attendance.entity.Case;
 import com.company.attendance.entity.Client;
 import com.company.attendance.mapper.CaseMapper;
+import com.company.attendance.mapper.ClientMapper;
 import com.company.attendance.repository.CaseRepository;
 import com.company.attendance.repository.ClientRepository;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -20,13 +22,15 @@ public class CaseService {
     private final CaseRepository caseRepository;
     private final ClientRepository clientRepository;
     private final CaseMapper caseMapper;
+    private final ClientMapper clientMapper;
 
     public CaseDto createCase(CaseDto caseDto) {
         Case entity = caseMapper.toEntity(caseDto);
 
-        // Set client relation from clientId
+        // Set client relation from clientId - convert Long to UUID
         if (caseDto.getClientId() != null) {
-            Client client = clientRepository.findById(caseDto.getClientId())
+            UUID clientId = clientMapper.longToUuid(caseDto.getClientId());
+            Client client = clientRepository.findById(clientId)
                     .orElseThrow(() -> new RuntimeException("Client not found with ID: " + caseDto.getClientId()));
             entity.setClient(client);
         }
@@ -41,7 +45,8 @@ public class CaseService {
 
         // Update client relation if a clientId is provided
         if (caseDto.getClientId() != null) {
-            Client client = clientRepository.findById(caseDto.getClientId())
+            UUID clientId = clientMapper.longToUuid(caseDto.getClientId());
+            Client client = clientRepository.findById(clientId)
                     .orElseThrow(() -> new RuntimeException("Client not found with ID: " + caseDto.getClientId()));
             existing.setClient(client);
         }

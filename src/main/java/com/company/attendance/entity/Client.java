@@ -37,6 +37,10 @@ public class Client {
     @Column(name = "is_active")
     private Boolean isActive = true;
     
+    public boolean isActive() {
+        return isActive != null && isActive;
+    }
+    
     @Column(columnDefinition = "json")
     private Map<String, Object> customFields;
     
