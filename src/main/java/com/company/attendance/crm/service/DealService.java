@@ -4,10 +4,12 @@ import com.company.attendance.crm.entity.Deal;
 import com.company.attendance.crm.entity.DealStageHistory;
 import com.company.attendance.crm.enums.DealStage;
 import com.company.attendance.crm.repository.DealRepository;
+import com.company.attendance.crm.repository.DealSpecifications;
 import com.company.attendance.crm.repository.DealStageHistoryRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +29,17 @@ public class DealService {
 
     public Optional<Deal> findById(UUID id) {
         return dealRepository.findByIdSafe(id);
+    }
+
+    public Page<Deal> list(Pageable pageable) {
+        return dealRepository.findByActiveTrue(pageable);
+    }
+
+    public Page<Deal> search(Boolean active, UUID ownerId, String q, Pageable pageable) {
+        Specification<Deal> spec = Specification.where(DealSpecifications.active(active))
+                .and(DealSpecifications.owner(ownerId))
+                .and(DealSpecifications.q(q));
+        return dealRepository.findAll(spec, pageable);
     }
 
     public Deal create(Deal deal, UUID userId) {
@@ -55,7 +68,10 @@ public class DealService {
     }
 
     public void delete(UUID id) {
-        dealRepository.deleteById(id);
+        Deal deal = dealRepository.findByIdSafe(id)
+                .orElseThrow(() -> new IllegalArgumentException("Deal not found"));
+        deal.setActive(false);
+        dealRepository.save(deal);
     }
 
     @Transactional

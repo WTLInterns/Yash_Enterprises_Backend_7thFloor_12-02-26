@@ -46,6 +46,19 @@ public class DealController {
         this.emailRecordRepository = emailRecordRepository;
     }
 
+    @GetMapping
+    public Page<Deal> list(@RequestParam(value = "active", required = false) Boolean active,
+                           @RequestParam(value = "ownerId", required = false) UUID ownerId,
+                           @RequestParam(value = "q", required = false) String q,
+                           Pageable pageable) {
+        // Default to active=true unless explicitly requested otherwise
+        if (active == null && ownerId == null && (q == null || q.isBlank())) {
+            return dealService.list(pageable); // This returns only active=true
+        }
+        Boolean effectiveActive = (active == null ? Boolean.TRUE : active);
+        return dealService.search(effectiveActive, ownerId, q, pageable);
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<DealDetailDTO> get(@PathVariable UUID id) {
         Deal deal = dealRepository.findByIdSafe(id).orElse(null);

@@ -1,22 +1,25 @@
 package com.company.attendance.crm.controller;
 
+import com.company.attendance.crm.dto.ProductDto;
 import com.company.attendance.crm.entity.Product;
 import com.company.attendance.crm.service.ProductService;
 import com.company.attendance.exception.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.company.attendance.crm.entity.DealProduct;
-import com.company.attendance.crm.entity.Product;
+import com.company.attendance.crm.mapper.CrmMapper;
 import com.company.attendance.crm.repository.DealProductRepository;
 import com.company.attendance.crm.repository.ProductPriceHistoryRepository;
 import com.company.attendance.crm.repository.ProductRepository;
 import com.company.attendance.crm.entity.ProductPriceHistory;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Tag(name = "Products")
 @RestController
@@ -26,25 +29,30 @@ public class ProductController {
     private final DealProductRepository dealProductRepository;
     private final ProductRepository productRepository;
     private final ProductPriceHistoryRepository priceHistoryRepository;
+    private final CrmMapper crmMapper;
 
     public ProductController(ProductService productService,
                              DealProductRepository dealProductRepository,
                              ProductRepository productRepository,
-                             ProductPriceHistoryRepository priceHistoryRepository) {
+                             ProductPriceHistoryRepository priceHistoryRepository,
+                             CrmMapper crmMapper) {
         this.productService = productService;
         this.dealProductRepository = dealProductRepository;
         this.productRepository = productRepository;
         this.priceHistoryRepository = priceHistoryRepository;
+        this.crmMapper = crmMapper;
     }
 
     @PostMapping
-    public ResponseEntity<Product> create(@RequestBody Product product){
+    public ResponseEntity<ProductDto> create(@RequestBody ProductDto productDto){
+        Product product = crmMapper.toProductEntity(productDto);
         Product created = productService.create(product);
-        return ResponseEntity.created(URI.create("/api/products/"+created.getId())).body(created);
+        ProductDto response = crmMapper.toProductDto(created);
+        return ResponseEntity.created(URI.create("/api/products/"+created.getId())).body(response);
     }
 
     @GetMapping
-    public Page<Product> list(@RequestParam(value = "active", required = false) Boolean active,
+    public Page<ProductDto> list(@RequestParam(value = "active", required = false) Boolean active,
                               @RequestParam(value = "category", required = false) String category,
                               @RequestParam(value = "ownerId", required = false) java.util.UUID ownerId,
                               @RequestParam(value = "q", required = false) String q,
@@ -53,9 +61,17 @@ public class ProductController {
         // Default to active=true unless explicitly requested otherwise
         Boolean effectiveActive = (active == null ? Boolean.TRUE : active);
         if (active == null && category == null && ownerId == null && q == null && categoryId == null) {
-            return productService.list(pageable);
+            Page<Product> products = productService.list(pageable);
+            List<ProductDto> dtos = products.getContent().stream()
+                .map(crmMapper::toProductDto)
+                .collect(Collectors.toList());
+            return new PageImpl<>(dtos, pageable, products.getTotalElements());
         }
-        return productService.search(effectiveActive, category, ownerId, q, categoryId, pageable);
+        Page<Product> products = productService.search(effectiveActive, category, ownerId, q, categoryId, pageable);
+        List<ProductDto> dtos = products.getContent().stream()
+            .map(crmMapper::toProductDto)
+            .collect(Collectors.toList());
+        return new PageImpl<>(dtos, pageable, products.getTotalElements());
     }
 
     @GetMapping("/search")
@@ -71,15 +87,18 @@ public class ProductController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Product> get(@PathVariable UUID id){
+    public ResponseEntity<ProductDto> get(@PathVariable UUID id){
         Product product = productService.get(id)
             .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
-        return ResponseEntity.ok(product);
+        ProductDto productDto = crmMapper.toProductDto(product);
+        return ResponseEntity.ok(productDto);
     }
 
     @PutMapping("/{id}")
-    public Product update(@PathVariable UUID id, @RequestBody Product incoming){
-        return productService.update(id, incoming);
+    public ProductDto update(@PathVariable UUID id, @RequestBody ProductDto productDto){
+        Product product = crmMapper.toProductEntity(productDto);
+        Product updated = productService.update(id, product);
+        return crmMapper.toProductDto(updated);
     }
 
     @PatchMapping("/{id}/status")
