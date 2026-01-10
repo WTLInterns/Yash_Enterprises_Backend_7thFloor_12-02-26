@@ -41,7 +41,7 @@ public class ProductService {
     }
 
     public Page<Product> list(Pageable pageable){
-        return productRepository.findAll(pageable);
+        return productRepository.findByActiveTrue(pageable);
     }
 
     public Page<Product> search(Boolean active, String category, UUID ownerId, String q, UUID categoryId, Pageable pageable){
@@ -113,7 +113,10 @@ public class ProductService {
     }
 
     public void delete(UUID id){
-        productRepository.deleteById(id);
+        Product p = productRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
+        p.setActive(false);
+        productRepository.save(p);
     }
 
     public void bulkPatchStatus(Iterable<UUID> ids, boolean active){

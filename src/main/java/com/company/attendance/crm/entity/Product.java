@@ -12,7 +12,6 @@ import java.util.UUID;
 })
 public class Product {
     @Id
-    @Column(length = 36)
     private UUID id;
 
     @Column(name = "product_name", nullable = false, unique = true)

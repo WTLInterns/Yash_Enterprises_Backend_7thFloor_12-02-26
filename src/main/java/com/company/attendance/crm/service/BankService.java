@@ -33,7 +33,7 @@ public class BankService {
 
     public Optional<Bank> get(UUID id){ return bankRepository.findById(id); }
 
-    public Page<Bank> list(Pageable pageable){ return bankRepository.findAll(pageable); }
+    public Page<Bank> list(Pageable pageable){ return bankRepository.findByActiveTrue(pageable); }
 
     public Page<Bank> search(Boolean active, UUID ownerId, String q, Pageable pageable){
         Specification<Bank> spec = Specification.where(BankSpecifications.active(active))
@@ -85,5 +85,10 @@ public class BankService {
         return bankRepository.save(db);
     }
 
-    public void delete(UUID id){ bankRepository.deleteById(id); }
+    public void delete(UUID id){
+        Bank b = bankRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Bank not found"));
+        b.setActive(false);
+        bankRepository.save(b);
+    }
 }

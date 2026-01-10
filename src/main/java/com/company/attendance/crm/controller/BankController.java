@@ -4,6 +4,7 @@ import com.company.attendance.crm.entity.Bank;
 import com.company.attendance.crm.entity.Deal;
 import com.company.attendance.crm.repository.DealRepository;
 import com.company.attendance.crm.service.BankService;
+import com.company.attendance.exception.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -36,13 +37,17 @@ public class BankController {
                            @RequestParam(value = "ownerId", required = false) UUID ownerId,
                            @RequestParam(value = "q", required = false) String q,
                            Pageable pageable){
+        // Default to active=true unless explicitly requested otherwise
+        Boolean effectiveActive = (active == null ? Boolean.TRUE : active);
         if (active == null && ownerId == null && (q == null || q.isBlank())) return bankService.list(pageable);
-        return bankService.search(active, ownerId, q, pageable);
+        return bankService.search(effectiveActive, ownerId, q, pageable);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<Bank> get(@PathVariable UUID id){
-        return bankService.get(id).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+        Bank bank = bankService.get(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Bank not found"));
+        return ResponseEntity.ok(bank);
     }
 
     @PutMapping("/{id}")

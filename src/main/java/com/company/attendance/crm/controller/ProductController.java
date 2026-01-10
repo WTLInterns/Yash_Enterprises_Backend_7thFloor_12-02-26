@@ -2,6 +2,7 @@ package com.company.attendance.crm.controller;
 
 import com.company.attendance.crm.entity.Product;
 import com.company.attendance.crm.service.ProductService;
+import com.company.attendance.exception.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.company.attendance.crm.entity.DealProduct;
 import com.company.attendance.crm.entity.Product;
@@ -49,10 +50,12 @@ public class ProductController {
                               @RequestParam(value = "q", required = false) String q,
                               @RequestParam(value = "categoryId", required = false) java.util.UUID categoryId,
                               Pageable pageable){
+        // Default to active=true unless explicitly requested otherwise
+        Boolean effectiveActive = (active == null ? Boolean.TRUE : active);
         if (active == null && category == null && ownerId == null && q == null && categoryId == null) {
             return productService.list(pageable);
         }
-        return productService.search(active, category, ownerId, q, categoryId, pageable);
+        return productService.search(effectiveActive, category, ownerId, q, categoryId, pageable);
     }
 
     @GetMapping("/search")
@@ -62,12 +65,16 @@ public class ProductController {
                                 @RequestParam(value = "q", required = false) String q,
                                 @RequestParam(value = "categoryId", required = false) java.util.UUID categoryId,
                                 Pageable pageable){
-        return productService.search(active, category, ownerId, q, categoryId, pageable);
+        // Default to active=true unless explicitly requested otherwise
+        Boolean effectiveActive = (active == null ? Boolean.TRUE : active);
+        return productService.search(effectiveActive, category, ownerId, q, categoryId, pageable);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<Product> get(@PathVariable UUID id){
-        return productService.get(id).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+        Product product = productService.get(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
+        return ResponseEntity.ok(product);
     }
 
     @PutMapping("/{id}")

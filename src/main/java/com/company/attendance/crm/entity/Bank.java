@@ -8,7 +8,6 @@ import java.util.UUID;
 @Table(name = "banks", uniqueConstraints = @UniqueConstraint(name = "uk_bank_name", columnNames = {"bank_name"}))
 public class Bank {
     @Id
-    @Column(length = 36)
     private UUID id;
 
     @Column(name = "bank_name", nullable = false)
