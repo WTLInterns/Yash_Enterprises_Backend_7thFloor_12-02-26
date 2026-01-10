@@ -18,6 +18,8 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     List<Employee> findByStatus(Employee.Status status);
     boolean existsByUserId(String userId);
     boolean existsByEmployeeId(String employeeId);
+    boolean existsById(Long id);
+    List<Employee> findByTeamId(Long teamId);
     
     // Add JOIN FETCH queries to load all relationships
     @Query("SELECT e FROM Employee e " +

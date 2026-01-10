@@ -135,10 +135,27 @@ public class TeamService {
         teamRepository.save(team);
     }
 
+    @Transactional
     public void delete(Long id) {
-        if (!teamRepository.existsById(id)) {
-            throw new RuntimeException("Team not found with id: " + id);
+        Team team = teamRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Team not found with id: " + id));
+        
+        // Check if team has members
+        if (team.getMembers() != null && !team.getMembers().isEmpty()) {
+            throw new RuntimeException("Cannot delete team with assigned members. Please reassign or remove members first.");
         }
+        
+        // Check if team has sub-teams
+        if (team.getSubTeams() != null && !team.getSubTeams().isEmpty()) {
+            throw new RuntimeException("Cannot delete team with sub-teams. Please delete or reassign sub-teams first.");
+        }
+        
+        // Check if any employee has this as their team
+        List<Employee> employeesWithTeam = employeeRepository.findByTeamId(id);
+        if (employeesWithTeam != null && !employeesWithTeam.isEmpty()) {
+            throw new RuntimeException("Cannot delete team. Employees are still assigned to this team. Please reassign employees first.");
+        }
+        
         teamRepository.deleteById(id);
     }
 

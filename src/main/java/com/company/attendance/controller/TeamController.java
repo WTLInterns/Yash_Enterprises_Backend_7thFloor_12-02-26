@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/teams")
@@ -43,9 +44,25 @@ public class TeamController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteTeam(@PathVariable Long id) {
-        teamService.delete(id);
-        return ResponseEntity.ok().build();
+    public ResponseEntity<Map<String, Object>> deleteTeam(@PathVariable Long id) {
+        try {
+            teamService.delete(id);
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Team deleted successfully"
+            ));
+        } catch (RuntimeException e) {
+            // Return 400 for validation/business logic errors instead of 500
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "message", e.getMessage()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                "success", false,
+                "message", "Failed to delete team: " + e.getMessage()
+            ));
+        }
     }
 
     @PostMapping("/{id}/assign-lead")

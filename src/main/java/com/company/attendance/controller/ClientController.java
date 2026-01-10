@@ -1,5 +1,8 @@
 package com.company.attendance.controller;
 
+import com.company.attendance.crm.dto.DealDetailDTO;
+import com.company.attendance.crm.entity.Deal;
+import com.company.attendance.crm.repository.DealRepository;
 import com.company.attendance.dto.ClientDto;
 import com.company.attendance.service.ClientService;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +22,7 @@ public class ClientController {
     private static final Logger log = LoggerFactory.getLogger(ClientController.class);
 
     private final ClientService clientService;
+    private final DealRepository dealRepository;
 
     @GetMapping
     public ResponseEntity<List<ClientDto>> listClients() {
@@ -66,6 +70,22 @@ public class ClientController {
             log.error("Error fetching client: {}", e.getMessage());
             return ResponseEntity.notFound().build();
         }
+    }
+
+    @GetMapping("/{id}/deal")
+    public ResponseEntity<DealDetailDTO> getClientDeal(@PathVariable Long id) {
+        log.info("GET /api/clients/{}/deal - Fetching latest deal for client", id);
+        Deal deal = dealRepository.findFirstByClientIdOrderByCreatedAtDesc(id).orElse(null);
+        if (deal == null) return ResponseEntity.notFound().build();
+        DealDetailDTO dto = new DealDetailDTO();
+        dto.id = deal.getId();
+        dto.name = deal.getName();
+        dto.valueAmount = deal.getValueAmount();
+        dto.closingDate = deal.getClosingDate();
+        dto.stage = deal.getStage() != null ? deal.getStage().name() : null;
+        dto.notesCount = 0;
+        dto.activitiesCount = 0;
+        return ResponseEntity.ok(dto);
     }
     
     @PostMapping

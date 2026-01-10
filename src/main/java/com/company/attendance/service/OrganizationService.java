@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -132,5 +134,38 @@ public class OrganizationService {
         return organizationRepository.searchOrganizations(
                 name, code, industry, isActive, pageable)
                 .map(organizationMapper::toDto);
+    }
+
+    @Transactional(readOnly = true)
+    public Organization findByName(String name) {
+        log.debug("Finding organization by name: {}", name);
+        return organizationRepository.findByName(name).orElse(null);
+    }
+
+    @Transactional
+    public Organization findByNameOrCreate(String name) {
+        log.debug("Finding or creating organization: {}", name);
+        Optional<Organization> existingOrgOpt = organizationRepository.findByName(name);
+        if (existingOrgOpt.isPresent()) {
+            return existingOrgOpt.get();
+        }
+        
+        // Create new organization if not found
+        Organization newOrg = Organization.builder()
+                .name(name)
+                .code("ORG_" + System.currentTimeMillis())
+                .isActive(true)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .createdBy(0L) // Use Long instead of String
+                .build();
+        
+        return organizationRepository.save(newOrg);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Organization> findAll() {
+        log.debug("Finding all organizations");
+        return organizationRepository.findAll();
     }
 }

@@ -1,0 +1,2 @@
+﻿First Name,Last Name,Email,Phone,Employee ID,User ID,Role,Team,Designation,Custom Designation,Status,Date of Birth,Gender,Hire Date,Attendance Allowed
+Test,User,test.user@example.com,1234567890,,test.user,Employee,Engineering,Software Engineer,Software Engineer,ACTIVE,1990-01-01,Male,2023-01-01,true

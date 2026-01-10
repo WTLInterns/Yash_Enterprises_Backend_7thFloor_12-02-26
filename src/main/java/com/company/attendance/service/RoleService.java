@@ -55,6 +55,10 @@ public class RoleService {
         return roleRepository.findByIsActive(isActive);
     }
 
+    public List<Role> findAllActiveRoles() {
+        return roleRepository.findByIsActive(true);
+    }
+
     public boolean existsByName(String name) {
         return roleRepository.existsByName(name);
     }

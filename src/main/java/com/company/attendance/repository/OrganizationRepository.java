@@ -28,6 +28,9 @@ public interface OrganizationRepository extends JpaRepository<Organization, Long
     // Find organizations by name (case-insensitive)
     List<Organization> findByNameContainingIgnoreCase(String name);
     
+    // Find organization by exact name
+    Optional<Organization> findByName(String name);
+    
     // Find organizations by industry
     List<Organization> findByIndustry(String industry);
     
