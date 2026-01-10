@@ -27,11 +27,11 @@ public class CaseService {
     public CaseDto createCase(CaseDto caseDto) {
         Case entity = caseMapper.toEntity(caseDto);
 
-        // Set client relation from clientId - convert Long to UUID
+        // Set client relation from clientId (UUID)
         if (caseDto.getClientId() != null) {
-            UUID clientId = clientMapper.longToUuid(caseDto.getClientId());
+            UUID clientId = caseDto.getClientId();
             Client client = clientRepository.findById(clientId)
-                    .orElseThrow(() -> new RuntimeException("Client not found with ID: " + caseDto.getClientId()));
+                    .orElseThrow(() -> new RuntimeException("Client not found with ID: " + clientId));
             entity.setClient(client);
         }
         Case saved = caseRepository.save(entity);
@@ -43,11 +43,11 @@ public class CaseService {
                 .orElseThrow(() -> new RuntimeException("Case not found with ID: " + id));
         caseMapper.updateEntityFromDto(caseDto, existing);
 
-        // Update client relation if a clientId is provided
+        // Update client relation if a clientId is provided (UUID)
         if (caseDto.getClientId() != null) {
-            UUID clientId = clientMapper.longToUuid(caseDto.getClientId());
+            UUID clientId = caseDto.getClientId();
             Client client = clientRepository.findById(clientId)
-                    .orElseThrow(() -> new RuntimeException("Client not found with ID: " + caseDto.getClientId()));
+                    .orElseThrow(() -> new RuntimeException("Client not found with ID: " + clientId));
             existing.setClient(client);
         }
         Case updated = caseRepository.save(existing);
@@ -65,7 +65,7 @@ public class CaseService {
         return caseMapper.toDtoList(cases);
     }
 
-    public List<CaseDto> getCasesByClientId(Long clientId) {
+    public List<CaseDto> getCasesByClientId(UUID clientId) {
         List<Case> cases = caseRepository.findByClientId(clientId);
         return caseMapper.toDtoList(cases);
     }

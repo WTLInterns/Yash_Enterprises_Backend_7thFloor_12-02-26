@@ -3,6 +3,7 @@ package com.company.attendance.crm.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.UuidGenerator;
 import org.hibernate.type.SqlTypes;
 
 import java.time.OffsetDateTime;
@@ -15,6 +16,8 @@ import java.util.UUID;
 @Data
 public class Bank {
     @Id
+    @GeneratedValue
+    @UuidGenerator
     private UUID id;
 
     @Column(name = "bank_name", nullable = false)

@@ -10,6 +10,7 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.UuidGenerator;
 import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
@@ -28,6 +29,8 @@ import java.util.UUID;
 @Builder
 public class Client {
     @Id
+    @GeneratedValue
+    @UuidGenerator
     private UUID id;
     
     @Column(nullable = false)

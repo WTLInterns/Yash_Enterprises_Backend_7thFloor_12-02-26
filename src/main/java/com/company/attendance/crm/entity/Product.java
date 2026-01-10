@@ -3,6 +3,7 @@ package com.company.attendance.crm.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.UuidGenerator;
 import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
@@ -19,6 +20,8 @@ import java.util.UUID;
 @Data
 public class Product {
     @Id
+    @GeneratedValue
+    @UuidGenerator
     private UUID id;
 
     @Column(name = "product_name", nullable = false, unique = true)

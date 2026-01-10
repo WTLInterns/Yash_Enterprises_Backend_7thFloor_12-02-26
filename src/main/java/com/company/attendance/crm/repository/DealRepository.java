@@ -15,9 +15,9 @@ import java.util.UUID;
 public interface DealRepository extends JpaRepository<Deal, UUID> {
     List<Deal> findByBankId(UUID bankId);
 
-    List<Deal> findByClientId(Long clientId);
+    List<Deal> findByClientId(UUID clientId);
 
-    Optional<Deal> findFirstByClientIdOrderByCreatedAtDesc(Long clientId);
+    Optional<Deal> findFirstByClientIdOrderByCreatedAtDesc(UUID clientId);
 
     // Compatibility lookup for legacy schemas storing UUID in BINARY(36) (first 16 bytes UUID + zero padding)
     @Query(value = "select * from deals where substring(id,1,16) = uuid_to_bin(:uuid)", nativeQuery = true)

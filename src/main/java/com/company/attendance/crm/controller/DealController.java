@@ -59,6 +59,11 @@ public class DealController {
         return dealService.search(effectiveActive, ownerId, q, pageable);
     }
 
+    @GetMapping("/all")
+    public ResponseEntity<java.util.List<Deal>> getAllDeals() {
+        return ResponseEntity.ok(dealService.getAllDeals());
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<DealDetailDTO> get(@PathVariable UUID id) {
         Deal deal = dealRepository.findByIdSafe(id).orElse(null);
@@ -76,7 +81,7 @@ public class DealController {
     }
 
     @GetMapping("/client/{clientId}")
-    public ResponseEntity<DealDetailDTO> getByClientId(@PathVariable Long clientId) {
+    public ResponseEntity<DealDetailDTO> getByClientId(@PathVariable UUID clientId) {
         Deal deal = dealRepository.findFirstByClientIdOrderByCreatedAtDesc(clientId).orElse(null);
         if (deal == null) return ResponseEntity.notFound().build();
         DealDetailDTO dto = new DealDetailDTO();

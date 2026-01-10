@@ -14,8 +14,8 @@ public class Deal {
     @Column(length = 36)
     private UUID id;
 
-    @Column(name = "client_id")
-    private Long clientId;
+    @Column(name = "client_id", columnDefinition = "BINARY(16)")
+    private UUID clientId;
 
     @Column(nullable = false)
     private String name;
@@ -85,8 +85,8 @@ public class Deal {
     public void setActive(Boolean active) { this.active = active; }
     public boolean isActive() { return active != null && active; }
 
-    public Long getClientId() { return clientId; }
-    public void setClientId(Long clientId) { this.clientId = clientId; }
+    public UUID getClientId() { return clientId; }
+    public void setClientId(UUID clientId) { this.clientId = clientId; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
     public BigDecimal getValueAmount() { return valueAmount; }

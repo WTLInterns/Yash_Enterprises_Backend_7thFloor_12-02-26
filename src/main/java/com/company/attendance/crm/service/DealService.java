@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -32,6 +33,10 @@ public class DealService {
 
     public Page<Deal> list(Pageable pageable) {
         return dealRepository.findAll(pageable);
+    }
+
+    public List<Deal> getAllDeals() {
+        return dealRepository.findAll();
     }
 
     public Page<Deal> search(Boolean active, UUID ownerId, String q, Pageable pageable) {

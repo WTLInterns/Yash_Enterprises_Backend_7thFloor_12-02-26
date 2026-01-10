@@ -8,21 +8,11 @@ import org.mapstruct.MappingTarget;
 import org.mapstruct.factory.Mappers;
 
 import java.util.List;
-import java.util.UUID;
 
 @Mapper(componentModel = "spring")
 public interface ClientMapper {
     
     ClientMapper INSTANCE = Mappers.getMapper(ClientMapper.class);
-    
-    default Long uuidToLong(UUID uuid) {
-        return uuid != null ? uuid.getMostSignificantBits() : null;
-    }
-    
-    default UUID longToUuid(Long value) {
-        if (value == null) return null;
-        return new UUID(value, 0L);
-    }
     
     @Mapping(target = "createdBy", ignore = true)
     @Mapping(target = "updatedBy", ignore = true)

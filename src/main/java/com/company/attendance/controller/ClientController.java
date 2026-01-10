@@ -97,7 +97,7 @@ public class ClientController {
     }
 
     @GetMapping("/{id}/deal")
-    public ResponseEntity<DealDetailDTO> getClientDeal(@PathVariable Long id) {
+    public ResponseEntity<DealDetailDTO> getClientDeal(@PathVariable UUID id) {
         log.info("GET /api/clients/{}/deal - Fetching latest deal for client", id);
         Deal deal = dealRepository.findFirstByClientIdOrderByCreatedAtDesc(id).orElse(null);
         if (deal == null) return ResponseEntity.notFound().build();
