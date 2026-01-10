@@ -3,6 +3,7 @@ package com.company.attendance.crm.entity;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import java.util.Map;
 
 @Entity
 @Table(name = "banks", uniqueConstraints = @UniqueConstraint(name = "uk_bank_name", columnNames = {"bank_name"}))
@@ -29,6 +30,9 @@ public class Bank {
 
     @Column(name = "owner_id", length = 36)
     private UUID ownerId;
+
+    @Column(columnDefinition = "json")
+    private Map<String, Object> customFields;
 
     private Boolean active = true;
 
@@ -68,6 +72,8 @@ public class Bank {
     public void setPinCode(String pinCode) { this.pinCode = pinCode; }
     public UUID getOwnerId() { return ownerId; }
     public void setOwnerId(UUID ownerId) { this.ownerId = ownerId; }
+    public Map<String, Object> getCustomFields() { return customFields; }
+    public void setCustomFields(Map<String, Object> customFields) { this.customFields = customFields; }
     public Boolean getActive() { return active; }
     public void setActive(Boolean active) { this.active = active; }
     public OffsetDateTime getCreatedAt() { return createdAt; }

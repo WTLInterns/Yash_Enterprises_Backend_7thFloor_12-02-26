@@ -7,6 +7,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 @Entity
 @Table(name = "clients")
@@ -17,8 +19,7 @@ import java.util.List;
 @Builder
 public class Client {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private UUID id;
     
     @Column(nullable = false)
     private String name;
@@ -36,6 +37,12 @@ public class Client {
     @Column(name = "is_active")
     private Boolean isActive = true;
     
+    @Column(columnDefinition = "json")
+    private Map<String, Object> customFields;
+    
+    @Column(name = "owner_id")
+    private UUID ownerId;
+    
     @OneToMany(mappedBy = "client", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Case> cases;
     
@@ -47,6 +54,6 @@ public class Client {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
     
-    private Long createdBy;
-    private Long updatedBy;
+    private UUID createdBy;
+    private UUID updatedBy;
 }

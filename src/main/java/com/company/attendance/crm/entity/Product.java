@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import java.util.Map;
 
 @Entity
 @Table(name = "products", indexes = {
@@ -32,20 +33,17 @@ public class Product {
     @Lob
     private String description;
 
-    @Column(name = "active")
-    private Boolean active = true;
-
     @Column(name = "owner_id", length = 36)
     private UUID ownerId;
 
+    @Column(columnDefinition = "json")
+    private Map<String, Object> customFields;
+
+    @Column(name = "active")
+    private Boolean active = true;
+
     @Column(name = "created_at")
     private OffsetDateTime createdAt;
-
-    @Column(name = "updated_at")
-    private OffsetDateTime updatedAt;
-
-    @PrePersist
-    public void prePersist(){
         if (id == null) id = UUID.randomUUID();
         createdAt = OffsetDateTime.now();
         if (active == null) active = true;
@@ -72,6 +70,8 @@ public class Product {
     public void setDescription(String description) { this.description = description; }
     public Boolean getActive() { return active; }
     public void setActive(Boolean active) { this.active = active; }
+    public Map<String, Object> getCustomFields() { return customFields; }
+    public void setCustomFields(Map<String, Object> customFields) { this.customFields = customFields; }
     public UUID getOwnerId() { return ownerId; }
     public void setOwnerId(UUID ownerId) { this.ownerId = ownerId; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
