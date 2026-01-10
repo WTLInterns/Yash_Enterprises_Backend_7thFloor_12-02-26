@@ -1,16 +1,22 @@
 package com.company.attendance.crm.entity;
 
 import jakarta.persistence.*;
+import lombok.Data;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.util.UUID;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @Entity
 @Table(name = "products", indexes = {
         @Index(name = "idx_products_name", columnList = "product_name", unique = true),
         @Index(name = "idx_products_code", columnList = "product_code")
 })
+@Data
 public class Product {
     @Id
     private UUID id;
@@ -36,6 +42,7 @@ public class Product {
     @Column(name = "owner_id", length = 36)
     private UUID ownerId;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "json")
     private Map<String, Object> customFields;
 

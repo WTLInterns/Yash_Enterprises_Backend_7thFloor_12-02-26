@@ -9,6 +9,7 @@ import com.company.attendance.entity.Client;
 import com.company.attendance.crm.service.BankService;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
@@ -39,8 +40,12 @@ public class CrmMapper {
         dto.setUpdatedBy(bank.getUpdatedBy());
         dto.setOwnerId(bank.getOwnerId());
         
-        // Custom fields - temporarily disabled
-        dto.setCustomFields(new HashMap<>());
+        // Custom fields - now properly mapped with JSON support
+        if (bank.getCustomFields() != null) {
+            dto.setCustomFields(bank.getCustomFields());
+        } else {
+            dto.setCustomFields(new HashMap<>());
+        }
         
         return dto;
     }
@@ -65,8 +70,12 @@ public class CrmMapper {
         dto.setUpdatedBy(product.getUpdatedBy());
         dto.setOwnerId(product.getOwnerId());
         
-        // Custom fields - temporarily disabled
-        dto.setCustomFields(new HashMap<>());
+        // Custom fields - now properly mapped with JSON support
+        if (product.getCustomFields() != null) {
+            dto.setCustomFields(product.getCustomFields());
+        } else {
+            dto.setCustomFields(new HashMap<>());
+        }
         
         return dto;
     }
@@ -81,17 +90,21 @@ public class CrmMapper {
         dto.setContactPhone(client.getContactPhone());
         dto.setAddress(client.getAddress());
         dto.setNotes(client.getNotes());
-        dto.setActive(client.getIsActive());
+        dto.setActive(client.isActive());
         
-        // Audit fields
+        // Audit fields - Client uses LocalDateTime
         dto.setCreatedAt(client.getCreatedAt() != null ? client.getCreatedAt().toInstant(ZoneOffset.UTC) : null);
         dto.setUpdatedAt(client.getUpdatedAt() != null ? client.getUpdatedAt().toInstant(ZoneOffset.UTC) : null);
         dto.setCreatedBy(client.getCreatedBy());
         dto.setUpdatedBy(client.getUpdatedBy());
         dto.setOwnerId(client.getOwnerId());
         
-        // Custom fields - temporarily disabled
-        dto.setCustomFields(new HashMap<>());
+        // Custom fields - now properly mapped with JSON support
+        if (client.getCustomFields() != null) {
+            dto.setCustomFields(client.getCustomFields());
+        } else {
+            dto.setCustomFields(new HashMap<>());
+        }
         
         return dto;
     }
