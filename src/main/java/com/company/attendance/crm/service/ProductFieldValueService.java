@@ -9,7 +9,6 @@ import com.company.attendance.crm.repository.ProductRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.UUID;
 
 @Service
 public class ProductFieldValueService {
@@ -25,12 +24,12 @@ public class ProductFieldValueService {
         this.valueRepository = valueRepository;
     }
 
-    public List<ProductFieldValue> list(UUID productId){
+    public List<ProductFieldValue> list(Long productId){
         Product product = productRepository.findById(productId).orElseThrow(() -> new IllegalArgumentException("Product not found"));
         return valueRepository.findByProduct(product);
     }
 
-    public ProductFieldValue upsert(UUID productId, String fieldKey, String value){
+    public ProductFieldValue upsert(Long productId, String fieldKey, String value){
         Product product = productRepository.findById(productId).orElseThrow(() -> new IllegalArgumentException("Product not found"));
         ProductFieldDefinition def = defRepository.findByFieldKey(fieldKey).orElseThrow(() -> new IllegalArgumentException("Field definition not found for key: "+fieldKey));
         ProductFieldValue existing = valueRepository.findByProductAndFieldDefinition(product, def).orElse(null);

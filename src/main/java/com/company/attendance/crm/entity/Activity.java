@@ -5,14 +5,13 @@ import com.company.attendance.crm.enums.ActivityType;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
-import java.util.UUID;
 
 @Entity
 @Table(name = "activities")
 public class Activity {
     @Id
-    @Column(length = 36)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "deal_id", nullable = false)
@@ -29,8 +28,8 @@ public class Activity {
     @Lob
     private String description;
 
-    @Column(name = "owner_id", length = 36)
-    private UUID ownerId;
+    @Column(name = "owner_id")
+    private Integer ownerId;
 
     @Column(name = "due_date")
     private OffsetDateTime dueDate; // for TASK
@@ -51,21 +50,20 @@ public class Activity {
 
     private OffsetDateTime reminder;
 
-    @Column(name = "created_by", length = 36)
-    private UUID createdBy;
+    @Column(name = "created_by")
+    private Integer createdBy;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
-    @Column(name = "modified_by", length = 36)
-    private UUID modifiedBy;
+    @Column(name = "modified_by")
+    private Integer modifiedBy;
 
     @Column(name = "modified_at")
     private OffsetDateTime modifiedAt;
 
     @PrePersist
     public void prePersist() {
-        if (id == null) id = UUID.randomUUID();
         if (createdAt == null) createdAt = OffsetDateTime.now();
         if (status == null) status = ActivityStatus.PENDING;
     }
@@ -75,9 +73,9 @@ public class Activity {
         modifiedAt = OffsetDateTime.now();
     }
 
-    // Getters & setters omitted for brevity
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
+    // Getters & setters
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
     public Deal getDeal() { return deal; }
     public void setDeal(Deal deal) { this.deal = deal; }
     public ActivityType getType() { return type; }
@@ -86,8 +84,8 @@ public class Activity {
     public void setName(String name) { this.name = name; }
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
-    public UUID getOwnerId() { return ownerId; }
-    public void setOwnerId(UUID ownerId) { this.ownerId = ownerId; }
+    public Integer getOwnerId() { return ownerId; }
+    public void setOwnerId(Integer ownerId) { this.ownerId = ownerId; }
     public OffsetDateTime getDueDate() { return dueDate; }
     public void setDueDate(OffsetDateTime dueDate) { this.dueDate = dueDate; }
     public OffsetDateTime getStartDate() { return startDate; }
@@ -102,12 +100,12 @@ public class Activity {
     public void setRepeatRule(String repeatRule) { this.repeatRule = repeatRule; }
     public OffsetDateTime getReminder() { return reminder; }
     public void setReminder(OffsetDateTime reminder) { this.reminder = reminder; }
-    public UUID getCreatedBy() { return createdBy; }
-    public void setCreatedBy(UUID createdBy) { this.createdBy = createdBy; }
+    public Integer getCreatedBy() { return createdBy; }
+    public void setCreatedBy(Integer createdBy) { this.createdBy = createdBy; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
-    public UUID getModifiedBy() { return modifiedBy; }
-    public void setModifiedBy(UUID modifiedBy) { this.modifiedBy = modifiedBy; }
+    public Integer getModifiedBy() { return modifiedBy; }
+    public void setModifiedBy(Integer modifiedBy) { this.modifiedBy = modifiedBy; }
     public OffsetDateTime getModifiedAt() { return modifiedAt; }
     public void setModifiedAt(OffsetDateTime modifiedAt) { this.modifiedAt = modifiedAt; }
 }

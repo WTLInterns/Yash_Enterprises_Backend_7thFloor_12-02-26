@@ -11,9 +11,6 @@
         <java.version>17</java.version>
         <spring-boot.version>3.2.4</spring-boot.version>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
-        <flyway.url>jdbc:mysql://localhost:3308/attendance_db?serverTimezone=UTC&amp;useSSL=false&amp;allowPublicKeyRetrieval=true&amp;useUnicode=true&amp;characterEncoding=utf8&amp;autoReconnect=true&amp;failOverReadOnly=false&amp;maxReconnects=10&amp;zeroDateTimeBehavior=CONVERT_TO_NULL&amp;allowZeroDateTime=true</flyway.url>
-        <flyway.user>root</flyway.user>
-        <flyway.password>root</flyway.password>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -76,33 +73,23 @@
             <version>1.18.34</version>
             <scope>provided</scope>
         </dependency>
-        <dependency>
-            <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-            <version>2.2.0</version>
-        </dependency>
+        <!-- MapStruct -->
         <dependency>
             <groupId>org.mapstruct</groupId>
             <artifactId>mapstruct</artifactId>
             <version>${mapstruct.version}</version>
+        </dependency>
+        <!-- SpringDoc OpenAPI -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>2.3.0</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
-        <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
-        </dependency>
-
-        
-        <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-mysql</artifactId>
-            <scope>runtime</scope>
-        </dependency>
-        
         <!-- Apache POI for Excel functionality -->
         <dependency>
             <groupId>org.apache.poi</groupId>
@@ -129,17 +116,6 @@
     </dependencies>
     <build>
         <plugins>
-            <plugin>
-                <groupId>org.flywaydb</groupId>
-                <artifactId>flyway-maven-plugin</artifactId>
-                <version>9.22.3</version>
-                <configuration>
-                    <url>${flyway.url}</url>
-                    <user>${flyway.user}</user>
-                    <password>${flyway.password}</password>
-                    <baselineOnMigrate>true</baselineOnMigrate>
-                </configuration>
-            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>

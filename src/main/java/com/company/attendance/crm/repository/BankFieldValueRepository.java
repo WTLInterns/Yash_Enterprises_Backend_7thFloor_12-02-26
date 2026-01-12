@@ -7,9 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
-public interface BankFieldValueRepository extends JpaRepository<BankFieldValue, UUID> {
+public interface BankFieldValueRepository extends JpaRepository<BankFieldValue, Integer> {
     List<BankFieldValue> findByBank(Bank bank);
     Optional<BankFieldValue> findByBankAndFieldDefinition(Bank bank, BankFieldDefinition def);
 }

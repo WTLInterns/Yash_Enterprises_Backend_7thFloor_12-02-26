@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -27,9 +26,9 @@ public class CaseService {
     public CaseDto createCase(CaseDto caseDto) {
         Case entity = caseMapper.toEntity(caseDto);
 
-        // Set client relation from clientId (UUID)
+        // Set client relation from clientId
         if (caseDto.getClientId() != null) {
-            UUID clientId = caseDto.getClientId();
+            Long clientId = caseDto.getClientId();
             Client client = clientRepository.findById(clientId)
                     .orElseThrow(() -> new RuntimeException("Client not found with ID: " + clientId));
             entity.setClient(client);
@@ -43,9 +42,9 @@ public class CaseService {
                 .orElseThrow(() -> new RuntimeException("Case not found with ID: " + id));
         caseMapper.updateEntityFromDto(caseDto, existing);
 
-        // Update client relation if a clientId is provided (UUID)
+        // Update client relation if a clientId is provided
         if (caseDto.getClientId() != null) {
-            UUID clientId = caseDto.getClientId();
+            Long clientId = caseDto.getClientId();
             Client client = clientRepository.findById(clientId)
                     .orElseThrow(() -> new RuntimeException("Client not found with ID: " + clientId));
             existing.setClient(client);
@@ -65,7 +64,7 @@ public class CaseService {
         return caseMapper.toDtoList(cases);
     }
 
-    public List<CaseDto> getCasesByClientId(UUID clientId) {
+    public List<CaseDto> getCasesByClientId(Long clientId) {
         List<Case> cases = caseRepository.findByClientId(clientId);
         return caseMapper.toDtoList(cases);
     }

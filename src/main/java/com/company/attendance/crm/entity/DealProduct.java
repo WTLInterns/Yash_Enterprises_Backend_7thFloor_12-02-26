@@ -3,14 +3,13 @@ package com.company.attendance.crm.entity;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.util.UUID;
 
 @Entity
 @Table(name = "deal_products")
 public class DealProduct {
     @Id
-    @Column(length = 36)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "deal_id", nullable = false)
@@ -36,7 +35,6 @@ public class DealProduct {
 
     @PrePersist
     public void prePersist(){
-        if (id == null) id = UUID.randomUUID();
         createdAt = OffsetDateTime.now();
         computeTotal();
     }
@@ -55,8 +53,8 @@ public class DealProduct {
         this.total = price.multiply(qty).subtract(disc).add(tx);
     }
 
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
     public Deal getDeal() { return deal; }
     public void setDeal(Deal deal) { this.deal = deal; }
     public Product getProduct() { return product; }

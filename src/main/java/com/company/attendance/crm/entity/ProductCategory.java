@@ -9,8 +9,8 @@ import java.util.UUID;
 })
 public class ProductCategory {
     @Id
-    @Column(length = 36)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
 
     @Column(nullable = false)
     private String name;
@@ -18,10 +18,10 @@ public class ProductCategory {
     private Boolean active = true;
 
     @PrePersist
-    public void prePersist(){ if (id == null) id = UUID.randomUUID(); if (active == null) active = true; }
+    public void prePersist(){ if (active == null) active = true; }
 
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
     public Boolean getActive() { return active; }

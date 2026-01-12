@@ -8,7 +8,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.UUID;
 
 @Service
 public class EmailRecordService {
@@ -20,13 +19,13 @@ public class EmailRecordService {
         this.emailRecordRepository = emailRecordRepository;
     }
 
-    public List<EmailRecord> list(UUID dealId){
-        Deal deal = dealRepository.findByIdSafe(dealId).orElseThrow(() -> new IllegalArgumentException("Deal not found"));
+    public List<EmailRecord> list(Integer dealId){
+        Deal deal = dealRepository.findByIdSafe(dealId);
         return emailRecordRepository.findByDealOrderBySentAtDesc(deal);
     }
 
-    public EmailRecord send(UUID dealId, EmailRecord record, UUID userId){
-        Deal deal = dealRepository.findByIdSafe(dealId).orElseThrow(() -> new IllegalArgumentException("Deal not found"));
+    public EmailRecord send(Integer dealId, EmailRecord record, Integer userId){
+        Deal deal = dealRepository.findByIdSafe(dealId);
         record.setDeal(deal);
         record.setSentBy(userId);
         record.setSentAt(OffsetDateTime.now());

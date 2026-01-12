@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.*;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @Tag(name = "Deal Products")
 @RestController
@@ -20,24 +19,24 @@ public class DealProductController {
     public DealProductController(DealProductService service) { this.service = service; }
 
     @GetMapping
-    public List<DealProduct> list(@PathVariable UUID dealId){
+    public List<DealProduct> list(@PathVariable Long dealId){
         return service.list(dealId);
     }
 
     @PostMapping
-    public ResponseEntity<DealProduct> create(@PathVariable UUID dealId, @RequestBody DealProduct payload){
-        UUID productId = payload.getProduct() != null ? payload.getProduct().getId() : null;
+    public ResponseEntity<DealProduct> create(@PathVariable Long dealId, @RequestBody DealProduct payload){
+        Long productId = payload.getProduct() != null ? payload.getProduct().getId() : null;
         DealProduct created = service.create(dealId, productId, payload);
         return ResponseEntity.created(URI.create("/api/deals/"+dealId+"/products/"+created.getId())).body(created);
     }
 
     @PutMapping("/{dealProductId}")
-    public DealProduct update(@PathVariable UUID dealId, @PathVariable UUID dealProductId, @RequestBody DealProduct payload){
+    public DealProduct update(@PathVariable Long dealId, @PathVariable Long dealProductId, @RequestBody DealProduct payload){
         return service.update(dealId, dealProductId, payload);
     }
 
     @DeleteMapping("/{dealProductId}")
-    public ResponseEntity<Void> delete(@PathVariable UUID dealId, @PathVariable UUID dealProductId){
+    public ResponseEntity<Void> delete(@PathVariable Long dealId, @PathVariable Long dealProductId){
         service.delete(dealId, dealProductId);
         return ResponseEntity.noContent().build();
     }

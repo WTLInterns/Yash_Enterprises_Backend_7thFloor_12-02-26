@@ -7,11 +7,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.util.Optional;
-import java.util.UUID;
 
-public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpecificationExecutor<Product> {
-    boolean existsByProductNameIgnoreCase(String productName);
-    Optional<Product> findByProductNameIgnoreCase(String productName);
+public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpecificationExecutor<Product> {
+    boolean existsByNameIgnoreCase(String name);
+    Optional<Product> findByNameIgnoreCase(String name);
 
     Page<Product> findByActiveTrue(Pageable pageable);
 }

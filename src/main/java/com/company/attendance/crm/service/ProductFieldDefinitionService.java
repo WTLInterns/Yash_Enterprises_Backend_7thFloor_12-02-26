@@ -5,7 +5,6 @@ import com.company.attendance.crm.repository.ProductFieldDefinitionRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.UUID;
 
 @Service
 public class ProductFieldDefinitionService {
@@ -25,16 +24,17 @@ public class ProductFieldDefinitionService {
         return defRepo.findAll();
     }
 
-    public ProductFieldDefinition update(UUID id, ProductFieldDefinition incoming){
+    public ProductFieldDefinition update(Integer id, ProductFieldDefinition incoming){
         ProductFieldDefinition db = defRepo.findById(id).orElseThrow(() -> new IllegalArgumentException("Field definition not found"));
         db.setFieldName(incoming.getFieldName());
         db.setFieldType(incoming.getFieldType());
+        db.setOptionsJson(incoming.getOptionsJson());
         db.setRequired(incoming.getRequired());
         db.setActive(incoming.getActive());
         return defRepo.save(db);
     }
 
-    public void delete(UUID id){
+    public void delete(Integer id){
         defRepo.deleteById(id);
     }
 

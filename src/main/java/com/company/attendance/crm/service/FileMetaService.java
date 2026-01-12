@@ -13,7 +13,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.UUID;
 
 @Service
 public class FileMetaService {
@@ -25,17 +24,24 @@ public class FileMetaService {
         this.fileRepo = fileRepo;
     }
 
-    public List<FileMeta> list(UUID dealId){
-        Deal deal = dealRepository.findByIdSafe(dealId).orElseThrow(() -> new IllegalArgumentException("Deal not found"));
+    public List<FileMeta> list(Integer dealId){
+        Deal deal = dealRepository.findByIdSafe(dealId);
         return fileRepo.findByDeal(deal);
     }
 
-    public FileMeta upload(UUID dealId, MultipartFile file, UUID userId) throws IOException {
-        Deal deal = dealRepository.findByIdSafe(dealId).orElseThrow(() -> new IllegalArgumentException("Deal not found"));
+    public FileMeta create(Integer dealId, FileMeta meta, Integer userId){
+        Deal deal = dealRepository.findByIdSafe(dealId);
+        meta.setDeal(deal);
+        meta.setCreatedBy(userId);
+        return fileRepo.save(meta);
+    }
+
+    public FileMeta upload(Integer dealId, MultipartFile file, Integer userId) throws IOException {
+        Deal deal = dealRepository.findByIdSafe(dealId);
         // simple local storage under ./uploads
         Path uploadDir = Path.of("uploads");
         if (!Files.exists(uploadDir)) Files.createDirectories(uploadDir);
-        String storedName = UUID.randomUUID() + "_" + file.getOriginalFilename();
+        String storedName = file.getOriginalFilename();
         Path target = uploadDir.resolve(storedName);
         Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
 
@@ -50,14 +56,14 @@ public class FileMetaService {
         return fileRepo.save(meta);
     }
 
-    public void delete(UUID fileId){
+    public void delete(Integer fileId){
         fileRepo.findById(fileId).ifPresent(meta -> {
             try { if (meta.getStoragePath() != null) Files.deleteIfExists(Path.of(meta.getStoragePath())); } catch (Exception ignored) {}
             fileRepo.delete(meta);
         });
     }
 
-    public FileMeta get(UUID fileId){
+    public FileMeta get(Integer fileId){
         return fileRepo.findById(fileId).orElseThrow(() -> new IllegalArgumentException("File not found"));
     }
 }

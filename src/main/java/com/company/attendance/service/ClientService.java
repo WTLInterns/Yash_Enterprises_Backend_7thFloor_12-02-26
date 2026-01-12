@@ -13,7 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -37,7 +36,7 @@ public class ClientService {
         return clientRepository.findByIsActive(true);
     }
 
-    public Client getClientEntityById(UUID id) {
+    public Client getClientEntityById(Long id) {
         log.info("Fetching client entity with ID: {}", id);
         return clientRepository.findById(id).orElse(null);
     }
@@ -56,7 +55,7 @@ public class ClientService {
     }
 
     @Transactional
-    public Client updateClientEntity(UUID id, Client client) {
+    public Client updateClientEntity(Long id, Client client) {
         log.info("Updating client entity with ID: {}", id);
         
         // Find existing client
@@ -106,7 +105,7 @@ public class ClientService {
         return updatedClient;
     }
 
-    public void deleteClientEntity(UUID id) {
+    public void deleteClientEntity(Long id) {
         log.info("Deleting client entity with ID: {}", id);
         
         Client client = clientRepository.findById(id)

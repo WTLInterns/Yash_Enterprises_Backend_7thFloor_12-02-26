@@ -10,7 +10,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/cases")
@@ -62,7 +61,7 @@ public class CaseController {
     }
     
     @GetMapping("/client/{clientId}")
-    public ResponseEntity<List<CaseDto>> getCasesByClientId(@PathVariable UUID clientId) {
+    public ResponseEntity<List<CaseDto>> getCasesByClientId(@PathVariable Long clientId) {
         try {
             List<CaseDto> cases = caseService.getCasesByClientId(clientId);
             return new ResponseEntity<>(cases, HttpStatus.OK);

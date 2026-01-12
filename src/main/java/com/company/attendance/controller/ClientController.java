@@ -5,6 +5,7 @@ import com.company.attendance.crm.entity.Deal;
 import com.company.attendance.entity.Client;
 import com.company.attendance.crm.repository.DealRepository;
 import com.company.attendance.crm.mapper.CrmMapper;
+import com.company.attendance.crm.service.AuditService;
 import com.company.attendance.dto.ClientDto;
 import com.company.attendance.service.ClientService;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +19,6 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @RestController
@@ -31,6 +31,7 @@ public class ClientController {
     private final ClientService clientService;
     private final DealRepository dealRepository;
     private final CrmMapper crmMapper;
+    private final AuditService auditService;
 
     @GetMapping
     public ResponseEntity<List<com.company.attendance.crm.dto.ClientDto>> listClients() {
@@ -81,7 +82,7 @@ public class ClientController {
     }
     
     @GetMapping("/{id}")
-    public ResponseEntity<com.company.attendance.crm.dto.ClientDto> getClient(@PathVariable UUID id) {
+    public ResponseEntity<com.company.attendance.crm.dto.ClientDto> getClient(@PathVariable Long id) {
         log.info("GET /api/clients/{} - Fetching client", id);
         try {
             Client client = clientService.getClientEntityById(id);
@@ -97,12 +98,12 @@ public class ClientController {
     }
 
     @GetMapping("/{id}/deal")
-    public ResponseEntity<DealDetailDTO> getClientDeal(@PathVariable UUID id) {
+    public ResponseEntity<DealDetailDTO> getClientDeal(@PathVariable Long id) {
         log.info("GET /api/clients/{}/deal - Fetching latest deal for client", id);
         Deal deal = dealRepository.findFirstByClientIdOrderByCreatedAtDesc(id).orElse(null);
         if (deal == null) return ResponseEntity.notFound().build();
         DealDetailDTO dto = new DealDetailDTO();
-        dto.id = deal.getId();
+        dto.id = deal.getId() != null ? deal.getId().longValue() : null;
         dto.name = deal.getName();
         dto.valueAmount = deal.getValueAmount();
         dto.closingDate = deal.getClosingDate();
@@ -116,6 +117,14 @@ public class ClientController {
     public ResponseEntity<com.company.attendance.crm.dto.ClientDto> createClient(@Valid @RequestBody com.company.attendance.crm.dto.ClientDto clientDto) {
         log.info("POST /api/clients - Creating new client: {}", clientDto.getName());
         try {
+            // Auto-set owner fields from authenticated user
+            if (clientDto.getCreatedBy() == null) {
+                clientDto.setCreatedBy(auditService.getCurrentUserId());
+            }
+            if (clientDto.getOwnerId() == null) {
+                clientDto.setOwnerId(auditService.getCurrentUserId());
+            }
+            
             Client client = crmMapper.toClientEntity(clientDto);
             Client createdClient = clientService.createClientEntity(client);
             com.company.attendance.crm.dto.ClientDto response = crmMapper.toClientDto(createdClient);
@@ -127,7 +136,7 @@ public class ClientController {
     }
     
     @PutMapping("/{id}")
-    public ResponseEntity<com.company.attendance.crm.dto.ClientDto> updateClient(@PathVariable UUID id, @Valid @RequestBody com.company.attendance.crm.dto.ClientDto clientDto) {
+    public ResponseEntity<com.company.attendance.crm.dto.ClientDto> updateClient(@PathVariable Long id, @Valid @RequestBody com.company.attendance.crm.dto.ClientDto clientDto) {
         log.info("PUT /api/clients/{} - Updating client", id);
         try {
             Client client = crmMapper.toClientEntity(clientDto);
@@ -141,7 +150,7 @@ public class ClientController {
     }
     
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteClient(@PathVariable UUID id) {
+    public ResponseEntity<Void> deleteClient(@PathVariable Long id) {
         log.info("DELETE /api/clients/{} - Deleting client", id);
         try {
             clientService.deleteClientEntity(id);

@@ -3,7 +3,7 @@ package com.company.attendance.crm.controller;
 import com.company.attendance.crm.dto.BankDto;
 import com.company.attendance.crm.entity.Bank;
 import com.company.attendance.crm.entity.Deal;
-import com.company.attendance.crm.mapper.CrmMapper;
+import com.company.attendance.crm.mapper.SimpleCrmMapper;
 import com.company.attendance.crm.repository.DealRepository;
 import com.company.attendance.crm.service.BankService;
 import com.company.attendance.exception.ResourceNotFoundException;
@@ -24,65 +24,65 @@ import java.util.stream.Collectors;
 public class BankController {
     private final BankService bankService;
     private final DealRepository dealRepository;
-    private final CrmMapper crmMapper;
+    private final SimpleCrmMapper simpleCrmMapper;
 
-    public BankController(BankService bankService, DealRepository dealRepository, CrmMapper crmMapper) {
+    public BankController(BankService bankService, DealRepository dealRepository, SimpleCrmMapper simpleCrmMapper) {
         this.bankService = bankService;
         this.dealRepository = dealRepository;
-        this.crmMapper = crmMapper;
+        this.simpleCrmMapper = simpleCrmMapper;
     }
 
     @PostMapping
     public ResponseEntity<BankDto> create(@RequestBody BankDto bankDto){
-        Bank bank = crmMapper.toBankEntity(bankDto);
+        Bank bank = simpleCrmMapper.toBankEntity(bankDto);
         Bank created = bankService.create(bank);
-        BankDto response = crmMapper.toBankDto(created);
+        BankDto response = simpleCrmMapper.toBankDto(created);
         return ResponseEntity.created(URI.create("/api/banks/"+created.getId())).body(response);
     }
 
     @GetMapping
     public Page<BankDto> list(@RequestParam(value = "active", required = false) Boolean active,
-                           @RequestParam(value = "ownerId", required = false) UUID ownerId,
+                           @RequestParam(value = "ownerId", required = false) Integer ownerId,
                            @RequestParam(value = "q", required = false) String q,
                            Pageable pageable){
         // Default to active=true unless explicitly requested otherwise
         if (active == null && ownerId == null && (q == null || q.isBlank())) {
             Page<Bank> banks = bankService.list(pageable); // This returns only active=true
             List<BankDto> dtos = banks.getContent().stream()
-                .map(crmMapper::toBankDto)
+                .map(simpleCrmMapper::toBankDto)
                 .collect(Collectors.toList());
             return new PageImpl<>(dtos, pageable, banks.getTotalElements());
         }
         Boolean effectiveActive = (active == null ? Boolean.TRUE : active);
         Page<Bank> banks = bankService.search(effectiveActive, ownerId, q, pageable);
         List<BankDto> dtos = banks.getContent().stream()
-            .map(crmMapper::toBankDto)
+            .map(simpleCrmMapper::toBankDto)
             .collect(Collectors.toList());
         return new PageImpl<>(dtos, pageable, banks.getTotalElements());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<BankDto> get(@PathVariable UUID id){
+    public ResponseEntity<BankDto> getById(@PathVariable Integer id) {
         Bank bank = bankService.get(id)
             .orElseThrow(() -> new ResourceNotFoundException("Bank not found"));
-        BankDto bankDto = crmMapper.toBankDto(bank);
+        BankDto bankDto = simpleCrmMapper.toBankDto(bank);
         return ResponseEntity.ok(bankDto);
     }
 
     @PutMapping("/{id}")
-    public BankDto update(@PathVariable UUID id, @RequestBody BankDto bankDto){
-        Bank bank = crmMapper.toBankEntity(bankDto);
-        Bank updated = bankService.update(id, bank);
-        return crmMapper.toBankDto(updated);
+    public BankDto update(@PathVariable Integer id, @RequestBody BankDto bankDto){
+        Bank bank = simpleCrmMapper.toBankEntity(bankDto);
+        Bank updated = bankService.update(id, bankDto);
+        return simpleCrmMapper.toBankDto(updated);
     }
 
     @PatchMapping("/{id}/status")
-    public Bank patchStatus(@PathVariable UUID id, @RequestParam("active") boolean active){
+    public Bank patchStatus(@PathVariable Integer id, @RequestParam("active") boolean active){
         return bankService.patchStatus(id, active);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable UUID id){
+    public ResponseEntity<Void> delete(@PathVariable Integer id){
         bankService.delete(id);
         return ResponseEntity.noContent().build();
     }
@@ -95,7 +95,7 @@ public class BankController {
         for (Bank b : page.getContent()){
             Map<String, Object> m = new HashMap<>();
             m.put("id", b.getId());
-            m.put("bankName", b.getBankName());
+            m.put("name", b.getName());
             items.add(m);
         }
         return items;
@@ -103,8 +103,8 @@ public class BankController {
 
     // usage
     @GetMapping("/{bankId}/deals")
-    public List<Map<String, Object>> usage(@PathVariable UUID bankId){
-        List<Deal> deals = dealRepository.findByBankId(bankId);
+    public List<Map<String, Object>> usage(@PathVariable Long bankId){
+        List<Deal> deals = dealRepository.findByClientId(bankId);
         List<Map<String, Object>> resp = new ArrayList<>();
         for (Deal d : deals){
             Map<String, Object> row = new HashMap<>();
@@ -119,12 +119,12 @@ public class BankController {
 
     // permissions helper
     @GetMapping("/{id}/permissions")
-    public ResponseEntity<Map<String, Boolean>> permissions(@PathVariable UUID id,
+    public ResponseEntity<Map<String, Boolean>> permissions(@PathVariable Integer id,
                                                             @RequestHeader(value = "X-User-Role", required = false) String role,
-                                                            @RequestHeader(value = "X-User-Id", required = false) UUID userId){
+                                                            @RequestHeader(value = "X-User-Id", required = false) Integer userId){
         return bankService.get(id).map(b -> {
             boolean isAdmin = "ADMIN".equalsIgnoreCase(role);
-            boolean isOwner = userId != null && userId.equals(b.getOwnerId());
+            boolean isOwner = userId != null && userId.equals(b.getCreatedBy());
             Map<String, Boolean> map = new HashMap<>();
             map.put("canEdit", isAdmin || isOwner);
             map.put("canDelete", isAdmin);

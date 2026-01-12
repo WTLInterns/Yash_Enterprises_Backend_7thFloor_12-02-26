@@ -13,7 +13,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.net.MalformedURLException;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.UUID;
 
 @RestController
 public class FileMetaController {
@@ -24,19 +23,19 @@ public class FileMetaController {
     }
 
     @GetMapping("/api/deals/{dealId}/files")
-    public List<FileMeta> list(@PathVariable UUID dealId){
+    public List<FileMeta> list(@PathVariable Integer dealId){
         return fileService.list(dealId);
     }
 
     @PostMapping(value = "/api/deals/{dealId}/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public FileMeta upload(@PathVariable UUID dealId,
+    public FileMeta upload(@PathVariable Integer dealId,
                            @RequestPart("file") MultipartFile file,
-                           @RequestHeader(value = "X-User-Id", required = false) UUID userId) throws Exception {
+                           @RequestHeader(value = "X-User-Id", required = false) Integer userId) throws Exception {
         return fileService.upload(dealId, file, userId);
     }
 
     @GetMapping("/api/files/{fileId}")
-    public ResponseEntity<Resource> download(@PathVariable UUID fileId) throws MalformedURLException {
+    public ResponseEntity<Resource> download(@PathVariable Integer fileId) throws MalformedURLException {
         FileMeta meta = fileService.get(fileId);
         Path path = Path.of(meta.getStoragePath());
         Resource res = new UrlResource(path.toUri());
@@ -47,7 +46,7 @@ public class FileMetaController {
     }
 
     @DeleteMapping("/api/files/{fileId}")
-    public ResponseEntity<Void> delete(@PathVariable UUID fileId){
+    public ResponseEntity<Void> delete(@PathVariable Integer fileId){
         fileService.delete(fileId);
         return ResponseEntity.noContent().build();
     }

@@ -16,7 +16,6 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.Optional;
-import java.util.UUID;
 
 @Service
 public class ProductService {
@@ -31,10 +30,10 @@ public class ProductService {
     }
 
     public Product create(Product product){
-        if (product.getProductName() == null || product.getProductName().isBlank()){
-            throw new IllegalArgumentException("productName is required");
+        if (product.getName() == null || product.getName().isBlank()){
+            throw new IllegalArgumentException("Product name is required");
         }
-        if (productRepository.existsByProductNameIgnoreCase(product.getProductName())){
+        if (productRepository.existsByNameIgnoreCase(product.getName())){
             throw new IllegalArgumentException("Product name already exists");
         }
         return productRepository.save(product);
@@ -44,7 +43,7 @@ public class ProductService {
         return productRepository.findByActiveTrue(pageable);
     }
 
-    public Page<Product> search(Boolean active, String category, UUID ownerId, String q, UUID categoryId, Pageable pageable){
+    public Page<Product> search(Boolean active, String category, Integer ownerId, String q, Integer categoryId, Pageable pageable){
         Specification<Product> spec = Specification.where(ProductSpecifications.active(active))
                 .and(ProductSpecifications.category(category))
                 .and(ProductSpecifications.owner(ownerId))
@@ -53,38 +52,37 @@ public class ProductService {
         return productRepository.findAll(spec, pageable);
     }
 
-    public Optional<Product> get(UUID id){
+    public Optional<Product> get(Long id){
         return productRepository.findById(id);
     }
 
-    public Product update(UUID id, Product incoming){
+    public Product update(Long id, Product incoming){
         // Find existing product
         Product existing = productRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
         
         // Validate foreign key exists
-        if (incoming.getCategoryId() != null && !categoryRepository.existsById(incoming.getCategoryId())) {
+        if (incoming.getCategoryId() != null && !categoryRepository.existsById(incoming.getCategoryId().intValue())) {
             throw new InvalidForeignKeyException("Category not found with ID: " + incoming.getCategoryId());
         }
         
-        // Note: ownerId is a UUID and should be sourced from authentication; no FK validation against Employee (Long id).
+        // Note: ownerId should be sourced from authentication; no FK validation against Employee (Long id).
         
         // Check for duplicate product name (excluding current product)
-        if (!existing.getProductName().equals(incoming.getProductName()) && 
-            productRepository.existsByProductNameIgnoreCase(incoming.getProductName())) {
+        if (!existing.getName().equals(incoming.getName()) && 
+            productRepository.existsByNameIgnoreCase(incoming.getName())) {
             throw new IllegalArgumentException("Product name already exists");
         }
         
-        BigDecimal oldPrice = existing.getUnitPrice();
+        BigDecimal oldPrice = existing.getPrice();
         
         // Update only editable fields, keep system fields intact
-        existing.setProductName(incoming.getProductName());
-        existing.setProductCode(incoming.getProductCode());
+        existing.setName(incoming.getName());
+        existing.setCode(incoming.getCode());
         // Note: productCategory field is not used in frontend, categoryId is used instead
         // existing.setProductCategory(incoming.getProductCategory());
-        existing.setUnitPrice(incoming.getUnitPrice());
+        existing.setPrice(incoming.getPrice());
         existing.setDescription(incoming.getDescription());
-        existing.setOwnerId(incoming.getOwnerId());
         existing.setCategoryId(incoming.getCategoryId());
         
         // Keep createdAt intact, update updatedAt
@@ -96,30 +94,30 @@ public class ProductService {
         Product saved = productRepository.save(existing);
         
         // Record price history if changed
-        if (incoming.getUnitPrice() != null && (oldPrice == null || oldPrice.compareTo(incoming.getUnitPrice()) != 0)){
+        if (incoming.getPrice() != null && (oldPrice == null || oldPrice.compareTo(incoming.getPrice()) != 0)){
             ProductPriceHistory ph = new ProductPriceHistory();
             ph.setProduct(saved);
             ph.setOldPrice(oldPrice);
-            ph.setNewPrice(incoming.getUnitPrice());
+            ph.setNewPrice(incoming.getPrice());
             priceHistoryRepository.save(ph);
         }
         return saved;
     }
 
-    public Product patchStatus(UUID id, boolean active){
+    public Product patchStatus(Long id, boolean active){
         Product db = productRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Product not found"));
         db.setActive(active);
         return productRepository.save(db);
     }
 
-    public void delete(UUID id){
+    public void delete(Long id){
         Product p = productRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
         p.setActive(false);
         productRepository.save(p);
     }
 
-    public void bulkPatchStatus(Iterable<UUID> ids, boolean active){
+    public void bulkPatchStatus(Iterable<Long> ids, boolean active){
         ids.forEach(id -> {
             productRepository.findById(id).ifPresent(p -> {
                 p.setActive(active);
@@ -128,7 +126,7 @@ public class ProductService {
         });
     }
 
-    public void bulkDelete(Iterable<UUID> ids){
+    public void bulkDelete(Iterable<Long> ids){
         ids.forEach(productRepository::deleteById);
     }
 }

@@ -8,7 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
-import java.util.UUID;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/deals/{dealId}/notes")
@@ -20,24 +20,24 @@ public class NoteController {
     }
 
     @GetMapping
-    public Page<Note> list(@PathVariable UUID dealId, Pageable pageable) {
+    public Page<Note> list(@PathVariable Integer dealId, Pageable pageable) {
         return noteService.list(dealId, pageable);
     }
 
     @PostMapping
-    public ResponseEntity<Note> create(@PathVariable UUID dealId, @RequestBody Note note,
-                                       @RequestHeader(value = "X-User-Id", required = false) UUID userId) {
+    public ResponseEntity<Note> create(@PathVariable Integer dealId, @RequestBody Note note,
+                                       @RequestHeader(value = "X-User-Id", required = false) Integer userId) {
         Note created = noteService.create(dealId, note, userId);
         return ResponseEntity.created(URI.create("/api/deals/"+dealId+"/notes/"+created.getId())).body(created);
     }
 
     @PutMapping("/{noteId}")
-    public Note update(@PathVariable UUID dealId, @PathVariable UUID noteId, @RequestBody Note note) {
+    public Note update(@PathVariable Integer dealId, @PathVariable Integer noteId, @RequestBody Note note) {
         return noteService.update(dealId, noteId, note);
     }
 
     @DeleteMapping("/{noteId}")
-    public ResponseEntity<Void> delete(@PathVariable UUID dealId, @PathVariable UUID noteId) {
+    public ResponseEntity<Void> delete(@PathVariable Integer dealId, @PathVariable Integer noteId) {
         noteService.delete(dealId, noteId);
         return ResponseEntity.noContent().build();
     }

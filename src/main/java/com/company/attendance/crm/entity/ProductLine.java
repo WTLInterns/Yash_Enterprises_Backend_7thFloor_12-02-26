@@ -3,14 +3,13 @@ package com.company.attendance.crm.entity;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.util.UUID;
 
 @Entity
 @Table(name = "product_lines")
 public class ProductLine {
     @Id
-    @Column(length = 36)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "deal_id", nullable = false)
@@ -22,18 +21,17 @@ public class ProductLine {
     private BigDecimal discount;
     private BigDecimal total;
 
-    @Column(name = "created_by", length = 36)
-    private UUID createdBy;
+    @Column(name = "created_by")
+    private Integer createdBy;
     @Column(name = "created_at")
     private OffsetDateTime createdAt;
-    @Column(name = "modified_by", length = 36)
-    private UUID modifiedBy;
+    @Column(name = "modified_by")
+    private Integer modifiedBy;
     @Column(name = "modified_at")
     private OffsetDateTime modifiedAt;
 
     @PrePersist
     public void prePersist(){
-        if (id == null) id = UUID.randomUUID();
         if (createdAt == null) createdAt = OffsetDateTime.now();
         computeTotal();
     }
@@ -51,8 +49,8 @@ public class ProductLine {
         this.total = price.multiply(qty).subtract(disc);
     }
 
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
     public Deal getDeal() { return deal; }
     public void setDeal(Deal deal) { this.deal = deal; }
     public String getProductName() { return productName; }
@@ -65,12 +63,12 @@ public class ProductLine {
     public void setDiscount(BigDecimal discount) { this.discount = discount; }
     public BigDecimal getTotal() { return total; }
     public void setTotal(BigDecimal total) { this.total = total; }
-    public UUID getCreatedBy() { return createdBy; }
-    public void setCreatedBy(UUID createdBy) { this.createdBy = createdBy; }
+    public Integer getCreatedBy() { return createdBy; }
+    public void setCreatedBy(Integer createdBy) { this.createdBy = createdBy; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
-    public UUID getModifiedBy() { return modifiedBy; }
-    public void setModifiedBy(UUID modifiedBy) { this.modifiedBy = modifiedBy; }
+    public Integer getModifiedBy() { return modifiedBy; }
+    public void setModifiedBy(Integer modifiedBy) { this.modifiedBy = modifiedBy; }
     public OffsetDateTime getModifiedAt() { return modifiedAt; }
     public void setModifiedAt(OffsetDateTime modifiedAt) { this.modifiedAt = modifiedAt; }
 }

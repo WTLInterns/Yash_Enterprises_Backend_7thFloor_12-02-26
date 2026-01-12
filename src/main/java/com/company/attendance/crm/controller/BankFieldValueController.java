@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @Tag(name = "Bank Field Values")
 @RestController
@@ -19,10 +18,10 @@ public class BankFieldValueController {
     public BankFieldValueController(BankFieldValueService service) { this.service = service; }
 
     @GetMapping
-    public List<BankFieldValue> list(@PathVariable UUID bankId){ return service.list(bankId); }
+    public List<BankFieldValue> list(@PathVariable Integer bankId){ return service.list(bankId); }
 
     @PostMapping
-    public ResponseEntity<BankFieldValue> upsert(@PathVariable UUID bankId, @RequestBody Map<String, String> body){
+    public ResponseEntity<BankFieldValue> upsert(@PathVariable Integer bankId, @RequestBody Map<String, String> body){
         String fieldKey = body.get("fieldKey");
         String value = body.get("value");
         return ResponseEntity.ok(service.upsert(bankId, fieldKey, value));

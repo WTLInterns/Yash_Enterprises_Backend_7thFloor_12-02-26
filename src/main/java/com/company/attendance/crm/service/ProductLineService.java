@@ -8,7 +8,6 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.UUID;
 
 @Service
 public class ProductLineService {
@@ -20,20 +19,20 @@ public class ProductLineService {
         this.productLineRepository = productLineRepository;
     }
 
-    public List<ProductLine> list(UUID dealId){
-        Deal deal = dealRepository.findByIdSafe(dealId).orElseThrow(() -> new IllegalArgumentException("Deal not found"));
+    public List<ProductLine> list(Integer dealId){
+        Deal deal = dealRepository.findByIdSafe(dealId);
         return productLineRepository.findByDeal(deal);
     }
 
-    public ProductLine create(UUID dealId, ProductLine pl, UUID userId){
-        Deal deal = dealRepository.findByIdSafe(dealId).orElseThrow(() -> new IllegalArgumentException("Deal not found"));
+    public ProductLine create(Integer dealId, ProductLine pl, Integer userId){
+        Deal deal = dealRepository.findByIdSafe(dealId);
         pl.setDeal(deal);
         pl.setCreatedBy(userId);
         pl.computeTotal();
         return productLineRepository.save(pl);
     }
 
-    public ProductLine update(UUID dealId, UUID productId, ProductLine incoming){
+    public ProductLine update(Integer dealId, Integer productId, ProductLine incoming){
         ProductLine db = productLineRepository.findById(productId).orElseThrow(() -> new IllegalArgumentException("Product not found"));
         if (!db.getDeal().getId().equals(dealId)) throw new IllegalArgumentException("Product not in deal");
         db.setProductName(incoming.getProductName());
@@ -44,13 +43,13 @@ public class ProductLineService {
         return productLineRepository.save(db);
     }
 
-    public void delete(UUID dealId, UUID productId){
+    public void delete(Integer dealId, Integer productId){
         ProductLine db = productLineRepository.findById(productId).orElseThrow(() -> new IllegalArgumentException("Product not found"));
         if (!db.getDeal().getId().equals(dealId)) throw new IllegalArgumentException("Product not in deal");
         productLineRepository.delete(db);
     }
 
-    public BigDecimal grandTotal(UUID dealId){
+    public BigDecimal grandTotal(Integer dealId){
         return list(dealId).stream()
                 .map(pl -> pl.getTotal() != null ? pl.getTotal() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);

@@ -5,8 +5,6 @@ import com.company.attendance.crm.enums.ActivityType;
 import com.company.attendance.crm.repository.*;
 import org.springframework.stereotype.Service;
 
-import java.util.UUID;
-
 @Service
 public class CallActivityService {
     private final DealRepository dealRepository;
@@ -19,8 +17,8 @@ public class CallActivityService {
         this.callRepo = callRepo;
     }
 
-    public CallActivity create(UUID dealId, CallActivity call, UUID userId){
-        Deal deal = dealRepository.findByIdSafe(dealId).orElseThrow(() -> new IllegalArgumentException("Deal not found"));
+    public CallActivity create(Integer dealId, CallActivity call, Integer userId){
+        Deal deal = dealRepository.findByIdSafe(dealId);
         Activity base = new Activity();
         base.setDeal(deal);
         base.setType(ActivityType.CALL);

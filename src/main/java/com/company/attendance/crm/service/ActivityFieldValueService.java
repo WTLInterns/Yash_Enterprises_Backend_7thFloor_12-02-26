@@ -6,7 +6,6 @@ import com.company.attendance.crm.repository.*;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.UUID;
 
 @Service
 public class ActivityFieldValueService {
@@ -20,12 +19,12 @@ public class ActivityFieldValueService {
         this.valRepo = valRepo;
     }
 
-    public List<ActivityFieldValue> list(UUID activityId){
+    public List<ActivityFieldValue> list(Integer activityId){
         Activity act = activityRepository.findById(activityId).orElseThrow(() -> new IllegalArgumentException("Activity not found"));
         return valRepo.findByActivity(act);
     }
 
-    public ActivityFieldValue upsert(UUID activityId, ActivityType type, String fieldKey, String value){
+    public ActivityFieldValue upsert(Integer activityId, ActivityType type, String fieldKey, String value){
         Activity act = activityRepository.findById(activityId).orElseThrow(() -> new IllegalArgumentException("Activity not found"));
         ActivityFieldDefinition def = defRepo.findByFieldKeyAndActivityType(fieldKey, type)
                 .orElseThrow(() -> new IllegalArgumentException("Field not found for type"));

@@ -7,11 +7,13 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.util.Optional;
-import java.util.UUID;
 
-public interface BankRepository extends JpaRepository<Bank, UUID>, JpaSpecificationExecutor<Bank> {
-    boolean existsByBankNameIgnoreCase(String bankName);
-    Optional<Bank> findByBankNameIgnoreCase(String bankName);
-
-    Page<Bank> findByActiveTrue(Pageable pageable);
+public interface BankRepository extends JpaRepository<Bank, Integer>, JpaSpecificationExecutor<Bank> {
+    boolean existsByNameIgnoreCase(String name);
+    
+    default Bank findByIdSafe(Integer id) {
+        return findById(id).orElseThrow(() ->
+            new RuntimeException("Bank not found: " + id)
+        );
+    }
 }

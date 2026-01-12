@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.*;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @Tag(name = "Product Field Values")
 @RestController
@@ -20,12 +19,12 @@ public class ProductFieldValueController {
     public ProductFieldValueController(ProductFieldValueService service) { this.service = service; }
 
     @GetMapping
-    public List<ProductFieldValue> list(@PathVariable UUID productId){
+    public List<ProductFieldValue> list(@PathVariable Long productId){
         return service.list(productId);
     }
 
     @PostMapping
-    public ResponseEntity<ProductFieldValue> upsert(@PathVariable UUID productId,
+    public ResponseEntity<ProductFieldValue> upsert(@PathVariable Long productId,
                                                     @RequestBody Map<String, String> payload){
         String fieldKey = payload.get("fieldKey");
         String value = payload.get("value");

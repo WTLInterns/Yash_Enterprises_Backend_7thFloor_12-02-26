@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @Tag(name = "Activity Field Values")
 @RestController
@@ -20,10 +19,10 @@ public class ActivityFieldValueController {
     public ActivityFieldValueController(ActivityFieldValueService service) { this.service = service; }
 
     @GetMapping
-    public List<ActivityFieldValue> list(@PathVariable UUID activityId){ return service.list(activityId); }
+    public List<ActivityFieldValue> list(@PathVariable Integer activityId){ return service.list(activityId); }
 
     @PostMapping
-    public ResponseEntity<ActivityFieldValue> upsert(@PathVariable UUID activityId,
+    public ResponseEntity<ActivityFieldValue> upsert(@PathVariable Integer activityId,
                                                      @RequestParam("type") ActivityType type,
                                                      @RequestBody Map<String, String> body){
         String fieldKey = body.get("fieldKey");

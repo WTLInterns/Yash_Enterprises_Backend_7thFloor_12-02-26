@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.UUID;
 
 @Service
 public class TaskActivityService {
@@ -24,8 +23,8 @@ public class TaskActivityService {
         this.taskRepo = taskRepo;
     }
 
-    public TaskActivity create(UUID dealId, TaskActivity task, UUID userId){
-        Deal deal = dealRepository.findByIdSafe(dealId).orElseThrow(() -> new IllegalArgumentException("Deal not found"));
+    public TaskActivity create(Integer dealId, TaskActivity task, Integer userId){
+        Deal deal = dealRepository.findByIdSafe(dealId);
         Activity base = new Activity();
         base.setDeal(deal);
         base.setType(ActivityType.TASK);

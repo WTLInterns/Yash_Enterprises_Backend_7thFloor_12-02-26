@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.List;
-import java.util.UUID;
 
 @Tag(name = "Product Categories")
 @RestController
@@ -28,12 +27,12 @@ public class ProductCategoryController {
     public List<ProductCategory> list(){ return service.list(); }
 
     @PutMapping("/{id}")
-    public ProductCategory update(@PathVariable UUID id, @RequestBody ProductCategory incoming){
+    public ProductCategory update(@PathVariable Integer id, @RequestBody ProductCategory incoming){
         return service.update(id, incoming);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable UUID id){
+    public ResponseEntity<Void> delete(@PathVariable Integer id){
         service.delete(id);
         return ResponseEntity.noContent().build();
     }

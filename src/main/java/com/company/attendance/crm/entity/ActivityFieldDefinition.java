@@ -2,16 +2,24 @@ package com.company.attendance.crm.entity;
 
 import com.company.attendance.crm.enums.ActivityType;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.OffsetDateTime;
-import java.util.UUID;
+import java.util.List;
 
 @Entity
 @Table(name = "activity_field_definitions", uniqueConstraints = @UniqueConstraint(name = "uk_activity_field_key_type", columnNames = {"field_key","activity_type"}))
 public class ActivityFieldDefinition {
-    @Id @Column(length = 36) private UUID id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
     @Column(name = "field_name", nullable = false) private String fieldName;
     @Column(name = "field_key", nullable = false) private String fieldKey;
     @Column(name = "field_type", nullable = false) private String fieldType; // TEXT, NUMBER, DATE, DATETIME, BOOLEAN, DROPDOWN, URL
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "options_json")
+    private List<String> optionsJson;
     @Enumerated(EnumType.STRING)
     @Column(name = "activity_type", nullable = false) private ActivityType activityType;
     @Column(name = "required") private Boolean required = false;
@@ -19,16 +27,18 @@ public class ActivityFieldDefinition {
     @Column(name = "created_at") private OffsetDateTime createdAt;
 
     @PrePersist
-    public void prePersist(){ if (id == null) id = UUID.randomUUID(); if (createdAt == null) createdAt = OffsetDateTime.now(); if (required == null) required = false; if (active == null) active = true; }
+    public void prePersist(){ if (createdAt == null) createdAt = OffsetDateTime.now(); if (required == null) required = false; if (active == null) active = true; }
 
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
     public String getFieldName() { return fieldName; }
     public void setFieldName(String fieldName) { this.fieldName = fieldName; }
     public String getFieldKey() { return fieldKey; }
     public void setFieldKey(String fieldKey) { this.fieldKey = fieldKey; }
     public String getFieldType() { return fieldType; }
     public void setFieldType(String fieldType) { this.fieldType = fieldType; }
+    public List<String> getOptionsJson() { return optionsJson; }
+    public void setOptionsJson(List<String> optionsJson) { this.optionsJson = optionsJson; }
     public ActivityType getActivityType() { return activityType; }
     public void setActivityType(ActivityType activityType) { this.activityType = activityType; }
     public Boolean getRequired() { return required; }

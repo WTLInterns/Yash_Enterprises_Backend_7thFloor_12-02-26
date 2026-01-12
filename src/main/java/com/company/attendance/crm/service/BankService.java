@@ -1,6 +1,7 @@
 package com.company.attendance.crm.service;
 
 import com.company.attendance.crm.entity.Bank;
+import com.company.attendance.crm.dto.BankDto;
 import com.company.attendance.crm.repository.BankRepository;
 import com.company.attendance.crm.repository.BankSpecifications;
 import com.company.attendance.exception.ResourceNotFoundException;
@@ -11,7 +12,6 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
-import java.util.UUID;
 
 @Service
 public class BankService {
@@ -22,70 +22,65 @@ public class BankService {
     }
 
     public Bank create(Bank bank){
-        if (bank.getBankName() == null || bank.getBankName().isBlank()){
-            throw new IllegalArgumentException("bankName is required");
+        if (bank.getName() == null || bank.getName().isBlank()){
+            throw new IllegalArgumentException("name is required");
         }
-        if (bankRepository.existsByBankNameIgnoreCase(bank.getBankName())){
+        if (bankRepository.existsByNameIgnoreCase(bank.getName())){
             throw new IllegalArgumentException("Bank name already exists");
         }
         return bankRepository.save(bank);
     }
 
-    public Optional<Bank> get(UUID id){ return bankRepository.findById(id); }
+    public Optional<Bank> get(Integer id) {
+        return bankRepository.findById(id);
+    }
 
-    public Page<Bank> list(Pageable pageable){ return bankRepository.findByActiveTrue(pageable); }
+    public Page<Bank> list(Pageable pageable) {
+        return bankRepository.findAll(pageable);
+    }
 
-    public Page<Bank> search(Boolean active, UUID ownerId, String q, Pageable pageable){
+    public Page<Bank> search(Boolean active, Integer ownerId, String q, Pageable pageable){
         Specification<Bank> spec = Specification.where(BankSpecifications.active(active))
                 .and(BankSpecifications.owner(ownerId))
                 .and(BankSpecifications.q(q));
         return bankRepository.findAll(spec, pageable);
     }
 
-    public Bank update(UUID id, Bank incoming){
+    public Bank update(Integer id, BankDto dto) {
         // Find existing bank
         Bank existing = bankRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Bank not found"));
         
-        // Preserve existing ownerId unless an explicit value is provided
-        // Note: ownerId is supplied/derived as UUID; do not validate against Employee (Long id)
-        
-        // Check for duplicate bank name (excluding current bank)
-        if (!existing.getBankName().equals(incoming.getBankName()) && 
-            bankRepository.existsByBankNameIgnoreCase(incoming.getBankName())) {
-            throw new IllegalArgumentException("Bank name already exists");
+        // Update fields
+        if (dto.getName() != null && !dto.getName().isBlank()){
+            existing.setName(dto.getName());
         }
-        
-        // Update only editable fields, keep system fields intact
-        existing.setBankName(incoming.getBankName());
-        existing.setBranchName(incoming.getBranchName());
-        existing.setPhone(incoming.getPhone());
-        existing.setWebsite(incoming.getWebsite());
-        existing.setDescription(incoming.getDescription());
-        existing.setAddress(incoming.getAddress());
-        existing.setTaluka(incoming.getTaluka());
-        existing.setDistrict(incoming.getDistrict());
-        existing.setPinCode(incoming.getPinCode());
-        if (incoming.getOwnerId() != null) {
-            existing.setOwnerId(incoming.getOwnerId());
+        if (dto.getAddress() != null){
+            existing.setAddress(dto.getAddress());
         }
-        
-        // Keep createdAt intact, update updatedAt
-        // existing.setCreatedAt() - Don't touch this
-        // existing.setUpdatedAt() - This will be handled by @PreUpdate
-        
-        if (incoming.getActive() != null) existing.setActive(incoming.getActive());
+        if (dto.getPhone() != null){
+            existing.setPhone(dto.getPhone());
+        }
+        if (dto.getWebsite() != null){
+            existing.setWebsite(dto.getWebsite());
+        }
+        if (dto.getDescription() != null){
+            existing.setDescription(dto.getDescription());
+        }
+        if (dto.getActive() != null){
+            existing.setActive(dto.getActive());
+        }
         
         return bankRepository.save(existing);
     }
 
-    public Bank patchStatus(UUID id, boolean active){
+    public Bank patchStatus(Integer id, boolean active){
         Bank db = bankRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Bank not found"));
         db.setActive(active);
         return bankRepository.save(db);
     }
 
-    public void delete(UUID id){
+    public void delete(Integer id){
         Bank b = bankRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Bank not found"));
         b.setActive(false);

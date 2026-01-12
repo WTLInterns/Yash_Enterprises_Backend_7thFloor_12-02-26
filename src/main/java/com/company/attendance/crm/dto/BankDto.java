@@ -1,36 +1,46 @@
 package com.company.attendance.crm.dto;
 
 import lombok.Data;
+import jakarta.validation.constraints.NotBlank;
 import java.time.Instant;
-import java.util.Map;
-import java.util.UUID;
 
 @Data
 public class BankDto {
-    private UUID id;
-    private String bankName;
+    private Long id;
+    
+    @NotBlank(message = "Bank name is required")
+    private String name;
+    
     private String branchName;
-    private String address;
     private String phone;
     private String website;
+    private String address;
     private String district;
     private String taluka;
     private String pinCode;
     private String description;
-    private boolean active;
+    private String timezone;
+    private String dateFormat;
+    private String timeFormat;
+    private String currency;
+    private String taxId;
+    private String registrationNumber;
+    private String fiscalYearStart;
+    private String fiscalYearEnd;
+    private String primaryColor;
+    private String secondaryColor;
     
-    // Audit fields
+    private String customFields;
+    private Boolean active = true;
+    
+    // Audit fields (read-only in frontend)
     private Instant createdAt;
     private Instant updatedAt;
-    private UUID createdBy;
-    private UUID updatedBy;
-    private UUID ownerId;
+    private Integer createdBy;
+    private Integer updatedBy;
     
-    // Owner names
+    // Owner names for display
     private String createdByName;
     private String updatedByName;
     private String ownerName;
-    
-    // Custom fields
-    private Map<String, Object> customFields;
 }

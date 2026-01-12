@@ -9,6 +9,7 @@ import com.company.attendance.service.RoleService;
 import com.company.attendance.service.OrganizationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.bind.annotation.CrossOrigin;
 
@@ -26,6 +27,7 @@ public class AuthController {
     private final EmployeeService employeeService;
     private final RoleService roleService;
     private final OrganizationService organizationService;
+    private final PasswordEncoder passwordEncoder;
     
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
@@ -215,21 +217,20 @@ public class AuthController {
         }
     }
 
-    // Simple password validation for development
+    // BCrypt password validation
     private boolean isValidPassword(String inputPassword, Employee employee) {
-        // For development, check against common passwords based on role
-        String roleName = employee.getRole() != null ? employee.getRole().getName() : "";
-        
-        switch (roleName) {
-            case "ADMIN":
-                return "admin123".equals(inputPassword);
-            case "MANAGER":
-                return "manager123".equals(inputPassword);
-            case "EMPLOYEE":
-                return "employee123".equals(inputPassword);
-            default:
-                return "password123".equals(inputPassword);
+        // For existing users with simple hashes, fall back to role-based check
+        if (employee.getPasswordHash() != null && employee.getPasswordHash().startsWith("hash_")) {
+            String roleName = employee.getRole() != null ? employee.getRole().getName() : "";
+            switch (roleName) {
+                case "ADMIN": return "admin123".equals(inputPassword);
+                case "MANAGER": return "manager123".equals(inputPassword);
+                case "EMPLOYEE": return "employee123".equals(inputPassword);
+                default: return "password123".equals(inputPassword);
+            }
         }
+        // For BCrypt hashes, use BCrypt matcher
+        return passwordEncoder.matches(inputPassword, employee.getPasswordHash());
     }
 
     // Simple token generation (in production, use JWT)
@@ -237,10 +238,9 @@ public class AuthController {
         return "token_" + employee.getId() + "_" + System.currentTimeMillis();
     }
 
-    // Simple password hashing (in production, use BCrypt)
+    // BCrypt password hashing
     private String hashPassword(String password) {
-        // For development, simple hashing
-        return "hash_" + password;
+        return passwordEncoder.encode(password);
     }
 
     // Generate unique user ID

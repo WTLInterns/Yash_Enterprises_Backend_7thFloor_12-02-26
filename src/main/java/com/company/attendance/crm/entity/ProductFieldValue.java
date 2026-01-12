@@ -9,8 +9,8 @@ import java.util.UUID;
 })
 public class ProductFieldValue {
     @Id
-    @Column(length = 36)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
@@ -23,11 +23,8 @@ public class ProductFieldValue {
     @Lob
     private String value; // store as string/JSON
 
-    @PrePersist
-    public void prePersist(){ if (id == null) id = UUID.randomUUID(); }
-
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
     public Product getProduct() { return product; }
     public void setProduct(Product product) { this.product = product; }
     public ProductFieldDefinition getFieldDefinition() { return fieldDefinition; }

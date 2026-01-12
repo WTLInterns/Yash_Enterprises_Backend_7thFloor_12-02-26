@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.List;
-import java.util.UUID;
 
 @Tag(name = "Product Field Definitions")
 @RestController
@@ -30,12 +29,12 @@ public class ProductFieldDefinitionController {
     }
 
     @PutMapping("/{id}")
-    public ProductFieldDefinition update(@PathVariable UUID id, @RequestBody ProductFieldDefinition incoming){
+    public ProductFieldDefinition update(@PathVariable Integer id, @RequestBody ProductFieldDefinition incoming){
         return service.update(id, incoming);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable UUID id){
+    public ResponseEntity<Void> delete(@PathVariable Integer id){
         service.delete(id);
         return ResponseEntity.noContent().build();
     }

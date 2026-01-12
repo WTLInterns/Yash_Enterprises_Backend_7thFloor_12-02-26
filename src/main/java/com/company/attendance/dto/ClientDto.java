@@ -4,11 +4,10 @@ import lombok.Data;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Email;
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Data
 public class ClientDto {
-    private UUID id;
+    private Long id;
     
     @NotBlank(message = "Client name is required")
     private String name;
@@ -23,8 +22,8 @@ public class ClientDto {
     
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    private UUID createdBy;
-    private UUID updatedBy;
+    private Long createdBy;
+    private Long updatedBy;
 
     // Explicit getters/setters used by services/controllers (defensive if Lombok is not processed)
 
@@ -40,7 +39,11 @@ public class ClientDto {
         return email;
     }
 
-    public void setEmail(String email) {
-        this.email = email;
+    public Boolean getIsActive() {
+        return isActive;
+    }
+
+    public void setIsActive(Boolean isActive) {
+        this.isActive = isActive;
     }
 }

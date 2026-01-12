@@ -1,33 +1,38 @@
 package com.company.attendance.crm.dto;
 
 import lombok.Data;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Min;
+import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.Map;
-import java.util.UUID;
 
 @Data
 public class ProductDto {
-    private UUID id;
-    private String productName;
-    private String productCode;
-    private String description;
-    private String productCategory;
-    private Double unitPrice;
-    private UUID categoryId;
-    private boolean active;
+    private Long id;
     
-    // Audit fields
+    @NotBlank(message = "Product name is required")
+    private String name;
+    
+    private String code;
+    private String description;
+    private Long categoryId;
+    
+    @NotNull(message = "Price is required")
+    @Min(value = 0, message = "Price must be greater than or equal to 0")
+    private BigDecimal price;
+    
+    private Boolean active = true;
+    
+    private String customFields;
+    
+    // Audit fields (read-only in frontend)
     private Instant createdAt;
     private Instant updatedAt;
-    private UUID createdBy;
-    private UUID updatedBy;
-    private UUID ownerId;
-    
-    // Owner names
+    private Integer createdBy;
+    private Integer updatedBy;
     private String createdByName;
     private String updatedByName;
     private String ownerName;
-    
-    // Custom fields
-    private Map<String, Object> customFields;
+    private String categoryName;
 }

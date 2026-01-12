@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/test")
@@ -27,15 +26,13 @@ public class TestJsonController {
         try {
             // Create a test bank with custom fields
             Bank bank = new Bank();
-            bank.setId(UUID.randomUUID());
-            bank.setBankName("Test Bank");
-            bank.setBranchName("Test Branch");
+            bank.setId(null); // Auto-generated
+            bank.setName("Test Bank JSON");
+            bank.setCode("TEST001");
+            bank.setActive(true);
             
             // Test JSON custom fields
-            Map<String, Object> customFields = new HashMap<>();
-            customFields.put("customField1", "customValue1");
-            customFields.put("customField2", 123);
-            customFields.put("customField3", true);
+            String customFields = "{\"customField1\":\"customValue1\",\"customField2\":123,\"customField3\":true}";
             
             bank.setCustomFields(customFields);
             
@@ -57,7 +54,7 @@ public class TestJsonController {
         try {
             return bankRepository.findAll().stream()
                 .findFirst()
-                .map(bank -> ResponseEntity.ok("Found bank with custom fields: " + bank.getCustomFields()))
+                .map(bank -> ResponseEntity.ok("Found bank: " + bank.getName() + ", Custom fields: " + bank.getCustomFields()))
                 .orElse(ResponseEntity.ok("No banks found"));
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Get Test Failed: " + e.getMessage());

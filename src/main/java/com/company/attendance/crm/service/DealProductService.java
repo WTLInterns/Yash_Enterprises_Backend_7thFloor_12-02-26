@@ -10,7 +10,6 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.UUID;
 
 @Service
 public class DealProductService {
@@ -24,20 +23,19 @@ public class DealProductService {
         this.dealProductRepository = dealProductRepository;
     }
 
-    public List<DealProduct> list(UUID dealId){
-        Deal deal = dealRepository.findByIdSafe(dealId).orElseThrow(() -> new IllegalArgumentException("Deal not found"));
-        // Compatibility lookup for legacy schemas storing deal_id in padded BINARY(36)
-        return dealProductRepository.findByDealIdCompat(deal.getId().toString());
+    public List<DealProduct> list(Long dealId){
+        Deal deal = dealRepository.findByIdSafe(dealId.intValue());
+        return dealProductRepository.findByDeal(deal);
     }
 
-    public DealProduct create(UUID dealId, UUID productId, DealProduct incoming){
-        Deal deal = dealRepository.findByIdSafe(dealId).orElseThrow(() -> new IllegalArgumentException("Deal not found"));
+    public DealProduct create(Long dealId, Long productId, DealProduct incoming){
+        Deal deal = dealRepository.findByIdSafe(dealId.intValue());
         Product product = productRepository.findById(productId).orElseThrow(() -> new IllegalArgumentException("Product not found"));
         DealProduct dp = new DealProduct();
         dp.setDeal(deal);
         dp.setProduct(product);
-        // snapshot price: use incoming if provided else product.unitPrice
-        BigDecimal price = incoming.getUnitPrice() != null ? incoming.getUnitPrice() : product.getUnitPrice();
+        // snapshot price: use incoming if provided else product.price
+        BigDecimal price = incoming.getUnitPrice() != null ? incoming.getUnitPrice() : product.getPrice();
         dp.setUnitPrice(price);
         dp.setQuantity(incoming.getQuantity());
         dp.setDiscount(incoming.getDiscount());
@@ -46,9 +44,9 @@ public class DealProductService {
         return dealProductRepository.save(dp);
     }
 
-    public DealProduct update(UUID dealId, UUID dealProductId, DealProduct incoming){
-        DealProduct db = dealProductRepository.findById(dealProductId).orElseThrow(() -> new IllegalArgumentException("DealProduct not found"));
-        if (!db.getDeal().getId().equals(dealId)) throw new IllegalArgumentException("DealProduct not in deal");
+    public DealProduct update(Long dealId, Long dealProductId, DealProduct incoming){
+        DealProduct db = dealProductRepository.findById(dealProductId.intValue()).orElseThrow(() -> new IllegalArgumentException("DealProduct not found"));
+        if (!db.getDeal().getId().equals(dealId.intValue())) throw new IllegalArgumentException("DealProduct not in deal");
         // we allow editing quantity/discount/tax and unitPrice if needed (but it's snapshot semantics)
         if (incoming.getUnitPrice() != null) db.setUnitPrice(incoming.getUnitPrice());
         db.setQuantity(incoming.getQuantity());
@@ -58,9 +56,9 @@ public class DealProductService {
         return dealProductRepository.save(db);
     }
 
-    public void delete(UUID dealId, UUID dealProductId){
-        DealProduct db = dealProductRepository.findById(dealProductId).orElseThrow(() -> new IllegalArgumentException("DealProduct not found"));
-        if (!db.getDeal().getId().equals(dealId)) throw new IllegalArgumentException("DealProduct not in deal");
+    public void delete(Long dealId, Long dealProductId){
+        DealProduct db = dealProductRepository.findById(dealProductId.intValue()).orElseThrow(() -> new IllegalArgumentException("DealProduct not found"));
+        if (!db.getDeal().getId().equals(dealId.intValue())) throw new IllegalArgumentException("DealProduct not in deal");
         dealProductRepository.delete(db);
     }
 }

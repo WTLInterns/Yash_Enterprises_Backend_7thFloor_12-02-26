@@ -2,21 +2,23 @@ package com.company.attendance.crm.entity;
 
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
-import java.util.UUID;
 
 @Entity
 @Table(name = "files")
 public class FileMeta {
     @Id
-    @Column(length = 36)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "deal_id")
     private Deal deal; // nullable: can be linked to note or deal
 
-    @Column(name = "uploaded_by", length = 36)
-    private UUID uploadedBy;
+    @Column(name = "uploaded_by")
+    private Integer uploadedBy;
+
+    @Column(name = "created_by")
+    private Integer createdBy;
 
     private String fileName;
     private Long fileSize;
@@ -28,17 +30,18 @@ public class FileMeta {
 
     @PrePersist
     public void prePersist(){
-        if (id == null) id = UUID.randomUUID();
         if (createdAt == null) createdAt = OffsetDateTime.now();
     }
 
     // getters/setters
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
     public Deal getDeal() { return deal; }
     public void setDeal(Deal deal) { this.deal = deal; }
-    public UUID getUploadedBy() { return uploadedBy; }
-    public void setUploadedBy(UUID uploadedBy) { this.uploadedBy = uploadedBy; }
+    public Integer getUploadedBy() { return uploadedBy; }
+    public void setUploadedBy(Integer uploadedBy) { this.uploadedBy = uploadedBy; }
+    public Integer getCreatedBy() { return createdBy; }
+    public void setCreatedBy(Integer createdBy) { this.createdBy = createdBy; }
     public String getFileName() { return fileName; }
     public void setFileName(String fileName) { this.fileName = fileName; }
     public Long getFileSize() { return fileSize; }

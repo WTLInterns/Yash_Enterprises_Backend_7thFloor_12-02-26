@@ -5,7 +5,6 @@ import com.company.attendance.crm.repository.*;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.UUID;
 
 @Service
 public class BankFieldValueService {
@@ -19,13 +18,13 @@ public class BankFieldValueService {
         this.valRepo = valRepo;
     }
 
-    public List<BankFieldValue> list(UUID bankId){
-        Bank bank = bankRepository.findById(bankId).orElseThrow(() -> new IllegalArgumentException("Bank not found"));
+    public List<BankFieldValue> list(Integer bankId){
+        Bank bank = bankRepository.findByIdSafe(bankId);
         return valRepo.findByBank(bank);
     }
 
-    public BankFieldValue upsert(UUID bankId, String fieldKey, String value){
-        Bank bank = bankRepository.findById(bankId).orElseThrow(() -> new IllegalArgumentException("Bank not found"));
+    public BankFieldValue upsert(Integer bankId, String fieldKey, String value){
+        Bank bank = bankRepository.findByIdSafe(bankId);
         BankFieldDefinition def = defRepo.findByFieldKey(fieldKey).orElseThrow(() -> new IllegalArgumentException("Field not found"));
         BankFieldValue existing = valRepo.findByBankAndFieldDefinition(bank, def).orElse(null);
         if (existing == null){

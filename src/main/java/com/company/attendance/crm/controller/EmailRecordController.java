@@ -7,7 +7,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/deals/{dealId}/emails")
@@ -19,14 +18,14 @@ public class EmailRecordController {
     }
 
     @GetMapping
-    public List<EmailRecord> list(@PathVariable UUID dealId){
+    public List<EmailRecord> list(@PathVariable Integer dealId){
         return emailService.list(dealId);
     }
 
     @PostMapping("/send")
-    public ResponseEntity<EmailRecord> send(@PathVariable UUID dealId,
+    public ResponseEntity<EmailRecord> send(@PathVariable Integer dealId,
                                             @RequestBody EmailRecord record,
-                                            @RequestHeader(value = "X-User-Id", required = false) UUID userId){
+                                            @RequestHeader(value = "X-User-Id", required = false) Integer userId){
         EmailRecord sent = emailService.send(dealId, record, userId);
         return ResponseEntity.created(URI.create("/api/deals/"+dealId+"/emails/"+sent.getId())).body(sent);
     }

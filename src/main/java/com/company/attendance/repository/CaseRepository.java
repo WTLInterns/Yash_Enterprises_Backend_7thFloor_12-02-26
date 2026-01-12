@@ -7,14 +7,13 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 @Repository
 public interface CaseRepository extends JpaRepository<Case, Long> {
     
     List<Case> findByClient(Client client);
     
-    List<Case> findByClientId(UUID clientId);
+    List<Case> findByClientId(Long clientId);
     
     List<Case> findByClientAndStatus(Client client, String status);
     

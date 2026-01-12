@@ -8,7 +8,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import java.util.UUID;
+import java.util.Optional;
 
 @Service
 public class NoteService {
@@ -20,19 +20,19 @@ public class NoteService {
         this.noteRepository = noteRepository;
     }
 
-    public Page<Note> list(UUID dealId, Pageable pageable){
-        Deal deal = dealRepository.findByIdSafe(dealId).orElseThrow(() -> new IllegalArgumentException("Deal not found"));
+    public Page<Note> list(Integer dealId, Pageable pageable){
+        Deal deal = dealRepository.findByIdSafe(dealId);
         return noteRepository.findByDealOrderByCreatedAtDesc(deal, pageable);
     }
 
-    public Note create(UUID dealId, Note note, UUID userId){
-        Deal deal = dealRepository.findByIdSafe(dealId).orElseThrow(() -> new IllegalArgumentException("Deal not found"));
+    public Note create(Integer dealId, Note note, Integer userId){
+        Deal deal = dealRepository.findByIdSafe(dealId);
         note.setDeal(deal);
         note.setCreatedBy(userId);
         return noteRepository.save(note);
     }
 
-    public Note update(UUID dealId, UUID noteId, Note incoming){
+    public Note update(Integer dealId, Integer noteId, Note incoming){
         Note db = noteRepository.findById(noteId).orElseThrow(() -> new IllegalArgumentException("Note not found"));
         if (!db.getDeal().getId().equals(dealId)) throw new IllegalArgumentException("Note not in deal");
         db.setTitle(incoming.getTitle());
@@ -40,7 +40,7 @@ public class NoteService {
         return noteRepository.save(db);
     }
 
-    public void delete(UUID dealId, UUID noteId){
+    public void delete(Integer dealId, Integer noteId){
         Note db = noteRepository.findById(noteId).orElseThrow(() -> new IllegalArgumentException("Note not found"));
         if (!db.getDeal().getId().equals(dealId)) throw new IllegalArgumentException("Note not in deal");
         noteRepository.delete(db);

@@ -10,7 +10,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/deals/{dealId}/activities")
@@ -22,16 +21,16 @@ public class ActivityController {
     }
 
     @GetMapping
-    public Page<Activity> list(@PathVariable UUID dealId,
+    public Page<Activity> list(@PathVariable Integer dealId,
                                @RequestParam(value = "type", required = false) ActivityType type,
                                Pageable pageable) {
         return activityService.list(dealId, type, pageable);
     }
 
     @PostMapping
-    public ResponseEntity<Activity> create(@PathVariable UUID dealId,
+    public ResponseEntity<Activity> create(@PathVariable Integer dealId,
                                            @RequestBody Activity activity,
-                                           @RequestHeader(value = "X-User-Id", required = false) UUID userId) {
+                                           @RequestHeader(value = "X-User-Id", required = false) Integer userId) {
         try {
             Activity created = activityService.create(dealId, activity, userId);
             return ResponseEntity.created(URI.create("/api/deals/" + dealId + "/activities/" + created.getId())).body(created);
@@ -46,8 +45,8 @@ public class ActivityController {
     }
 
     @PutMapping("/{activityId}")
-    public ResponseEntity<Activity> update(@PathVariable UUID dealId,
-                           @PathVariable UUID activityId,
+    public ResponseEntity<Activity> update(@PathVariable Integer dealId,
+                           @PathVariable Integer activityId,
                            @RequestBody Activity incoming) {
         try {
             Activity updated = activityService.update(dealId, activityId, incoming);
@@ -63,16 +62,16 @@ public class ActivityController {
     }
 
     @PatchMapping("/{activityId}/status")
-    public ResponseEntity<Activity> patchStatus(@PathVariable UUID dealId,
-                                @PathVariable UUID activityId,
+    public ResponseEntity<Activity> patchStatus(@PathVariable Integer dealId,
+                                @PathVariable Integer activityId,
                                 @RequestParam("status") ActivityStatus status) {
         Activity updated = activityService.patchStatus(dealId, activityId, status);
         return ResponseEntity.ok(updated);
     }
 
     @DeleteMapping("/{activityId}")
-    public ResponseEntity<Void> delete(@PathVariable UUID dealId,
-                                       @PathVariable UUID activityId) {
+    public ResponseEntity<Void> delete(@PathVariable Integer dealId,
+                                       @PathVariable Integer activityId) {
         try {
             activityService.delete(dealId, activityId);
             return ResponseEntity.noContent().build();

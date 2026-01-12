@@ -7,7 +7,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.UUID;
 
 @Service
 public class EventActivityService {
@@ -21,8 +20,8 @@ public class EventActivityService {
         this.eventRepo = eventRepo;
     }
 
-    public EventActivity create(UUID dealId, EventActivity ev, UUID userId){
-        Deal deal = dealRepository.findByIdSafe(dealId).orElseThrow(() -> new IllegalArgumentException("Deal not found"));
+    public EventActivity create(Integer dealId, EventActivity ev, Integer userId){
+        Deal deal = dealRepository.findByIdSafe(dealId);
         Activity base = new Activity();
         base.setDeal(deal);
         base.setType(ActivityType.EVENT);

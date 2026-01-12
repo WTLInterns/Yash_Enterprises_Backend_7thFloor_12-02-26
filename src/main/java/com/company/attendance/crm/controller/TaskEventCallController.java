@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
-import java.util.UUID;
 
 import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 
@@ -30,9 +29,9 @@ public class TaskEventCallController {
     }
 
     @PostMapping("/tasks")
-    public ResponseEntity<Void> createTask(@PathVariable UUID dealId,
+    public ResponseEntity<Void> createTask(@PathVariable Integer dealId,
                                           @RequestBody TaskActivity task,
-                                          @RequestHeader(value = "X-User-Id", required = false) UUID userId){
+                                          @RequestHeader(value = "X-User-Id", required = false) Integer userId){
         try {
             TaskActivity created = taskService.create(dealId, task, userId);
             return ResponseEntity.created(URI.create("/api/deals/"+dealId+"/activities/"+created.getId())).build();
@@ -43,9 +42,9 @@ public class TaskEventCallController {
     }
 
     @PostMapping("/events")
-    public ResponseEntity<Void> createEvent(@PathVariable UUID dealId,
+    public ResponseEntity<Void> createEvent(@PathVariable Integer dealId,
                                            @RequestBody EventActivity ev,
-                                           @RequestHeader(value = "X-User-Id", required = false) UUID userId){
+                                           @RequestHeader(value = "X-User-Id", required = false) Integer userId){
         try {
             EventActivity created = eventService.create(dealId, ev, userId);
             return ResponseEntity.created(URI.create("/api/deals/"+dealId+"/activities/"+created.getId())).build();
@@ -56,9 +55,9 @@ public class TaskEventCallController {
     }
 
     @PostMapping("/calls")
-    public ResponseEntity<Void> createCall(@PathVariable UUID dealId,
+    public ResponseEntity<Void> createCall(@PathVariable Integer dealId,
                                           @RequestBody CallActivity call,
-                                          @RequestHeader(value = "X-User-Id", required = false) UUID userId){
+                                          @RequestHeader(value = "X-User-Id", required = false) Integer userId){
         try {
             CallActivity created = callService.create(dealId, call, userId);
             return ResponseEntity.created(URI.create("/api/deals/"+dealId+"/activities/"+created.getId())).build();

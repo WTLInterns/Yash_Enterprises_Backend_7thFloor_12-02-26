@@ -6,7 +6,9 @@ import java.util.UUID;
 @Entity
 @Table(name = "bank_field_values", uniqueConstraints = @UniqueConstraint(name = "uk_bank_field_value", columnNames = {"bank_id","field_definition_id"}))
 public class BankFieldValue {
-    @Id @Column(length = 36) private UUID id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "bank_id", nullable = false)
     private Bank bank;
@@ -18,11 +20,8 @@ public class BankFieldValue {
     @Lob
     private String value;
 
-    @PrePersist
-    public void prePersist(){ if (id == null) id = UUID.randomUUID(); }
-
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
     public Bank getBank() { return bank; }
     public void setBank(Bank bank) { this.bank = bank; }
     public BankFieldDefinition getFieldDefinition() { return fieldDefinition; }

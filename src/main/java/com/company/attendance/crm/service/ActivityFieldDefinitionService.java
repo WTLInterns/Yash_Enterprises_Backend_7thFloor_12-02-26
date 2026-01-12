@@ -6,7 +6,6 @@ import com.company.attendance.crm.repository.ActivityFieldDefinitionRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.UUID;
 
 @Service
 public class ActivityFieldDefinitionService {
@@ -22,15 +21,16 @@ public class ActivityFieldDefinitionService {
     public List<ActivityFieldDefinition> list(ActivityType type){
         return type == null ? repo.findAll() : repo.findByActivityTypeAndActiveTrue(type);
     }
-    public ActivityFieldDefinition update(UUID id, ActivityFieldDefinition incoming){
+    public ActivityFieldDefinition update(Integer id, ActivityFieldDefinition incoming){
         ActivityFieldDefinition db = repo.findById(id).orElseThrow(() -> new IllegalArgumentException("not found"));
         db.setFieldName(incoming.getFieldName());
         db.setFieldType(incoming.getFieldType());
+        db.setOptionsJson(incoming.getOptionsJson());
         db.setRequired(incoming.getRequired());
         db.setActive(incoming.getActive());
         return repo.save(db);
     }
-    public void delete(UUID id){ repo.deleteById(id); }
+    public void delete(Integer id){ repo.deleteById(id); }
 
     public boolean validateValue(ActivityType type, String fieldKey, String value){
         ActivityFieldDefinition def = repo.findByFieldKeyAndActivityType(fieldKey, type)

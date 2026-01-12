@@ -3,7 +3,6 @@ package com.company.attendance.dto;
 import lombok.Data;
 import jakarta.validation.constraints.NotBlank;
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Data
 public class CaseDto {
@@ -18,7 +17,7 @@ public class CaseDto {
     private String description;
     private String status;
     private String priority;
-    private UUID clientId;
+    private Long clientId;
     private String clientName;
     
     private LocalDateTime createdAt;

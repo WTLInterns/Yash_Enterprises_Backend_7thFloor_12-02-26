@@ -2,10 +2,9 @@ package com.company.attendance.crm.repository;
 
 import com.company.attendance.crm.entity.ProductCategory;
 import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.List;
 
-import java.util.UUID;
-
-public interface ProductCategoryRepository extends JpaRepository<ProductCategory, UUID> {
+public interface ProductCategoryRepository extends JpaRepository<ProductCategory, Integer> {
     boolean existsByNameIgnoreCase(String name);
-    boolean existsById(UUID id);
+    List<ProductCategory> findByActiveTrueOrderByNameAsc();
 }

@@ -1,37 +1,23 @@
 package com.company.attendance.entity;
 
 import jakarta.persistence.*;
-import lombok.Builder;
 import lombok.Data;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
-import lombok.Setter;
-import org.hibernate.annotations.JdbcTypeCode;
+import lombok.EqualsAndHashCode;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-import org.hibernate.annotations.UuidGenerator;
-import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 
 @Entity
 @Table(name = "clients")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Data
+@EqualsAndHashCode(callSuper = false)
 public class Client {
+    
     @Id
-    @GeneratedValue
-    @UuidGenerator
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
     
     @Column(nullable = false)
     private String name;
@@ -45,32 +31,21 @@ public class Client {
     @Column(columnDefinition = "TEXT")
     private String notes;
     
-    @Builder.Default
     @Column(name = "is_active")
     private Boolean isActive = true;
     
-    public boolean isActive() {
-        return isActive != null && isActive;
-    }
-    
-    @Column(columnDefinition = "json")
-    @JdbcTypeCode(SqlTypes.JSON)
-    private Map<String, Object> customFields;
-    
-    @Column(name = "owner_id")
-    private UUID ownerId;
-    
-    @OneToMany(mappedBy = "client", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Case> cases;
+    @Column(name="custom_fields", columnDefinition="json")
+    private String customFields;
     
     @CreationTimestamp
-    @Column(name = "created_at")
+    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
     
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
     
-    private UUID createdBy;
-    private UUID updatedBy;
+    private Long createdBy;
+    private Long updatedBy;
+    private Long ownerId;
 }

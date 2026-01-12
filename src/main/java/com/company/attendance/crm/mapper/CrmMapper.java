@@ -6,11 +6,8 @@ import com.company.attendance.crm.dto.ProductDto;
 import com.company.attendance.crm.entity.Bank;
 import com.company.attendance.crm.entity.Product;
 import com.company.attendance.entity.Client;
-import com.company.attendance.crm.service.BankService;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -22,30 +19,23 @@ public class CrmMapper {
         
         BankDto dto = new BankDto();
         dto.setId(bank.getId());
-        dto.setBankName(bank.getBankName());
+        dto.setName(bank.getName());
         dto.setBranchName(bank.getBranchName());
-        dto.setAddress(bank.getAddress());
         dto.setPhone(bank.getPhone());
         dto.setWebsite(bank.getWebsite());
+        dto.setAddress(bank.getAddress());
         dto.setDistrict(bank.getDistrict());
         dto.setTaluka(bank.getTaluka());
         dto.setPinCode(bank.getPinCode());
         dto.setDescription(bank.getDescription());
-        dto.setActive(bank.isActive());
+        dto.setCustomFields(bank.getCustomFields());
+        dto.setActive(bank.getActive());
         
         // Audit fields
-        dto.setCreatedAt(bank.getCreatedAt() != null ? bank.getCreatedAt().toInstant() : null);
-        dto.setUpdatedAt(bank.getUpdatedAt() != null ? bank.getUpdatedAt().toInstant() : null);
+        dto.setCreatedAt(bank.getCreatedAt());
+        dto.setUpdatedAt(bank.getUpdatedAt());
         dto.setCreatedBy(bank.getCreatedBy());
         dto.setUpdatedBy(bank.getUpdatedBy());
-        dto.setOwnerId(bank.getOwnerId());
-        
-        // Custom fields - now properly mapped with JSON support
-        if (bank.getCustomFields() != null) {
-            dto.setCustomFields(bank.getCustomFields());
-        } else {
-            dto.setCustomFields(new HashMap<>());
-        }
         
         return dto;
     }
@@ -55,26 +45,34 @@ public class CrmMapper {
         
         ProductDto dto = new ProductDto();
         dto.setId(product.getId());
-        dto.setProductName(product.getProductName());
-        dto.setProductCode(product.getProductCode());
+        dto.setName(product.getName());
+        dto.setCode(product.getCode());
         dto.setDescription(product.getDescription());
-        dto.setProductCategory(product.getProductCategory());
-        dto.setUnitPrice(product.getUnitPrice() != null ? product.getUnitPrice().doubleValue() : null);
         dto.setCategoryId(product.getCategoryId());
-        dto.setActive(product.isActive());
+        dto.setPrice(product.getPrice());
+        dto.setActive(product.getActive());
         
         // Audit fields
-        dto.setCreatedAt(product.getCreatedAt() != null ? product.getCreatedAt().toInstant() : null);
-        dto.setUpdatedAt(product.getUpdatedAt() != null ? product.getUpdatedAt().toInstant() : null);
+        dto.setCreatedAt(product.getCreatedAt());
+        dto.setUpdatedAt(product.getUpdatedAt());
         dto.setCreatedBy(product.getCreatedBy());
         dto.setUpdatedBy(product.getUpdatedBy());
-        dto.setOwnerId(product.getOwnerId());
         
-        // Custom fields - now properly mapped with JSON support
+        // Set owner name (in real app, fetch from user service)
+        dto.setOwnerName("Admin User");
+        dto.setCreatedByName("Admin User");
+        dto.setUpdatedByName("Admin User");
+        
+        // Category name
+        if (product.getCategory() != null) {
+            dto.setCategoryName(product.getCategory().getName());
+        }
+        
+        // Custom fields
         if (product.getCustomFields() != null) {
             dto.setCustomFields(product.getCustomFields());
         } else {
-            dto.setCustomFields(new HashMap<>());
+            dto.setCustomFields("{}");
         }
         
         return dto;
@@ -90,21 +88,24 @@ public class CrmMapper {
         dto.setContactPhone(client.getContactPhone());
         dto.setAddress(client.getAddress());
         dto.setNotes(client.getNotes());
-        dto.setActive(client.isActive());
+        dto.setActive(client.getIsActive());
+        dto.setCustomFields(client.getCustomFields());
         
-        // Audit fields - Client uses LocalDateTime
-        dto.setCreatedAt(client.getCreatedAt() != null ? client.getCreatedAt().toInstant(ZoneOffset.UTC) : null);
-        dto.setUpdatedAt(client.getUpdatedAt() != null ? client.getUpdatedAt().toInstant(ZoneOffset.UTC) : null);
-        dto.setCreatedBy(client.getCreatedBy());
-        dto.setUpdatedBy(client.getUpdatedBy());
-        dto.setOwnerId(client.getOwnerId());
-        
-        // Custom fields - now properly mapped with JSON support
-        if (client.getCustomFields() != null) {
-            dto.setCustomFields(client.getCustomFields());
-        } else {
-            dto.setCustomFields(new HashMap<>());
+        // Audit fields - convert LocalDateTime to Instant
+        if (client.getCreatedAt() != null) {
+            dto.setCreatedAt(client.getCreatedAt().toInstant(java.time.ZoneOffset.UTC));
         }
+        if (client.getUpdatedAt() != null) {
+            dto.setUpdatedAt(client.getUpdatedAt().toInstant(java.time.ZoneOffset.UTC));
+        }
+        dto.setCreatedBy(client.getCreatedBy() != null ? client.getCreatedBy().intValue() : null);
+        dto.setUpdatedBy(client.getUpdatedBy() != null ? client.getUpdatedBy().intValue() : null);
+        dto.setOwnerId(client.getOwnerId() != null ? client.getOwnerId().intValue() : null);
+        
+        // Set owner name (in real app, fetch from user service)
+        dto.setOwnerName("Admin User");
+        dto.setCreatedByName("Admin User");
+        dto.setUpdatedByName("Admin User");
         
         return dto;
     }
@@ -114,22 +115,17 @@ public class CrmMapper {
         
         Bank bank = new Bank();
         bank.setId(dto.getId());
-        bank.setBankName(dto.getBankName());
+        bank.setName(dto.getName());
         bank.setBranchName(dto.getBranchName());
-        bank.setAddress(dto.getAddress());
         bank.setPhone(dto.getPhone());
         bank.setWebsite(dto.getWebsite());
+        bank.setAddress(dto.getAddress());
         bank.setDistrict(dto.getDistrict());
         bank.setTaluka(dto.getTaluka());
         bank.setPinCode(dto.getPinCode());
         bank.setDescription(dto.getDescription());
-        bank.setActive(dto.isActive());
-        bank.setOwnerId(dto.getOwnerId());
-        
-        // Custom fields
-        if (dto.getCustomFields() != null) {
-            bank.setCustomFields(dto.getCustomFields());
-        }
+        bank.setCustomFields(dto.getCustomFields());
+        bank.setActive(dto.getActive());
         
         return bank;
     }
@@ -139,14 +135,12 @@ public class CrmMapper {
         
         Product product = new Product();
         product.setId(dto.getId());
-        product.setProductName(dto.getProductName());
-        product.setProductCode(dto.getProductCode());
+        product.setName(dto.getName());
+        product.setCode(dto.getCode());
         product.setDescription(dto.getDescription());
-        product.setProductCategory(dto.getProductCategory());
-        product.setUnitPrice(dto.getUnitPrice() != null ? java.math.BigDecimal.valueOf(dto.getUnitPrice()) : null);
         product.setCategoryId(dto.getCategoryId());
-        product.setActive(dto.isActive());
-        product.setOwnerId(dto.getOwnerId());
+        product.setPrice(dto.getPrice());
+        product.setActive(dto.getActive());
         
         // Custom fields
         if (dto.getCustomFields() != null) {
@@ -166,13 +160,7 @@ public class CrmMapper {
         client.setContactPhone(dto.getContactPhone());
         client.setAddress(dto.getAddress());
         client.setNotes(dto.getNotes());
-        client.setIsActive(dto.isActive());
-        client.setOwnerId(dto.getOwnerId());
-        
-        // Custom fields
-        if (dto.getCustomFields() != null) {
-            client.setCustomFields(dto.getCustomFields());
-        }
+        client.setIsActive(dto.getActive());
         
         return client;
     }

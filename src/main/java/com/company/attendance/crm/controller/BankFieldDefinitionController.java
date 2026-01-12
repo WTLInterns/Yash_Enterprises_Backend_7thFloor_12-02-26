@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.List;
-import java.util.UUID;
 
 @Tag(name = "Bank Field Definitions")
 @RestController
@@ -27,12 +26,12 @@ public class BankFieldDefinitionController {
     public List<BankFieldDefinition> list(){ return service.list(); }
 
     @PutMapping("/{id}")
-    public BankFieldDefinition update(@PathVariable UUID id, @RequestBody BankFieldDefinition incoming){
+    public BankFieldDefinition update(@PathVariable Integer id, @RequestBody BankFieldDefinition incoming){
         return service.update(id, incoming);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable UUID id){
+    public ResponseEntity<Void> delete(@PathVariable Integer id){
         service.delete(id);
         return ResponseEntity.noContent().build();
     }

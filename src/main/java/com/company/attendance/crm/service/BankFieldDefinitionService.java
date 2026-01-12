@@ -5,7 +5,6 @@ import com.company.attendance.crm.repository.BankFieldDefinitionRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.UUID;
 
 @Service
 public class BankFieldDefinitionService {
@@ -18,15 +17,16 @@ public class BankFieldDefinitionService {
         return repo.save(d);
     }
     public List<BankFieldDefinition> list(){ return repo.findAll(); }
-    public BankFieldDefinition update(UUID id, BankFieldDefinition incoming){
+    public BankFieldDefinition update(Integer id, BankFieldDefinition incoming){
         BankFieldDefinition db = repo.findById(id).orElseThrow(() -> new IllegalArgumentException("not found"));
         db.setFieldName(incoming.getFieldName());
         db.setFieldType(incoming.getFieldType());
+        db.setOptionsJson(incoming.getOptionsJson());
         db.setRequired(incoming.getRequired());
         db.setActive(incoming.getActive());
         return repo.save(db);
     }
-    public void delete(UUID id){ repo.deleteById(id); }
+    public void delete(Integer id){ repo.deleteById(id); }
 
     public boolean validateValue(String fieldKey, String value){
         BankFieldDefinition def = repo.findByFieldKey(fieldKey).orElseThrow(() -> new IllegalArgumentException("Field not found"));

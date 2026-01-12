@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.List;
-import java.util.UUID;
 
 @Tag(name = "Activity Field Definitions")
 @RestController
@@ -31,12 +30,12 @@ public class ActivityFieldDefinitionController {
     }
 
     @PutMapping("/{id}")
-    public ActivityFieldDefinition update(@PathVariable UUID id, @RequestBody ActivityFieldDefinition incoming){
+    public ActivityFieldDefinition update(@PathVariable Integer id, @RequestBody ActivityFieldDefinition incoming){
         return service.update(id, incoming);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable UUID id){
+    public ResponseEntity<Void> delete(@PathVariable Integer id){
         service.delete(id);
         return ResponseEntity.noContent().build();
     }
