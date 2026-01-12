@@ -5,6 +5,7 @@ import com.company.attendance.crm.entity.Bank;
 import com.company.attendance.crm.entity.Deal;
 import com.company.attendance.crm.mapper.SimpleCrmMapper;
 import com.company.attendance.crm.repository.DealRepository;
+import com.company.attendance.crm.service.AuditService;
 import com.company.attendance.crm.service.BankService;
 import com.company.attendance.exception.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,11 +26,13 @@ public class BankController {
     private final BankService bankService;
     private final DealRepository dealRepository;
     private final SimpleCrmMapper simpleCrmMapper;
+    private final AuditService auditService;
 
-    public BankController(BankService bankService, DealRepository dealRepository, SimpleCrmMapper simpleCrmMapper) {
+    public BankController(BankService bankService, DealRepository dealRepository, SimpleCrmMapper simpleCrmMapper, AuditService auditService) {
         this.bankService = bankService;
         this.dealRepository = dealRepository;
         this.simpleCrmMapper = simpleCrmMapper;
+        this.auditService = auditService;
     }
 
     @PostMapping
@@ -37,6 +40,11 @@ public class BankController {
         Bank bank = simpleCrmMapper.toBankEntity(bankDto);
         Bank created = bankService.create(bank);
         BankDto response = simpleCrmMapper.toBankDto(created);
+        // Owner is whoever just created the bank
+        Integer ownerId = created.getUpdatedBy() != null ? created.getUpdatedBy() : created.getCreatedBy();
+        response.setOwnerName(auditService.getUserName(ownerId));
+        response.setCreatedByName(auditService.getUserName(created.getCreatedBy()));
+        response.setUpdatedByName(auditService.getUserName(created.getUpdatedBy()));
         return ResponseEntity.created(URI.create("/api/banks/"+created.getId())).body(response);
     }
 
@@ -49,14 +57,28 @@ public class BankController {
         if (active == null && ownerId == null && (q == null || q.isBlank())) {
             Page<Bank> banks = bankService.list(pageable); // This returns only active=true
             List<BankDto> dtos = banks.getContent().stream()
-                .map(simpleCrmMapper::toBankDto)
+                .map(bank -> {
+                    BankDto dto = simpleCrmMapper.toBankDto(bank);
+                    Integer owner = bank.getUpdatedBy() != null ? bank.getUpdatedBy() : bank.getCreatedBy();
+                    dto.setOwnerName(auditService.getUserName(owner));
+                    dto.setCreatedByName(auditService.getUserName(bank.getCreatedBy()));
+                    dto.setUpdatedByName(auditService.getUserName(bank.getUpdatedBy()));
+                    return dto;
+                })
                 .collect(Collectors.toList());
             return new PageImpl<>(dtos, pageable, banks.getTotalElements());
         }
         Boolean effectiveActive = (active == null ? Boolean.TRUE : active);
         Page<Bank> banks = bankService.search(effectiveActive, ownerId, q, pageable);
         List<BankDto> dtos = banks.getContent().stream()
-            .map(simpleCrmMapper::toBankDto)
+            .map(bank -> {
+                BankDto dto = simpleCrmMapper.toBankDto(bank);
+                Integer owner = bank.getUpdatedBy() != null ? bank.getUpdatedBy() : bank.getCreatedBy();
+                dto.setOwnerName(auditService.getUserName(owner));
+                dto.setCreatedByName(auditService.getUserName(bank.getCreatedBy()));
+                dto.setUpdatedByName(auditService.getUserName(bank.getUpdatedBy()));
+                return dto;
+            })
             .collect(Collectors.toList());
         return new PageImpl<>(dtos, pageable, banks.getTotalElements());
     }
@@ -66,14 +88,22 @@ public class BankController {
         Bank bank = bankService.get(id)
             .orElseThrow(() -> new ResourceNotFoundException("Bank not found"));
         BankDto bankDto = simpleCrmMapper.toBankDto(bank);
+        Integer owner = bank.getUpdatedBy() != null ? bank.getUpdatedBy() : bank.getCreatedBy();
+        bankDto.setOwnerName(auditService.getUserName(owner));
+        bankDto.setCreatedByName(auditService.getUserName(bank.getCreatedBy()));
+        bankDto.setUpdatedByName(auditService.getUserName(bank.getUpdatedBy()));
         return ResponseEntity.ok(bankDto);
     }
 
     @PutMapping("/{id}")
     public BankDto update(@PathVariable Integer id, @RequestBody BankDto bankDto){
-        Bank bank = simpleCrmMapper.toBankEntity(bankDto);
         Bank updated = bankService.update(id, bankDto);
-        return simpleCrmMapper.toBankDto(updated);
+        BankDto dto = simpleCrmMapper.toBankDto(updated);
+        Integer owner = updated.getUpdatedBy() != null ? updated.getUpdatedBy() : updated.getCreatedBy();
+        dto.setOwnerName(auditService.getUserName(owner));
+        dto.setCreatedByName(auditService.getUserName(updated.getCreatedBy()));
+        dto.setUpdatedByName(auditService.getUserName(updated.getUpdatedBy()));
+        return dto;
     }
 
     @PatchMapping("/{id}/status")

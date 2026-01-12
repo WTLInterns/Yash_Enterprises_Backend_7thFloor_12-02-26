@@ -16,9 +16,11 @@ import java.util.Optional;
 @Service
 public class BankService {
     private final BankRepository bankRepository;
+    private final AuditService auditService;
 
-    public BankService(BankRepository bankRepository) { 
+    public BankService(BankRepository bankRepository, AuditService auditService) { 
         this.bankRepository = bankRepository; 
+        this.auditService = auditService;
     }
 
     public Bank create(Bank bank){
@@ -28,6 +30,8 @@ public class BankService {
         if (bankRepository.existsByNameIgnoreCase(bank.getName())){
             throw new IllegalArgumentException("Bank name already exists");
         }
+        // Set audit fields (createdBy, createdAt)
+        auditService.setAuditFields(bank);
         return bankRepository.save(bank);
     }
 
@@ -67,9 +71,17 @@ public class BankService {
         if (dto.getDescription() != null){
             existing.setDescription(dto.getDescription());
         }
+        if (dto.getDistrict() != null){
+            existing.setDistrict(dto.getDistrict());
+        }
+        if (dto.getTaluka() != null){
+            existing.setTaluka(dto.getTaluka());
+        }
         if (dto.getActive() != null){
             existing.setActive(dto.getActive());
         }
+        // Update audit fields (updatedBy, updatedAt)
+        auditService.updateAuditFields(existing);
         
         return bankRepository.save(existing);
     }

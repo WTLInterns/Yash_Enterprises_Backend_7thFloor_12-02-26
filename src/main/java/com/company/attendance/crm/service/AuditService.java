@@ -61,6 +61,32 @@ public class AuditService {
         return "Admin User";
     }
     
+    public String getUserName(Integer userId) {
+        if (userId == null) return null;
+        try {
+            return employeeRepository.findById(userId.longValue())
+                .map(e -> {
+                    String first = e.getFirstName();
+                    String last  = e.getLastName();
+
+                    if (first != null && !first.isBlank()) {
+                        String full = (first + " " + (last == null ? "" : last)).trim();
+                        return full;
+                    }
+
+                    String email = e.getEmail();
+                    if (email != null && !email.isBlank()) {
+                        return email;
+                    }
+
+                    return "User " + userId;
+                })
+                .orElse("User " + userId);
+        } catch (Exception e) {
+            return "User " + userId;
+        }
+    }
+    
     public void setAuditFields(Object entity) {
         try {
             // Use reflection to set audit fields if they exist

@@ -18,6 +18,9 @@ public class SimpleCrmMapper {
         bank.setAddress(dto.getAddress());
         bank.setDescription(dto.getDescription());
         bank.setActive(dto.getActive());
+        bank.setDistrict(dto.getDistrict());
+        bank.setTaluka(dto.getTaluka());
+        bank.setPinCode(dto.getPinCode());
         return bank;
     }
 
@@ -33,6 +36,11 @@ public class SimpleCrmMapper {
         dto.setAddress(bank.getAddress());
         dto.setDescription(bank.getDescription());
         dto.setActive(bank.getActive());
+        dto.setDistrict(bank.getDistrict());
+        dto.setTaluka(bank.getTaluka());
+        dto.setPinCode(bank.getPinCode());
+        dto.setCreatedAt(bank.getCreatedAt());
+        dto.setUpdatedAt(bank.getUpdatedAt());
         return dto;
     }
 }
