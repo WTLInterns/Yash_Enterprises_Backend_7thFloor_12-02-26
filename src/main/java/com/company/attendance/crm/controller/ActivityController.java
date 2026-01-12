@@ -21,14 +21,14 @@ public class ActivityController {
     }
 
     @GetMapping
-    public Page<Activity> list(@PathVariable Integer dealId,
+    public Page<Activity> list(@PathVariable("dealId") Integer dealId,
                                @RequestParam(value = "type", required = false) ActivityType type,
                                Pageable pageable) {
         return activityService.list(dealId, type, pageable);
     }
 
     @PostMapping
-    public ResponseEntity<Activity> create(@PathVariable Integer dealId,
+    public ResponseEntity<Activity> create(@PathVariable("dealId") Integer dealId,
                                            @RequestBody Activity activity,
                                            @RequestHeader(value = "X-User-Id", required = false) Integer userId) {
         try {
@@ -46,7 +46,7 @@ public class ActivityController {
 
     @PutMapping("/{activityId}")
     public ResponseEntity<Activity> update(@PathVariable Integer dealId,
-                           @PathVariable Integer activityId,
+                           @PathVariable("activityId") Long activityId,
                            @RequestBody Activity incoming) {
         try {
             Activity updated = activityService.update(dealId, activityId, incoming);
@@ -62,19 +62,25 @@ public class ActivityController {
     }
 
     @PatchMapping("/{activityId}/status")
-    public ResponseEntity<Activity> patchStatus(@PathVariable Integer dealId,
-                                @PathVariable Integer activityId,
+    public ResponseEntity<Activity> patchStatus(@PathVariable("dealId") Integer dealId,
+                                @PathVariable("activityId") Long activityId,
                                 @RequestParam("status") ActivityStatus status) {
         Activity updated = activityService.patchStatus(dealId, activityId, status);
         return ResponseEntity.ok(updated);
     }
 
     @DeleteMapping("/{activityId}")
-    public ResponseEntity<Void> delete(@PathVariable Integer dealId,
-                                       @PathVariable Integer activityId) {
+    public ResponseEntity<Void> delete(@PathVariable("dealId") Integer dealId,
+                                       @PathVariable("activityId") Long activityId) {
         try {
             activityService.delete(dealId, activityId);
             return ResponseEntity.noContent().build();
+        } catch (IllegalArgumentException e) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.CONFLICT,
+                e.getMessage(),
+                e
+            );
         } catch (Exception e) {
             org.slf4j.LoggerFactory.getLogger(ActivityController.class).error("Activity delete failed for deal {} activity {}", dealId, activityId, e);
             throw new org.springframework.web.server.ResponseStatusException(

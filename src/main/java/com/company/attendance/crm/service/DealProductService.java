@@ -1,15 +1,20 @@
 package com.company.attendance.crm.service;
 
+import com.company.attendance.crm.dto.DealProductDto;
+import com.company.attendance.crm.dto.DealProductRequestDto;
 import com.company.attendance.crm.entity.Deal;
 import com.company.attendance.crm.entity.DealProduct;
 import com.company.attendance.crm.entity.Product;
 import com.company.attendance.crm.repository.DealProductRepository;
 import com.company.attendance.crm.repository.DealRepository;
 import com.company.attendance.crm.repository.ProductRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class DealProductService {
@@ -23,14 +28,39 @@ public class DealProductService {
         this.dealProductRepository = dealProductRepository;
     }
 
-    public List<DealProduct> list(Long dealId){
-        Deal deal = dealRepository.findByIdSafe(dealId.intValue());
-        return dealProductRepository.findByDeal(deal);
+    private DealProductDto toDto(DealProduct dp) {
+        if (dp == null) return null;
+        DealProductDto dto = new DealProductDto();
+        dto.setId(dp.getId());
+        dto.setDealId(dp.getDeal() != null ? dp.getDeal().getId().longValue() : null);
+        dto.setProductId(dp.getProduct() != null ? dp.getProduct().getId() : null);
+        dto.setProductName(dp.getProduct() != null ? dp.getProduct().getName() : null);
+        dto.setUnitPrice(dp.getUnitPrice());
+        dto.setQuantity(dp.getQuantity());
+        dto.setDiscount(dp.getDiscount());
+        dto.setTax(dp.getTax());
+        dto.setTotal(dp.getTotal());
+        dto.setCreatedAt(dp.getCreatedAt());
+        dto.setUpdatedAt(dp.getUpdatedAt());
+        return dto;
     }
 
-    public DealProduct create(Long dealId, Long productId, DealProduct incoming){
+    public List<DealProductDto> list(Long dealId){
         Deal deal = dealRepository.findByIdSafe(dealId.intValue());
-        Product product = productRepository.findById(productId).orElseThrow(() -> new IllegalArgumentException("Product not found"));
+        return dealProductRepository.findByDeal(deal)
+            .stream()
+            .map(this::toDto)
+            .collect(Collectors.toList());
+    }
+
+    public DealProductDto create(Long dealId, DealProductRequestDto incoming){
+        if (incoming == null || incoming.getProductId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "productId is required");
+        }
+
+        Deal deal = dealRepository.findByIdSafe(dealId.intValue());
+        Product product = productRepository.findById(incoming.getProductId())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
         DealProduct dp = new DealProduct();
         dp.setDeal(deal);
         dp.setProduct(product);
@@ -41,19 +71,21 @@ public class DealProductService {
         dp.setDiscount(incoming.getDiscount());
         dp.setTax(incoming.getTax());
         dp.computeTotal();
-        return dealProductRepository.save(dp);
+        return toDto(dealProductRepository.save(dp));
     }
 
-    public DealProduct update(Long dealId, Long dealProductId, DealProduct incoming){
+    public DealProductDto update(Long dealId, Long dealProductId, DealProductRequestDto incoming){
         DealProduct db = dealProductRepository.findById(dealProductId.intValue()).orElseThrow(() -> new IllegalArgumentException("DealProduct not found"));
         if (!db.getDeal().getId().equals(dealId.intValue())) throw new IllegalArgumentException("DealProduct not in deal");
         // we allow editing quantity/discount/tax and unitPrice if needed (but it's snapshot semantics)
-        if (incoming.getUnitPrice() != null) db.setUnitPrice(incoming.getUnitPrice());
-        db.setQuantity(incoming.getQuantity());
-        db.setDiscount(incoming.getDiscount());
-        db.setTax(incoming.getTax());
+        if (incoming != null && incoming.getUnitPrice() != null) db.setUnitPrice(incoming.getUnitPrice());
+        if (incoming != null) {
+            db.setQuantity(incoming.getQuantity());
+            db.setDiscount(incoming.getDiscount());
+            db.setTax(incoming.getTax());
+        }
         db.computeTotal();
-        return dealProductRepository.save(db);
+        return toDto(dealProductRepository.save(db));
     }
 
     public void delete(Long dealId, Long dealProductId){

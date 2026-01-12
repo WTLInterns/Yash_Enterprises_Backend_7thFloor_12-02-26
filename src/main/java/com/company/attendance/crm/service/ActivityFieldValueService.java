@@ -19,12 +19,12 @@ public class ActivityFieldValueService {
         this.valRepo = valRepo;
     }
 
-    public List<ActivityFieldValue> list(Integer activityId){
+    public List<ActivityFieldValue> list(Long activityId){
         Activity act = activityRepository.findById(activityId).orElseThrow(() -> new IllegalArgumentException("Activity not found"));
         return valRepo.findByActivity(act);
     }
 
-    public ActivityFieldValue upsert(Integer activityId, ActivityType type, String fieldKey, String value){
+    public ActivityFieldValue upsert(Long activityId, ActivityType type, String fieldKey, String value){
         Activity act = activityRepository.findById(activityId).orElseThrow(() -> new IllegalArgumentException("Activity not found"));
         ActivityFieldDefinition def = defRepo.findByFieldKeyAndActivityType(fieldKey, type)
                 .orElseThrow(() -> new IllegalArgumentException("Field not found for type"));

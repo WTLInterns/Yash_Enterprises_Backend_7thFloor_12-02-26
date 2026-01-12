@@ -1,6 +1,7 @@
 package com.company.attendance.crm.controller;
 
-import com.company.attendance.crm.entity.DealProduct;
+import com.company.attendance.crm.dto.DealProductDto;
+import com.company.attendance.crm.dto.DealProductRequestDto;
 import com.company.attendance.crm.service.DealProductService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
@@ -8,7 +9,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.List;
-import java.util.Map;
 
 @Tag(name = "Deal Products")
 @RestController
@@ -19,19 +19,18 @@ public class DealProductController {
     public DealProductController(DealProductService service) { this.service = service; }
 
     @GetMapping
-    public List<DealProduct> list(@PathVariable Long dealId){
+    public List<DealProductDto> list(@PathVariable Long dealId){
         return service.list(dealId);
     }
 
     @PostMapping
-    public ResponseEntity<DealProduct> create(@PathVariable Long dealId, @RequestBody DealProduct payload){
-        Long productId = payload.getProduct() != null ? payload.getProduct().getId() : null;
-        DealProduct created = service.create(dealId, productId, payload);
+    public ResponseEntity<DealProductDto> create(@PathVariable Long dealId, @RequestBody DealProductRequestDto payload){
+        DealProductDto created = service.create(dealId, payload);
         return ResponseEntity.created(URI.create("/api/deals/"+dealId+"/products/"+created.getId())).body(created);
     }
 
     @PutMapping("/{dealProductId}")
-    public DealProduct update(@PathVariable Long dealId, @PathVariable Long dealProductId, @RequestBody DealProduct payload){
+    public DealProductDto update(@PathVariable Long dealId, @PathVariable Long dealProductId, @RequestBody DealProductRequestDto payload){
         return service.update(dealId, dealProductId, payload);
     }
 

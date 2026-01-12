@@ -2,166 +2,230 @@ package com.company.attendance.crm.mapper;
 
 import com.company.attendance.crm.dto.BankDto;
 import com.company.attendance.crm.dto.ClientDto;
+import com.company.attendance.crm.dto.DealDto;
 import com.company.attendance.crm.dto.ProductDto;
 import com.company.attendance.crm.entity.Bank;
+import com.company.attendance.crm.entity.Deal;
 import com.company.attendance.crm.entity.Product;
 import com.company.attendance.entity.Client;
+import com.company.attendance.entity.Employee;
+import com.company.attendance.repository.EmployeeRepository;
 import org.springframework.stereotype.Component;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.time.ZoneOffset;
+import java.util.Optional;
 
 @Component
 public class CrmMapper {
 
-    public BankDto toBankDto(Bank bank) {
-        if (bank == null) return null;
-        
-        BankDto dto = new BankDto();
-        dto.setId(bank.getId());
-        dto.setName(bank.getName());
-        dto.setBranchName(bank.getBranchName());
-        dto.setPhone(bank.getPhone());
-        dto.setWebsite(bank.getWebsite());
-        dto.setAddress(bank.getAddress());
-        dto.setDistrict(bank.getDistrict());
-        dto.setTaluka(bank.getTaluka());
-        dto.setPinCode(bank.getPinCode());
-        dto.setDescription(bank.getDescription());
-        dto.setCustomFields(bank.getCustomFields());
-        dto.setActive(bank.getActive());
-        
-        // Audit fields
-        dto.setCreatedAt(bank.getCreatedAt());
-        dto.setUpdatedAt(bank.getUpdatedAt());
-        dto.setCreatedBy(bank.getCreatedBy());
-        dto.setUpdatedBy(bank.getUpdatedBy());
-        
-        return dto;
-    }
+  private final EmployeeRepository employeeRepository;
 
-    public ProductDto toProductDto(Product product) {
-        if (product == null) return null;
-        
-        ProductDto dto = new ProductDto();
-        dto.setId(product.getId());
-        dto.setName(product.getName());
-        dto.setCode(product.getCode());
-        dto.setDescription(product.getDescription());
-        dto.setCategoryId(product.getCategoryId());
-        dto.setPrice(product.getPrice());
-        dto.setActive(product.getActive());
-        
-        // Audit fields
-        dto.setCreatedAt(product.getCreatedAt());
-        dto.setUpdatedAt(product.getUpdatedAt());
-        dto.setCreatedBy(product.getCreatedBy());
-        dto.setUpdatedBy(product.getUpdatedBy());
-        
-        // Set owner name (in real app, fetch from user service)
-        dto.setOwnerName("Admin User");
-        dto.setCreatedByName("Admin User");
-        dto.setUpdatedByName("Admin User");
-        
-        // Category name
-        if (product.getCategory() != null) {
-            dto.setCategoryName(product.getCategory().getName());
-        }
-        
-        // Custom fields
-        if (product.getCustomFields() != null) {
-            dto.setCustomFields(product.getCustomFields());
-        } else {
-            dto.setCustomFields("{}");
-        }
-        
-        return dto;
-    }
+  public CrmMapper(EmployeeRepository employeeRepository) {
+    this.employeeRepository = employeeRepository;
+  }
 
-    public ClientDto toClientDto(Client client) {
-        if (client == null) return null;
-        
-        ClientDto dto = new ClientDto();
-        dto.setId(client.getId());
-        dto.setName(client.getName());
-        dto.setEmail(client.getEmail());
-        dto.setContactPhone(client.getContactPhone());
-        dto.setAddress(client.getAddress());
-        dto.setNotes(client.getNotes());
-        dto.setActive(client.getIsActive());
-        dto.setCustomFields(client.getCustomFields());
-        
-        // Audit fields - convert LocalDateTime to Instant
-        if (client.getCreatedAt() != null) {
-            dto.setCreatedAt(client.getCreatedAt().toInstant(java.time.ZoneOffset.UTC));
-        }
-        if (client.getUpdatedAt() != null) {
-            dto.setUpdatedAt(client.getUpdatedAt().toInstant(java.time.ZoneOffset.UTC));
-        }
-        dto.setCreatedBy(client.getCreatedBy() != null ? client.getCreatedBy().intValue() : null);
-        dto.setUpdatedBy(client.getUpdatedBy() != null ? client.getUpdatedBy().intValue() : null);
-        dto.setOwnerId(client.getOwnerId() != null ? client.getOwnerId().intValue() : null);
-        
-        // Set owner name (in real app, fetch from user service)
-        dto.setOwnerName("Admin User");
-        dto.setCreatedByName("Admin User");
-        dto.setUpdatedByName("Admin User");
-        
-        return dto;
-    }
+  private String employeeName(Integer employeeId) {
+    if (employeeId == null) return null;
+    Optional<Employee> emp = employeeRepository.findById(employeeId.longValue());
+    if (emp.isEmpty()) return null;
+    String first = emp.get().getFirstName() != null ? emp.get().getFirstName().trim() : "";
+    String last = emp.get().getLastName() != null ? emp.get().getLastName().trim() : "";
+    String full = (first + " " + last).trim();
+    return full.isEmpty() ? null : full;
+  }
 
-    public Bank toBankEntity(BankDto dto) {
-        if (dto == null) return null;
-        
-        Bank bank = new Bank();
-        bank.setId(dto.getId());
-        bank.setName(dto.getName());
-        bank.setBranchName(dto.getBranchName());
-        bank.setPhone(dto.getPhone());
-        bank.setWebsite(dto.getWebsite());
-        bank.setAddress(dto.getAddress());
-        bank.setDistrict(dto.getDistrict());
-        bank.setTaluka(dto.getTaluka());
-        bank.setPinCode(dto.getPinCode());
-        bank.setDescription(dto.getDescription());
-        bank.setCustomFields(dto.getCustomFields());
-        bank.setActive(dto.getActive());
-        
-        return bank;
-    }
+  // ---- Bank ----
+  public BankDto toBankDto(Bank bank) {
+    if (bank == null) return null;
+    BankDto dto = new BankDto();
+    dto.setId(bank.getId());
+    dto.setName(bank.getName());
+    dto.setBranchName(bank.getBranchName());
+    dto.setPhone(bank.getPhone());
+    dto.setWebsite(bank.getWebsite());
+    dto.setAddress(bank.getAddress());
+    dto.setDistrict(bank.getDistrict());
+    dto.setTaluka(bank.getTaluka());
+    dto.setPinCode(bank.getPinCode());
+    dto.setDescription(bank.getDescription());
+    dto.setCustomFields(bank.getCustomFields());
+    dto.setActive(bank.getActive());
+    dto.setCreatedAt(bank.getCreatedAt());
+    dto.setUpdatedAt(bank.getUpdatedAt());
+    dto.setCreatedBy(bank.getCreatedBy());
+    dto.setUpdatedBy(bank.getUpdatedBy());
+    dto.setCreatedByName(employeeName(bank.getCreatedBy()));
+    dto.setUpdatedByName(employeeName(bank.getUpdatedBy()));
+    return dto;
+  }
 
-    public Product toProductEntity(ProductDto dto) {
-        if (dto == null) return null;
-        
-        Product product = new Product();
-        product.setId(dto.getId());
-        product.setName(dto.getName());
-        product.setCode(dto.getCode());
-        product.setDescription(dto.getDescription());
-        product.setCategoryId(dto.getCategoryId());
-        product.setPrice(dto.getPrice());
-        product.setActive(dto.getActive());
-        
-        // Custom fields
-        if (dto.getCustomFields() != null) {
-            product.setCustomFields(dto.getCustomFields());
-        }
-        
-        return product;
-    }
+  public Bank toBankEntity(BankDto dto) {
+    if (dto == null) return null;
+    Bank bank = new Bank();
+    bank.setId(dto.getId());
+    bank.setName(dto.getName());
+    bank.setBranchName(dto.getBranchName());
+    bank.setPhone(dto.getPhone());
+    bank.setWebsite(dto.getWebsite());
+    bank.setAddress(dto.getAddress());
+    bank.setDistrict(dto.getDistrict());
+    bank.setTaluka(dto.getTaluka());
+    bank.setPinCode(dto.getPinCode());
+    bank.setDescription(dto.getDescription());
+    bank.setCustomFields(dto.getCustomFields());
+    bank.setActive(dto.getActive());
+    return bank;
+  }
 
-    public Client toClientEntity(ClientDto dto) {
-        if (dto == null) return null;
-        
-        Client client = new Client();
-        client.setId(dto.getId());
-        client.setName(dto.getName());
-        client.setEmail(dto.getEmail());
-        client.setContactPhone(dto.getContactPhone());
-        client.setAddress(dto.getAddress());
-        client.setNotes(dto.getNotes());
-        client.setIsActive(dto.getActive());
-        
-        return client;
+  // ---- Product ----
+  public ProductDto toProductDto(Product product) {
+    if (product == null) return null;
+    ProductDto dto = new ProductDto();
+    dto.setId(product.getId());
+    dto.setName(product.getName());
+    dto.setCode(product.getCode());
+    dto.setDescription(product.getDescription());
+    dto.setCategoryId(product.getCategoryId());
+    dto.setPrice(product.getPrice());
+    dto.setActive(product.getActive());
+    dto.setCreatedAt(product.getCreatedAt());
+    dto.setUpdatedAt(product.getUpdatedAt());
+    dto.setCreatedBy(product.getCreatedBy());
+    dto.setUpdatedBy(product.getUpdatedBy());
+    dto.setCreatedByName(employeeName(product.getCreatedBy()));
+    dto.setUpdatedByName(employeeName(product.getUpdatedBy()));
+    dto.setOwnerName(employeeName(product.getCreatedBy()));
+    dto.setCategoryName(product.getCategory() != null ? product.getCategory().getName() : null);
+    dto.setCustomFields(product.getCustomFields() != null ? product.getCustomFields() : "{}");
+    return dto;
+  }
+
+  public Product toProductEntity(ProductDto dto) {
+    if (dto == null) return null;
+    Product product = new Product();
+    product.setId(dto.getId());
+    product.setName(dto.getName());
+    product.setCode(dto.getCode());
+    product.setDescription(dto.getDescription());
+    product.setCategoryId(dto.getCategoryId());
+    product.setPrice(dto.getPrice());
+    product.setActive(dto.getActive());
+    if (dto.getCustomFields() != null) {
+      product.setCustomFields(dto.getCustomFields());
     }
+    return product;
+  }
+
+  // ---- Client ----
+  public ClientDto toClientDto(Client client) {
+    if (client == null) return null;
+    ClientDto dto = new ClientDto();
+    dto.setId(client.getId());
+    dto.setName(client.getName());
+    dto.setEmail(client.getEmail());
+    dto.setContactPhone(client.getContactPhone());
+    dto.setAddress(client.getAddress());
+    dto.setNotes(client.getNotes());
+    dto.setActive(client.getIsActive());
+
+    if (client.getCreatedAt() != null) {
+      dto.setCreatedAt(client.getCreatedAt().toInstant(ZoneOffset.UTC));
+    }
+    if (client.getUpdatedAt() != null) {
+      dto.setUpdatedAt(client.getUpdatedAt().toInstant(ZoneOffset.UTC));
+    }
+    dto.setCreatedBy(client.getCreatedBy() != null ? client.getCreatedBy().intValue() : null);
+    dto.setUpdatedBy(client.getUpdatedBy() != null ? client.getUpdatedBy().intValue() : null);
+    dto.setOwnerId(client.getOwnerId() != null ? client.getOwnerId().intValue() : null);
+
+    dto.setCreatedByName(employeeName(dto.getCreatedBy()));
+    dto.setUpdatedByName(employeeName(dto.getUpdatedBy()));
+    dto.setOwnerName(employeeName(dto.getOwnerId()));
+
+    return dto;
+  }
+
+  public Client toClientEntity(ClientDto dto) {
+    if (dto == null) return null;
+    Client client = new Client();
+    client.setId(dto.getId());
+    client.setName(dto.getName());
+    client.setEmail(dto.getEmail());
+    client.setContactPhone(dto.getContactPhone());
+    client.setAddress(dto.getAddress());
+    client.setNotes(dto.getNotes());
+    client.setIsActive(dto.getActive());
+    client.setCustomFields(dto.getCustomFields());
+    client.setOwnerId(dto.getOwnerId() != null ? dto.getOwnerId().longValue() : null);
+    client.setCreatedBy(dto.getCreatedBy() != null ? dto.getCreatedBy().longValue() : null);
+    client.setUpdatedBy(dto.getUpdatedBy() != null ? dto.getUpdatedBy().longValue() : null);
+    return client;
+  }
+
+  // ---- Deal (FIXED) ----
+  public DealDto toDealDto(Deal deal) {
+    if (deal == null) return null;
+
+    DealDto dto = new DealDto();
+    dto.setId(deal.getId());
+    dto.setClientId(deal.getClientId());
+    dto.setBankId(deal.getBankId()); // IMPORTANT: prefill bank dropdown on UI
+
+    dto.setName(deal.getName());
+    dto.setValueAmount(deal.getValueAmount());
+    dto.setClosingDate(deal.getClosingDate());
+    dto.setBranchName(deal.getBranchName());
+    dto.setRelatedBankName(deal.getRelatedBankName());
+    dto.setDescription(deal.getDescription());
+    dto.setRequiredAmount(deal.getRequiredAmount());
+    dto.setOutstandingAmount(deal.getOutstandingAmount());
+    dto.setStage(deal.getStage() != null ? deal.getStage().name() : null);
+    dto.setActive(deal.getActive());
+
+    if (deal.getCreatedAt() != null) {
+      dto.setCreatedAt(deal.getCreatedAt().toInstant(ZoneOffset.UTC));
+    }
+    if (deal.getUpdatedAt() != null) {
+      dto.setUpdatedAt(deal.getUpdatedAt().toInstant(ZoneOffset.UTC));
+    }
+    dto.setCreatedBy(deal.getCreatedBy());
+    dto.setUpdatedBy(deal.getUpdatedBy());
+    dto.setCreatedByName(employeeName(deal.getCreatedBy()));
+    dto.setUpdatedByName(employeeName(deal.getUpdatedBy()));
+    dto.setOwnerName(employeeName(deal.getCreatedBy()));
+
+    // Optional display fields if relations loaded
+    dto.setClientName(deal.getClient() != null ? deal.getClient().getName() : null);
+    dto.setBankName(deal.getBank() != null ? deal.getBank().getName() : null);
+
+    // Keep customFields default if absent
+    if (dto.getCustomFields() == null) {
+      dto.setCustomFields("{}");
+    }
+    return dto;
+  }
+
+  public Deal toDealEntity(DealDto dto) {
+    if (dto == null) return null;
+
+    Deal deal = new Deal();
+    deal.setId(dto.getId());
+    deal.setClientId(dto.getClientId());
+    deal.setBankId(dto.getBankId()); // IMPORTANT: persist bankId from UI
+    deal.setName(dto.getName());
+    deal.setValueAmount(dto.getValueAmount());
+    deal.setClosingDate(dto.getClosingDate());
+    deal.setBranchName(dto.getBranchName());
+    deal.setRelatedBankName(dto.getRelatedBankName());
+    deal.setDescription(dto.getDescription());
+    deal.setRequiredAmount(dto.getRequiredAmount());
+    deal.setOutstandingAmount(dto.getOutstandingAmount());
+    if (dto.getStage() != null) {
+      try {
+        deal.setStage(com.company.attendance.crm.enums.DealStage.valueOf(dto.getStage()));
+      } catch (IllegalArgumentException ignored) {}
+    }
+    deal.setActive(dto.getActive());
+    return deal;
+  }
 }

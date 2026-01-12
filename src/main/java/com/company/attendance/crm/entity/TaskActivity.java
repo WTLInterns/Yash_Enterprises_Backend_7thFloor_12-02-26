@@ -7,14 +7,12 @@ import org.springframework.data.domain.Persistable;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.UUID;
 
 @Entity
 @Table(name = "task_activities")
-public class TaskActivity implements Persistable<UUID> {
+public class TaskActivity implements Persistable<Long> {
     @Id
-    @Column(length = 36)
-    private UUID id; // same as Activity.id
+    private Long id; // same as Activity.id
 
     @Transient
     private boolean isNew = true;
@@ -50,8 +48,8 @@ public class TaskActivity implements Persistable<UUID> {
     @Column(name = "expense_description")
     private String expenseDescription;
 
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
 
     @Override
     public boolean isNew() {

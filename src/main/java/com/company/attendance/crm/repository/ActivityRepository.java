@@ -8,7 +8,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
-public interface ActivityRepository extends JpaRepository<Activity, Integer> {
+public interface ActivityRepository extends JpaRepository<Activity, Long> {
     Page<Activity> findByDeal(Deal deal, Pageable pageable);
     Page<Activity> findByDealAndType(Deal deal, ActivityType type, Pageable pageable);
     List<Activity> findByDealOrderByCreatedAtDesc(Deal deal);

@@ -22,6 +22,14 @@ public class Deal {
     @Column(name = "client_id", nullable = false)
     private Long clientId;
     
+    // Optional: store selected bank
+    @Column(name = "bank_id")
+    private Long bankId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "bank_id", insertable = false, updatable = false)
+    private Bank bank;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "client_id", insertable = false, updatable = false)
     private com.company.attendance.entity.Client client;

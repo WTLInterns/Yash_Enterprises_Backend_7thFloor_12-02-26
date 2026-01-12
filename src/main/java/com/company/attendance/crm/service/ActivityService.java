@@ -5,7 +5,10 @@ import com.company.attendance.crm.entity.Deal;
 import com.company.attendance.crm.enums.ActivityStatus;
 import com.company.attendance.crm.enums.ActivityType;
 import com.company.attendance.crm.repository.ActivityRepository;
+import com.company.attendance.crm.repository.CallActivityRepository;
 import com.company.attendance.crm.repository.DealRepository;
+import com.company.attendance.crm.repository.EventActivityRepository;
+import com.company.attendance.crm.repository.TaskActivityRepository;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,10 +22,22 @@ import java.time.OffsetDateTime;
 public class ActivityService {
     private final DealRepository dealRepository;
     private final ActivityRepository activityRepository;
+    private final TaskActivityRepository taskActivityRepository;
+    private final EventActivityRepository eventActivityRepository;
+    private final CallActivityRepository callActivityRepository;
 
-    public ActivityService(DealRepository dealRepository, ActivityRepository activityRepository) {
+    public ActivityService(
+        DealRepository dealRepository,
+        ActivityRepository activityRepository,
+        TaskActivityRepository taskActivityRepository,
+        EventActivityRepository eventActivityRepository,
+        CallActivityRepository callActivityRepository
+    ) {
         this.dealRepository = dealRepository;
         this.activityRepository = activityRepository;
+        this.taskActivityRepository = taskActivityRepository;
+        this.eventActivityRepository = eventActivityRepository;
+        this.callActivityRepository = callActivityRepository;
     }
 
     public Page<Activity> list(Integer dealId, ActivityType type, Pageable pageable){
@@ -44,7 +59,7 @@ public class ActivityService {
         return activityRepository.save(activity);
     }
 
-    public Activity update(Integer dealId, Integer activityId, Activity incoming){
+    public Activity update(Integer dealId, Long activityId, Activity incoming){
         Activity db = activityRepository.findById(activityId).orElseThrow(() -> new IllegalArgumentException("Activity not found"));
         if (!db.getDeal().getId().equals(dealId)) throw new IllegalArgumentException("Activity not in deal");
         db.setName(incoming.getName());
@@ -61,16 +76,23 @@ public class ActivityService {
         return activityRepository.save(db);
     }
 
-    public Activity patchStatus(Integer dealId, Integer activityId, ActivityStatus status){
+    public Activity patchStatus(Integer dealId, Long activityId, ActivityStatus status){
         Activity db = activityRepository.findById(activityId).orElseThrow(() -> new IllegalArgumentException("Activity not found"));
         if (!db.getDeal().getId().equals(dealId)) throw new IllegalArgumentException("Activity not in deal");
         db.setStatus(status);
         return activityRepository.save(db);
     }
 
-    public void delete(Integer dealId, Integer activityId){
+    public void delete(Integer dealId, Long activityId){
         Activity db = activityRepository.findById(activityId).orElseThrow(() -> new IllegalArgumentException("Activity not found"));
         if (!db.getDeal().getId().equals(dealId)) throw new IllegalArgumentException("Activity not in deal");
+
+        // Child tables use @MapsId (PK=FK to activities.id). Delete child first to avoid FK constraint violations.
+        // Safe to call even if no child row exists.
+        try { taskActivityRepository.deleteById(activityId); } catch (org.springframework.dao.EmptyResultDataAccessException ignored) {}
+        try { eventActivityRepository.deleteById(activityId); } catch (org.springframework.dao.EmptyResultDataAccessException ignored) {}
+        try { callActivityRepository.deleteById(activityId); } catch (org.springframework.dao.EmptyResultDataAccessException ignored) {}
+
         activityRepository.delete(db);
     }
 }

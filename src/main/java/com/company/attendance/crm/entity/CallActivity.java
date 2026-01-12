@@ -5,14 +5,12 @@ import jakarta.persistence.*;
 import org.springframework.data.domain.Persistable;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Entity
 @Table(name = "call_activities")
-public class CallActivity implements Persistable<UUID> {
+public class CallActivity implements Persistable<Long> {
     @Id
-    @Column(length = 36)
-    private UUID id; // same as Activity.id
+    private Long id; // same as Activity.id
 
     @Transient
     private boolean isNew = true;
@@ -35,8 +33,8 @@ public class CallActivity implements Persistable<UUID> {
 
     private String recordingUrl;
 
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
 
     @Override
     public boolean isNew() {

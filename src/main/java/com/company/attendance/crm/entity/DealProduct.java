@@ -1,5 +1,6 @@
 package com.company.attendance.crm.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -13,10 +14,12 @@ public class DealProduct {
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "deal_id", nullable = false)
+    @JsonIgnore
     private Deal deal;
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
+    @JsonIgnore
     private Product product;
 
     @Column(name = "unit_price")

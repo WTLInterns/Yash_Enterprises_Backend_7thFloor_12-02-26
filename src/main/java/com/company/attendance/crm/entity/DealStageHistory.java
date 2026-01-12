@@ -27,7 +27,7 @@ public class DealStageHistory {
     private DealStage newStage;
 
     @Column(name = "changed_by", length = 36)
-    private UUID changedBy;
+    private String changedBy;
 
     @Column(name = "changed_at", nullable = false)
     private OffsetDateTime changedAt;
@@ -50,8 +50,8 @@ public class DealStageHistory {
     public void setPreviousStage(DealStage previousStage) { this.previousStage = previousStage; }
     public DealStage getNewStage() { return newStage; }
     public void setNewStage(DealStage newStage) { this.newStage = newStage; }
-    public UUID getChangedBy() { return changedBy; }
-    public void setChangedBy(UUID changedBy) { this.changedBy = changedBy; }
+    public String getChangedBy() { return changedBy; }
+    public void setChangedBy(String changedBy) { this.changedBy = changedBy; }
     public OffsetDateTime getChangedAt() { return changedAt; }
     public void setChangedAt(OffsetDateTime changedAt) { this.changedAt = changedAt; }
     public String getNote() { return note; }

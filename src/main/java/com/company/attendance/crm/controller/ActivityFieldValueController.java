@@ -19,10 +19,10 @@ public class ActivityFieldValueController {
     public ActivityFieldValueController(ActivityFieldValueService service) { this.service = service; }
 
     @GetMapping
-    public List<ActivityFieldValue> list(@PathVariable Integer activityId){ return service.list(activityId); }
+    public List<ActivityFieldValue> list(@PathVariable Long activityId){ return service.list(activityId); }
 
     @PostMapping
-    public ResponseEntity<ActivityFieldValue> upsert(@PathVariable Integer activityId,
+    public ResponseEntity<ActivityFieldValue> upsert(@PathVariable Long activityId,
                                                      @RequestParam("type") ActivityType type,
                                                      @RequestBody Map<String, String> body){
         String fieldKey = body.get("fieldKey");
