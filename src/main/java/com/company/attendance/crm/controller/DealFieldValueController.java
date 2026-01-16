@@ -21,12 +21,12 @@ public class DealFieldValueController {
     }
 
     @GetMapping
-    public List<DealFieldValue> list(@PathVariable Integer dealId) {
+    public List<DealFieldValue> list(@PathVariable Long dealId) {
         return service.list(dealId);
     }
 
     @PostMapping
-    public ResponseEntity<DealFieldValue> upsert(@PathVariable Integer dealId, @RequestBody Map<String, String> payload) {
+    public ResponseEntity<DealFieldValue> upsert(@PathVariable Long dealId, @RequestBody Map<String, String> payload) {
         String fieldKey = payload.get("fieldKey");
         String value = payload.get("value");
         DealFieldValue saved = service.upsert(dealId, fieldKey, value);

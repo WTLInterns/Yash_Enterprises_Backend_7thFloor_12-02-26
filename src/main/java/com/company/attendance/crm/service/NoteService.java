@@ -20,29 +20,33 @@ public class NoteService {
         this.noteRepository = noteRepository;
     }
 
-    public Page<Note> list(Integer dealId, Pageable pageable){
+    public Page<Note> list(Long dealId, Pageable pageable){
         Deal deal = dealRepository.findByIdSafe(dealId);
         return noteRepository.findByDealOrderByCreatedAtDesc(deal, pageable);
     }
 
-    public Note create(Integer dealId, Note note, Integer userId){
+    public Note create(Long dealId, Note note, Integer userId){
         Deal deal = dealRepository.findByIdSafe(dealId);
         note.setDeal(deal);
         note.setCreatedBy(userId);
         return noteRepository.save(note);
     }
 
-    public Note update(Integer dealId, Integer noteId, Note incoming){
+    public Note update(Long dealId, Integer noteId, Note incoming){
         Note db = noteRepository.findById(noteId).orElseThrow(() -> new IllegalArgumentException("Note not found"));
-        if (!db.getDeal().getId().equals(dealId)) throw new IllegalArgumentException("Note not in deal");
+        if (db.getDeal() == null || db.getDeal().getId() == null || !db.getDeal().getId().equals(dealId)) {
+            throw new IllegalArgumentException("Note not in deal");
+        }
         db.setTitle(incoming.getTitle());
         db.setBody(incoming.getBody());
         return noteRepository.save(db);
     }
 
-    public void delete(Integer dealId, Integer noteId){
+    public void delete(Long dealId, Integer noteId){
         Note db = noteRepository.findById(noteId).orElseThrow(() -> new IllegalArgumentException("Note not found"));
-        if (!db.getDeal().getId().equals(dealId)) throw new IllegalArgumentException("Note not in deal");
+        if (db.getDeal() == null || db.getDeal().getId() == null || !db.getDeal().getId().equals(dealId)) {
+            throw new IllegalArgumentException("Note not in deal");
+        }
         noteRepository.delete(db);
     }
 }

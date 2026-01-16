@@ -19,12 +19,12 @@ public class EmailRecordService {
         this.emailRecordRepository = emailRecordRepository;
     }
 
-    public List<EmailRecord> list(Integer dealId){
+    public List<EmailRecord> list(Long dealId){
         Deal deal = dealRepository.findByIdSafe(dealId);
         return emailRecordRepository.findByDealOrderBySentAtDesc(deal);
     }
 
-    public EmailRecord send(Integer dealId, EmailRecord record, Integer userId){
+    public EmailRecord send(Long dealId, EmailRecord record, Integer userId){
         Deal deal = dealRepository.findByIdSafe(dealId);
         record.setDeal(deal);
         record.setSentBy(userId);

@@ -19,12 +19,12 @@ public class ProductLineService {
         this.productLineRepository = productLineRepository;
     }
 
-    public List<ProductLine> list(Integer dealId){
+    public List<ProductLine> list(Long dealId){
         Deal deal = dealRepository.findByIdSafe(dealId);
         return productLineRepository.findByDeal(deal);
     }
 
-    public ProductLine create(Integer dealId, ProductLine pl, Integer userId){
+    public ProductLine create(Long dealId, ProductLine pl, Integer userId){
         Deal deal = dealRepository.findByIdSafe(dealId);
         pl.setDeal(deal);
         pl.setCreatedBy(userId);
@@ -32,9 +32,11 @@ public class ProductLineService {
         return productLineRepository.save(pl);
     }
 
-    public ProductLine update(Integer dealId, Integer productId, ProductLine incoming){
+    public ProductLine update(Long dealId, Integer productId, ProductLine incoming){
         ProductLine db = productLineRepository.findById(productId).orElseThrow(() -> new IllegalArgumentException("Product not found"));
-        if (!db.getDeal().getId().equals(dealId)) throw new IllegalArgumentException("Product not in deal");
+        if (db.getDeal() == null || db.getDeal().getId() == null || !db.getDeal().getId().equals(dealId)) {
+            throw new IllegalArgumentException("Product not in deal");
+        }
         db.setProductName(incoming.getProductName());
         db.setListPrice(incoming.getListPrice());
         db.setQuantity(incoming.getQuantity());
@@ -43,13 +45,15 @@ public class ProductLineService {
         return productLineRepository.save(db);
     }
 
-    public void delete(Integer dealId, Integer productId){
+    public void delete(Long dealId, Integer productId){
         ProductLine db = productLineRepository.findById(productId).orElseThrow(() -> new IllegalArgumentException("Product not found"));
-        if (!db.getDeal().getId().equals(dealId)) throw new IllegalArgumentException("Product not in deal");
+        if (db.getDeal() == null || db.getDeal().getId() == null || !db.getDeal().getId().equals(dealId)) {
+            throw new IllegalArgumentException("Product not in deal");
+        }
         productLineRepository.delete(db);
     }
 
-    public BigDecimal grandTotal(Integer dealId){
+    public BigDecimal grandTotal(Long dealId){
         return list(dealId).stream()
                 .map(pl -> pl.getTotal() != null ? pl.getTotal() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);

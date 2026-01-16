@@ -24,19 +24,19 @@ public class FileMetaService {
         this.fileRepo = fileRepo;
     }
 
-    public List<FileMeta> list(Integer dealId){
+    public List<FileMeta> list(Long dealId){
         Deal deal = dealRepository.findByIdSafe(dealId);
         return fileRepo.findByDeal(deal);
     }
 
-    public FileMeta create(Integer dealId, FileMeta meta, Integer userId){
+    public FileMeta create(Long dealId, FileMeta meta, Integer userId){
         Deal deal = dealRepository.findByIdSafe(dealId);
         meta.setDeal(deal);
         meta.setCreatedBy(userId);
         return fileRepo.save(meta);
     }
 
-    public FileMeta upload(Integer dealId, MultipartFile file, Integer userId) throws IOException {
+    public FileMeta upload(Long dealId, MultipartFile file, Integer userId) throws IOException {
         Deal deal = dealRepository.findByIdSafe(dealId);
         // simple local storage under ./uploads
         Path uploadDir = Path.of("uploads");

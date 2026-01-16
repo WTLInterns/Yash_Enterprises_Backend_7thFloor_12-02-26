@@ -94,9 +94,28 @@ public class CaseDocumentService {
 
     public List<CaseDocumentDto> getDocumentsByCaseId(Long caseId) {
         log.info("Fetching documents for case ID: {}", caseId);
-        
+
+        if (caseId == null || !caseRepository.existsById(caseId)) {
+            return List.of();
+        }
+
         List<CaseDocument> documents = caseDocumentRepository.findByCaseEntityId(caseId);
         return documents.stream()
+                .filter(doc -> {
+                    String filePath = doc.getFilePath();
+                    if (filePath == null || filePath.isBlank()) {
+                        log.warn("CaseDocument {} has empty filePath; deleting orphan record", doc.getId());
+                        if (doc.getId() != null) caseDocumentRepository.deleteById(doc.getId());
+                        return false;
+                    }
+                    Path path = Paths.get(filePath);
+                    if (!Files.exists(path)) {
+                        log.warn("CaseDocument {} points to missing file {}; deleting orphan record", doc.getId(), filePath);
+                        if (doc.getId() != null) caseDocumentRepository.deleteById(doc.getId());
+                        return false;
+                    }
+                    return true;
+                })
                 .map(caseDocumentMapper::toDto)
                 .toList();
     }

@@ -101,7 +101,7 @@ public class DealController {
   }
 
   @GetMapping("/{id}")
-  public ResponseEntity<DealDto> getById(@PathVariable Integer id) {
+  public ResponseEntity<DealDto> getById(@PathVariable Long id) {
     Optional<Deal> deal = dealRepository.findById(id);
     return deal.map(d -> ResponseEntity.ok(mapper.toDealDto(d))).orElse(ResponseEntity.notFound().build());
   }
@@ -121,7 +121,7 @@ public class DealController {
   }
 
   @PutMapping("/{id}")
-  public ResponseEntity<DealDto> update(@PathVariable Integer id, @RequestBody DealDto dealDto) {
+  public ResponseEntity<DealDto> update(@PathVariable Long id, @RequestBody DealDto dealDto) {
     Optional<Deal> existing = dealRepository.findById(id);
     if (existing.isEmpty()) {
       return ResponseEntity.notFound().build();
@@ -151,14 +151,14 @@ public class DealController {
   }
 
   @DeleteMapping("/{id}")
-  public ResponseEntity<Void> delete(@PathVariable Integer id) {
+  public ResponseEntity<Void> delete(@PathVariable Long id) {
     dealService.delete(id);
     return ResponseEntity.noContent().build();
   }
 
   @GetMapping("/{dealId}/stages")
   public ResponseEntity<List<Map<String, Object>>> getStages(@PathVariable Long dealId) {
-    Deal deal = dealRepository.findByIdSafe(dealId.intValue());
+    Deal deal = dealRepository.findByIdSafe(dealId);
     List<DealStageHistory> history = dealStageHistoryRepository.findByDealOrderByChangedAtDesc(deal, Pageable.unpaged()).getContent();
     List<Map<String, Object>> body = history.stream().map(h -> {
       Map<String, Object> m = new HashMap<>();
@@ -179,7 +179,7 @@ public class DealController {
     @RequestBody Map<String, String> body,
     @RequestHeader(value = "X-User-Id", required = false) Integer headerUserId
   ) {
-    Deal deal = dealRepository.findByIdSafe(dealId.intValue());
+    Deal deal = dealRepository.findByIdSafe(dealId);
     String stageRaw = body.get("newStage");
     if (stageRaw == null || stageRaw.isBlank()) {
       stageRaw = body.get("stage");
@@ -212,7 +212,7 @@ public class DealController {
 
   @GetMapping("/{dealId}/timeline")
   public ResponseEntity<List<Map<String, Object>>> timeline(@PathVariable Long dealId) {
-    Deal deal = dealRepository.findByIdSafe(dealId.intValue());
+    Deal deal = dealRepository.findByIdSafe(dealId);
 
     List<Map<String, Object>> stageItems = dealStageHistoryRepository
       .findByDealOrderByChangedAtDesc(deal, Pageable.unpaged())

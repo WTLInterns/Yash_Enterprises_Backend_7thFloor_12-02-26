@@ -22,12 +22,12 @@ public class DealFieldValueService {
         this.valRepo = valRepo;
     }
 
-    public List<DealFieldValue> list(Integer dealId) {
+    public List<DealFieldValue> list(Long dealId) {
         Deal deal = dealRepository.findByIdSafe(dealId);
         return valRepo.findByDeal(deal);
     }
 
-    public DealFieldValue upsert(Integer dealId, String fieldKey, String value) {
+    public DealFieldValue upsert(Long dealId, String fieldKey, String value) {
         Deal deal = dealRepository.findByIdSafe(dealId);
         DealFieldDefinition def = defRepo.findByFieldKey(fieldKey).orElseThrow(() -> new IllegalArgumentException("Field not found"));
         DealFieldValue existing = valRepo.findByDealAndFieldDefinition(deal, def).orElse(null);

@@ -51,14 +51,14 @@ public class NoteController {
     }
 
     @GetMapping
-    public Page<NoteDto> list(@PathVariable Integer dealId, Pageable pageable) {
+    public Page<NoteDto> list(@PathVariable Long dealId, Pageable pageable) {
         Page<Note> page = noteService.list(dealId, pageable);
         List<NoteDto> content = page.getContent().stream().map(this::toDto).collect(Collectors.toList());
         return new PageImpl<>(content, pageable, page.getTotalElements());
     }
 
     @PostMapping
-    public ResponseEntity<NoteDto> create(@PathVariable Integer dealId, @RequestBody Map<String, Object> body,
+    public ResponseEntity<NoteDto> create(@PathVariable Long dealId, @RequestBody Map<String, Object> body,
                                        @RequestHeader(value = "X-User-Id", required = false) Integer userId) {
         Note note = new Note();
         Object title = body.get("title");
@@ -71,12 +71,12 @@ public class NoteController {
     }
 
     @PutMapping("/{noteId}")
-    public NoteDto update(@PathVariable Integer dealId, @PathVariable Integer noteId, @RequestBody Note note) {
+    public NoteDto update(@PathVariable Long dealId, @PathVariable Integer noteId, @RequestBody Note note) {
         return toDto(noteService.update(dealId, noteId, note));
     }
 
     @DeleteMapping("/{noteId}")
-    public ResponseEntity<Void> delete(@PathVariable Integer dealId, @PathVariable Integer noteId) {
+    public ResponseEntity<Void> delete(@PathVariable Long dealId, @PathVariable Integer noteId) {
         noteService.delete(dealId, noteId);
         return ResponseEntity.noContent().build();
     }

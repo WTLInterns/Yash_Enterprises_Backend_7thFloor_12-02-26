@@ -18,12 +18,12 @@ public class EmailRecordController {
     }
 
     @GetMapping
-    public List<EmailRecord> list(@PathVariable Integer dealId){
+    public List<EmailRecord> list(@PathVariable Long dealId){
         return emailService.list(dealId);
     }
 
     @PostMapping("/send")
-    public ResponseEntity<EmailRecord> send(@PathVariable Integer dealId,
+    public ResponseEntity<EmailRecord> send(@PathVariable Long dealId,
                                             @RequestBody EmailRecord record,
                                             @RequestHeader(value = "X-User-Id", required = false) Integer userId){
         EmailRecord sent = emailService.send(dealId, record, userId);

@@ -18,24 +18,24 @@ public class ProductLineController {
     }
 
     @GetMapping
-    public List<ProductLine> list(@PathVariable Integer dealId){
+    public List<ProductLine> list(@PathVariable Long dealId){
         return productLineService.list(dealId);
     }
 
     @PostMapping
-    public ResponseEntity<ProductLine> create(@PathVariable Integer dealId, @RequestBody ProductLine product,
+    public ResponseEntity<ProductLine> create(@PathVariable Long dealId, @RequestBody ProductLine product,
                                               @RequestHeader(value = "X-User-Id", required = false) Integer userId){
         ProductLine created = productLineService.create(dealId, product, userId);
         return ResponseEntity.created(URI.create("/api/deals/"+dealId+"/product-lines/"+created.getId())).body(created);
     }
 
     @PutMapping("/{productId}")
-    public ProductLine update(@PathVariable Integer dealId, @PathVariable Integer productId, @RequestBody ProductLine incoming){
+    public ProductLine update(@PathVariable Long dealId, @PathVariable Integer productId, @RequestBody ProductLine incoming){
         return productLineService.update(dealId, productId, incoming);
     }
 
     @DeleteMapping("/{productId}")
-    public ResponseEntity<Void> delete(@PathVariable Integer dealId, @PathVariable Integer productId){
+    public ResponseEntity<Void> delete(@PathVariable Long dealId, @PathVariable Integer productId){
         productLineService.delete(dealId, productId);
         return ResponseEntity.noContent().build();
     }

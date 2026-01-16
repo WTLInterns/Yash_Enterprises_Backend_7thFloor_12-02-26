@@ -15,4 +15,6 @@ public interface CaseDocumentRepository extends JpaRepository<CaseDocument, Long
     Optional<CaseDocument> findByFileNameAndCaseEntityId(String fileName, Long caseId);
     
     Long countByCaseEntityId(Long caseId);
+
+    void deleteByCaseEntityId(Long caseId);
 }

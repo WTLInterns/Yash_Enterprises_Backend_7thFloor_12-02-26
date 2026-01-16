@@ -23,12 +23,12 @@ public class FileMetaController {
     }
 
     @GetMapping("/api/deals/{dealId}/files")
-    public List<FileMeta> list(@PathVariable Integer dealId){
+    public List<FileMeta> list(@PathVariable Long dealId){
         return fileService.list(dealId);
     }
 
     @PostMapping(value = "/api/deals/{dealId}/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public FileMeta upload(@PathVariable Integer dealId,
+    public FileMeta upload(@PathVariable Long dealId,
                            @RequestPart("file") MultipartFile file,
                            @RequestHeader(value = "X-User-Id", required = false) Integer userId) throws Exception {
         return fileService.upload(dealId, file, userId);

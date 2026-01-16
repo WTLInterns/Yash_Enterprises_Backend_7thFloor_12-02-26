@@ -21,48 +21,30 @@ public class ActivityController {
     }
 
     @GetMapping
-    public Page<Activity> list(@PathVariable("dealId") Integer dealId,
+    public Page<Activity> list(@PathVariable("dealId") Long dealId,
                                @RequestParam(value = "type", required = false) ActivityType type,
                                Pageable pageable) {
         return activityService.list(dealId, type, pageable);
     }
 
     @PostMapping
-    public ResponseEntity<Activity> create(@PathVariable("dealId") Integer dealId,
+    public ResponseEntity<Activity> create(@PathVariable("dealId") Long dealId,
                                            @RequestBody Activity activity,
                                            @RequestHeader(value = "X-User-Id", required = false) Integer userId) {
-        try {
-            Activity created = activityService.create(dealId, activity, userId);
-            return ResponseEntity.created(URI.create("/api/deals/" + dealId + "/activities/" + created.getId())).body(created);
-        } catch (Exception e) {
-            org.slf4j.LoggerFactory.getLogger(ActivityController.class).error("Activity create failed for deal {}", dealId, e);
-            throw new org.springframework.web.server.ResponseStatusException(
-                org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR,
-                "Activity create failed",
-                e
-            );
-        }
+        Activity created = activityService.create(dealId, activity, userId);
+        return ResponseEntity.created(URI.create("/api/deals/" + dealId + "/activities/" + created.getId())).body(created);
     }
 
     @PutMapping("/{activityId}")
-    public ResponseEntity<Activity> update(@PathVariable Integer dealId,
+    public ResponseEntity<Activity> update(@PathVariable Long dealId,
                            @PathVariable("activityId") Long activityId,
                            @RequestBody Activity incoming) {
-        try {
-            Activity updated = activityService.update(dealId, activityId, incoming);
-            return ResponseEntity.ok(updated);
-        } catch (Exception e) {
-            org.slf4j.LoggerFactory.getLogger(ActivityController.class).error("Activity update failed for deal {} activity {}", dealId, activityId, e);
-            throw new org.springframework.web.server.ResponseStatusException(
-                org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR,
-                "Activity update failed",
-                e
-            );
-        }
+        Activity updated = activityService.update(dealId, activityId, incoming);
+        return ResponseEntity.ok(updated);
     }
 
     @PatchMapping("/{activityId}/status")
-    public ResponseEntity<Activity> patchStatus(@PathVariable("dealId") Integer dealId,
+    public ResponseEntity<Activity> patchStatus(@PathVariable("dealId") Long dealId,
                                 @PathVariable("activityId") Long activityId,
                                 @RequestParam("status") ActivityStatus status) {
         Activity updated = activityService.patchStatus(dealId, activityId, status);
@@ -70,24 +52,9 @@ public class ActivityController {
     }
 
     @DeleteMapping("/{activityId}")
-    public ResponseEntity<Void> delete(@PathVariable("dealId") Integer dealId,
+    public ResponseEntity<Void> delete(@PathVariable("dealId") Long dealId,
                                        @PathVariable("activityId") Long activityId) {
-        try {
-            activityService.delete(dealId, activityId);
-            return ResponseEntity.noContent().build();
-        } catch (IllegalArgumentException e) {
-            throw new org.springframework.web.server.ResponseStatusException(
-                org.springframework.http.HttpStatus.CONFLICT,
-                e.getMessage(),
-                e
-            );
-        } catch (Exception e) {
-            org.slf4j.LoggerFactory.getLogger(ActivityController.class).error("Activity delete failed for deal {} activity {}", dealId, activityId, e);
-            throw new org.springframework.web.server.ResponseStatusException(
-                org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR,
-                "Activity delete failed",
-                e
-            );
-        }
+        activityService.delete(dealId, activityId);
+        return ResponseEntity.noContent().build();
     }
 }

@@ -18,7 +18,7 @@ public class DealService {
         this.dealRepository = dealRepository;
     }
 
-    public Optional<Deal> findById(Integer id) {
+    public Optional<Deal> findById(Long id) {
         return dealRepository.findById(id);
     }
 
@@ -38,7 +38,7 @@ public class DealService {
         return dealRepository.save(deal);
     }
 
-    public void delete(Integer id) {
+    public void delete(Long id) {
         dealRepository.deleteById(id);
     }
 }

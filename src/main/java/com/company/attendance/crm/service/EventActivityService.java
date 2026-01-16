@@ -20,7 +20,7 @@ public class EventActivityService {
         this.eventRepo = eventRepo;
     }
 
-    public EventActivity create(Integer dealId, EventActivity ev, Integer userId){
+    public EventActivity create(Long dealId, EventActivity ev, Integer userId){
         Deal deal = dealRepository.findByIdSafe(dealId);
         Activity base = new Activity();
         base.setDeal(deal);

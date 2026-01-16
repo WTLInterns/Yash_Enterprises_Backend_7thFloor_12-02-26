@@ -29,41 +29,26 @@ public class TaskEventCallController {
     }
 
     @PostMapping("/tasks")
-    public ResponseEntity<Void> createTask(@PathVariable Integer dealId,
+    public ResponseEntity<Void> createTask(@PathVariable Long dealId,
                                           @RequestBody TaskActivity task,
                                           @RequestHeader(value = "X-User-Id", required = false) Integer userId){
-        try {
-            TaskActivity created = taskService.create(dealId, task, userId);
-            return ResponseEntity.created(URI.create("/api/deals/"+dealId+"/activities/"+created.getId())).build();
-        } catch (Exception e) {
-            log.error("Failed to create task for deal {}", dealId, e);
-            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "Failed to create task", e);
-        }
+        TaskActivity created = taskService.create(dealId, task, userId);
+        return ResponseEntity.created(URI.create("/api/deals/"+dealId+"/activities/"+created.getId())).build();
     }
 
     @PostMapping("/events")
-    public ResponseEntity<Void> createEvent(@PathVariable Integer dealId,
+    public ResponseEntity<Void> createEvent(@PathVariable Long dealId,
                                            @RequestBody EventActivity ev,
                                            @RequestHeader(value = "X-User-Id", required = false) Integer userId){
-        try {
-            EventActivity created = eventService.create(dealId, ev, userId);
-            return ResponseEntity.created(URI.create("/api/deals/"+dealId+"/activities/"+created.getId())).build();
-        } catch (Exception e) {
-            log.error("Failed to create event for deal {}", dealId, e);
-            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "Failed to create event", e);
-        }
+        EventActivity created = eventService.create(dealId, ev, userId);
+        return ResponseEntity.created(URI.create("/api/deals/"+dealId+"/activities/"+created.getId())).build();
     }
 
     @PostMapping("/calls")
-    public ResponseEntity<Void> createCall(@PathVariable Integer dealId,
+    public ResponseEntity<Void> createCall(@PathVariable Long dealId,
                                           @RequestBody CallActivity call,
                                           @RequestHeader(value = "X-User-Id", required = false) Integer userId){
-        try {
-            CallActivity created = callService.create(dealId, call, userId);
-            return ResponseEntity.created(URI.create("/api/deals/"+dealId+"/activities/"+created.getId())).build();
-        } catch (Exception e) {
-            log.error("Failed to create call for deal {}", dealId, e);
-            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "Failed to create call", e);
-        }
+        CallActivity created = callService.create(dealId, call, userId);
+        return ResponseEntity.created(URI.create("/api/deals/"+dealId+"/activities/"+created.getId())).build();
     }
 }

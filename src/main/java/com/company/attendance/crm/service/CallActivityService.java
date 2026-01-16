@@ -17,7 +17,7 @@ public class CallActivityService {
         this.callRepo = callRepo;
     }
 
-    public CallActivity create(Integer dealId, CallActivity call, Integer userId){
+    public CallActivity create(Long dealId, CallActivity call, Integer userId){
         Deal deal = dealRepository.findByIdSafe(dealId);
         Activity base = new Activity();
         base.setDeal(deal);

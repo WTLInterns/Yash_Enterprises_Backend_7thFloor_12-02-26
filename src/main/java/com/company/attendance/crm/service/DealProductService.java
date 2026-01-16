@@ -32,7 +32,7 @@ public class DealProductService {
         if (dp == null) return null;
         DealProductDto dto = new DealProductDto();
         dto.setId(dp.getId());
-        dto.setDealId(dp.getDeal() != null ? dp.getDeal().getId().longValue() : null);
+        dto.setDealId(dp.getDeal() != null ? dp.getDeal().getId() : null);
         dto.setProductId(dp.getProduct() != null ? dp.getProduct().getId() : null);
         dto.setProductName(dp.getProduct() != null ? dp.getProduct().getName() : null);
         dto.setUnitPrice(dp.getUnitPrice());
@@ -46,7 +46,7 @@ public class DealProductService {
     }
 
     public List<DealProductDto> list(Long dealId){
-        Deal deal = dealRepository.findByIdSafe(dealId.intValue());
+        Deal deal = dealRepository.findByIdSafe(dealId);
         return dealProductRepository.findByDeal(deal)
             .stream()
             .map(this::toDto)
@@ -58,7 +58,7 @@ public class DealProductService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "productId is required");
         }
 
-        Deal deal = dealRepository.findByIdSafe(dealId.intValue());
+        Deal deal = dealRepository.findByIdSafe(dealId);
         Product product = productRepository.findById(incoming.getProductId())
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
         DealProduct dp = new DealProduct();
@@ -76,7 +76,9 @@ public class DealProductService {
 
     public DealProductDto update(Long dealId, Long dealProductId, DealProductRequestDto incoming){
         DealProduct db = dealProductRepository.findById(dealProductId.intValue()).orElseThrow(() -> new IllegalArgumentException("DealProduct not found"));
-        if (!db.getDeal().getId().equals(dealId.intValue())) throw new IllegalArgumentException("DealProduct not in deal");
+        if (db.getDeal() == null || db.getDeal().getId() == null || !db.getDeal().getId().equals(dealId)) {
+            throw new IllegalArgumentException("DealProduct not in deal");
+        }
         // we allow editing quantity/discount/tax and unitPrice if needed (but it's snapshot semantics)
         if (incoming != null && incoming.getUnitPrice() != null) db.setUnitPrice(incoming.getUnitPrice());
         if (incoming != null) {
@@ -90,7 +92,9 @@ public class DealProductService {
 
     public void delete(Long dealId, Long dealProductId){
         DealProduct db = dealProductRepository.findById(dealProductId.intValue()).orElseThrow(() -> new IllegalArgumentException("DealProduct not found"));
-        if (!db.getDeal().getId().equals(dealId.intValue())) throw new IllegalArgumentException("DealProduct not in deal");
+        if (db.getDeal() == null || db.getDeal().getId() == null || !db.getDeal().getId().equals(dealId)) {
+            throw new IllegalArgumentException("DealProduct not in deal");
+        }
         dealProductRepository.delete(db);
     }
 }

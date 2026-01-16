@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
@@ -23,7 +24,7 @@ public class TaskActivityService {
         this.taskRepo = taskRepo;
     }
 
-    public TaskActivity create(Integer dealId, TaskActivity task, Integer userId){
+    public TaskActivity create(Long dealId, TaskActivity task, Integer userId){
         Deal deal = dealRepository.findByIdSafe(dealId);
         Activity base = new Activity();
         base.setDeal(deal);
@@ -35,9 +36,13 @@ public class TaskActivityService {
                 : "Task";
         base.setName(taskName);
 
+        OffsetDateTime dueDateTime = OffsetDateTime.now(ZoneOffset.UTC);
         if (task != null && task.getDueDate() != null) {
-            base.setDueDate(task.getDueDate().atStartOfDay().atOffset(ZoneOffset.UTC));
+            dueDateTime = task.getDueDate()
+                .atTime(LocalTime.now(ZoneOffset.UTC))
+                .atOffset(ZoneOffset.UTC);
         }
+        base.setDueDate(dueDateTime);
 
         log.info("Creating task activity for deal {} with name '{}'", dealId, taskName);
         base = activityRepository.save(base);

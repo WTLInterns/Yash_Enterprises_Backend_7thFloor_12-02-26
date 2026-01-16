@@ -3,14 +3,18 @@ package com.company.attendance.service;
 import com.company.attendance.dto.CaseDto;
 import com.company.attendance.entity.Case;
 import com.company.attendance.entity.Client;
+import com.company.attendance.entity.CaseDocument;
 import com.company.attendance.mapper.CaseMapper;
 import com.company.attendance.mapper.ClientMapper;
+import com.company.attendance.repository.CaseDocumentRepository;
 import com.company.attendance.repository.CaseRepository;
 import com.company.attendance.repository.ClientRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
 
 @Service
@@ -19,6 +23,7 @@ import java.util.List;
 public class CaseService {
 
     private final CaseRepository caseRepository;
+    private final CaseDocumentRepository caseDocumentRepository;
     private final ClientRepository clientRepository;
     private final CaseMapper caseMapper;
     private final ClientMapper clientMapper;
@@ -85,6 +90,19 @@ public class CaseService {
     public void deleteCase(Long id) {
         Case entity = caseRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Case not found with ID: " + id));
+
+        // Clean up documents + physical files before deleting case.
+        List<CaseDocument> docs = caseDocumentRepository.findByCaseEntityId(id);
+        for (CaseDocument doc : docs) {
+            try {
+                if (doc.getFilePath() != null) {
+                    Files.deleteIfExists(Paths.get(doc.getFilePath()));
+                }
+            } catch (Exception e) {
+                // best-effort: DB delete should still proceed
+            }
+        }
+        caseDocumentRepository.deleteByCaseEntityId(id);
         caseRepository.delete(entity);
     }
 }
