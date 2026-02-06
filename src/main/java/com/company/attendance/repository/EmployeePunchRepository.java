@@ -14,13 +14,33 @@ import java.util.Optional;
 @Repository
 public interface EmployeePunchRepository extends JpaRepository<EmployeePunch, Long> {
 
-    // List<EmployeePunch> findByEmployeeIdOrderByPunchTimeDesc(Long employeeId);
+    // New methods for task-based punch system
+    
+    /**
+     * Find all active punches for employee (no punch_out_time)
+     */
+    @Query("SELECT ep FROM EmployeePunch ep WHERE ep.employee.id = :employeeId AND ep.punchOutTime IS NULL ORDER BY ep.punchInTime DESC")
+    List<EmployeePunch> findActivePunchesByEmployeeId(@Param("employeeId") Long employeeId);
+    
+    /**
+     * Find all active punches (for auto punch-out)
+     */
+    @Query("SELECT ep FROM EmployeePunch ep WHERE ep.punchOutTime IS NULL")
+    List<EmployeePunch> findAllActivePunches();
+    
+    /**
+     * Find punch by employee and task
+     */
+    @Query("SELECT ep FROM EmployeePunch ep WHERE ep.employee.id = :employeeId AND ep.task.id = :taskId ORDER BY ep.punchInTime DESC")
+    List<EmployeePunch> findByEmployeeIdAndTaskId(@Param("employeeId") Long employeeId, @Param("taskId") Long taskId);
+    
+    /**
+     * Find punch by employee and task on specific date
+     */
+    @Query("SELECT ep FROM EmployeePunch ep WHERE ep.employee.id = :employeeId AND ep.task.id = :taskId AND DATE(ep.punchInTime) = :date")
+    Optional<EmployeePunch> findByEmployeeIdAndTaskIdAndDate(@Param("employeeId") Long employeeId, @Param("taskId") Long taskId, @Param("date") LocalDate date);
 
-    // List<EmployeePunch> findByEmployeeIdAndPunchTimeBetweenOrderByPunchTimeDesc(
-    //         Long employeeId, LocalDateTime start, LocalDateTime end);
-
-    // Optional<EmployeePunch> findFirstByEmployeeIdAndPunchTypeOrderByPunchTimeDesc(Long employeeId, String punchType);
-
+    // Legacy methods for backward compatibility
     @Query("SELECT ep FROM EmployeePunch ep WHERE ep.employee.id = :employeeId AND DATE(ep.punchTime) = :date ORDER BY ep.punchTime ASC")
     List<EmployeePunch> findByEmployeeIdAndDate(@Param("employeeId") Long employeeId, @Param("date") LocalDate date);
 

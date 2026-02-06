@@ -1,12 +1,16 @@
 package com.company.attendance.crm.dto;
 
 import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Email;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import java.time.Instant;
 
 @Data
+@Getter
+@Setter
 public class ClientDto {
     private Long id;
     
@@ -18,8 +22,21 @@ public class ClientDto {
     
     private String contactPhone;
     private String address;
-    private String notes;
     
+    // ✅ Geocoding fields
+    private Double latitude;
+    private Double longitude;
+    private String city;
+    private String pincode;
+    private String state;
+    private String country;
+    
+    // ✅ Contact details
+    private String contactName;
+    private String contactNumber;
+    private String countryCode;
+    
+    private String notes;
     private String customFields;
     private Boolean active = true;
     

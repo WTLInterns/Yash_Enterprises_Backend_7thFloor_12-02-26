@@ -38,6 +38,9 @@ public class EmployeeTracking {
     @Column(name = "location_address")
     private String locationAddress;
 
+    @Column(name = "resolved_address")
+    private String resolvedAddress;
+
     @Column(name = "tracking_type")
     private String trackingType; // CHECK_IN, CHECK_OUT, MOVEMENT
 

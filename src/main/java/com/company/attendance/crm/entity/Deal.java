@@ -4,11 +4,15 @@ import com.company.attendance.crm.enums.DealStage;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "deals")
@@ -77,4 +81,28 @@ public class Deal {
     
     @Column(name = "updated_by")
     private Integer updatedBy;
+    
+    @OneToMany(mappedBy = "deal", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    private List<DealStageHistory> stageHistory;
+    
+    @OneToMany(mappedBy = "deal", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    private List<DealProduct> dealProducts;
+    
+    @OneToMany(mappedBy = "deal", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    private List<Note> notes;
+    
+    @OneToMany(mappedBy = "deal", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    private List<Activity> activities;
+
+    // Initialize lists to avoid NullPointerException
+    public Deal() {
+        this.stageHistory = new ArrayList<>();
+        this.dealProducts = new ArrayList<>();
+        this.notes = new ArrayList<>();
+        this.activities = new ArrayList<>();
+    }
 }

@@ -3,18 +3,20 @@ package com.company.attendance.crm.entity;
 import com.company.attendance.crm.enums.DealStage;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 import java.time.OffsetDateTime;
-import java.util.UUID;
 
 @Entity
 @Table(name = "deal_stage_history")
 public class DealStageHistory {
     @Id
-    @Column(length = 36)
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "deal_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     @JsonIgnore
     private Deal deal;
 
@@ -37,13 +39,12 @@ public class DealStageHistory {
 
     @PrePersist
     public void prePersist() {
-        if (id == null) id = UUID.randomUUID();
         if (changedAt == null) changedAt = OffsetDateTime.now();
     }
 
     // getters/setters
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
     public Deal getDeal() { return deal; }
     public void setDeal(Deal deal) { this.deal = deal; }
     public DealStage getPreviousStage() { return previousStage; }

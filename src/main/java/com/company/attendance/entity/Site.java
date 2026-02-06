@@ -54,6 +54,14 @@ public class Site {
     @Column(length = 20)
     private String pincode;
 
+    // ✅ NEW: Client mapping for CRM structure
+    @Column(name = "client_id", nullable = false)
+    private Long clientId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "client_id", insertable = false, updatable = false)
+    private Client client;
+
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;

@@ -3,6 +3,8 @@ package com.company.attendance.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDate;
+
 @Entity
 @Table(name = "expenses")
 @Getter
@@ -17,6 +19,8 @@ public class Expense {
     private Long employeeId;
     private Double amount;
     private String category;
+    private String description;
+    private LocalDate expenseDate;
     private String receiptUrl;
     private Long approvedBy;
     private String status;

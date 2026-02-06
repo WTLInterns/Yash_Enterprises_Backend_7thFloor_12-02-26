@@ -30,6 +30,12 @@ public class BankService {
         if (bankRepository.existsByNameIgnoreCase(bank.getName())){
             throw new IllegalArgumentException("Bank name already exists");
         }
+        
+        // Set owner from logged-in user
+        if (bank.getCreatedBy() == null) {
+            bank.setCreatedBy(auditService.getCurrentUserId());
+        }
+        
         // Set audit fields (createdBy, createdAt)
         auditService.setAuditFields(bank);
         return bankRepository.save(bank);
@@ -80,6 +86,12 @@ public class BankService {
         if (dto.getActive() != null){
             existing.setActive(dto.getActive());
         }
+        
+        // Update owner if not set
+        if (existing.getCreatedBy() == null) {
+            existing.setCreatedBy(auditService.getCurrentUserId());
+        }
+        
         // Update audit fields (updatedBy, updatedAt)
         auditService.updateAuditFields(existing);
         

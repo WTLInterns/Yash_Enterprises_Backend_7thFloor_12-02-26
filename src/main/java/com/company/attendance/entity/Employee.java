@@ -58,6 +58,12 @@ public class Employee {
 
     private String profileImageUrl;
 
+    @Column(length = 512)
+    private String fcmTokenMobile;
+
+    @Column(length = 512)
+    private String fcmTokenWeb;
+
     private LocalDate hiredAt;
 
     private LocalDate terminationDate;

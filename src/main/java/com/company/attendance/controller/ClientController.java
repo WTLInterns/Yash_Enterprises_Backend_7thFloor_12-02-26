@@ -35,9 +35,9 @@ public class ClientController {
 
     @GetMapping
     public ResponseEntity<List<com.company.attendance.crm.dto.ClientDto>> listClients() {
-        log.info("GET /api/clients - Fetching all clients");
+        log.info("GET /api/clients - Fetching active clients");
         try {
-            List<Client> clients = clientService.getAllClientEntities();
+            List<Client> clients = clientService.getActiveClientEntities();
             List<com.company.attendance.crm.dto.ClientDto> dtos = clients.stream()
                 .map(crmMapper::toClientDto)
                 .collect(Collectors.toList());
@@ -155,9 +155,17 @@ public class ClientController {
         try {
             clientService.deleteClientEntity(id);
             return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            if (e.getMessage().contains("not found")) {
+                log.error("Client not found: {}", e.getMessage());
+                return ResponseEntity.notFound().build();
+            } else {
+                log.error("Error deleting client: {}", e.getMessage());
+                return ResponseEntity.internalServerError().build();
+            }
         } catch (Exception e) {
             log.error("Error deleting client: {}", e.getMessage());
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.internalServerError().build();
         }
     }
     

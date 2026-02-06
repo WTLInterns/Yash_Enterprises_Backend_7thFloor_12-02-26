@@ -7,7 +7,9 @@ import com.company.attendance.entity.Organization;
 import com.company.attendance.service.EmployeeService;
 import com.company.attendance.service.RoleService;
 import com.company.attendance.service.OrganizationService;
+import com.company.attendance.repository.EmployeeRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -21,6 +23,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@Slf4j
 @CrossOrigin(origins = "*")
 public class AuthController {
     
@@ -28,22 +31,23 @@ public class AuthController {
     private final RoleService roleService;
     private final OrganizationService organizationService;
     private final PasswordEncoder passwordEncoder;
+    private final EmployeeRepository employeeRepository;
     
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
+        log.info("Login attempt for email: {}", loginRequest.getEmail());
+        
         try {
-            // Find employee by email or mobile
-            Optional<Employee> employeeOpt;
+            // Find employee by email
+            String email = loginRequest.getEmail();
             
-            if (loginRequest.getEmail() != null && !loginRequest.getEmail().trim().isEmpty()) {
-                employeeOpt = employeeService.findByEmail(loginRequest.getEmail());
-            } else if (loginRequest.getMobile() != null && !loginRequest.getMobile().trim().isEmpty()) {
-                employeeOpt = employeeService.findByPhone(loginRequest.getMobile());
-            } else {
+            if (email == null || email.trim().isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of(
-                    "error", "Email or mobile number is required"
+                    "error", "Email is required"
                 ));
             }
+
+            Optional<Employee> employeeOpt = employeeService.findByEmail(email);
 
             if (employeeOpt.isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of(
@@ -52,6 +56,12 @@ public class AuthController {
             }
 
             Employee employee = employeeOpt.get();
+            
+            // Log current FCM tokens
+            log.info("Employee {} current FCM tokens - Mobile: {}, Web: {}", 
+                    employee.getId(),
+                    employee.getFcmTokenMobile() != null ? employee.getFcmTokenMobile().substring(0, Math.min(20, employee.getFcmTokenMobile().length())) + "..." : "NULL",
+                    employee.getFcmTokenWeb() != null ? employee.getFcmTokenWeb().substring(0, Math.min(20, employee.getFcmTokenWeb().length())) + "..." : "NULL");
             
             // Check if password matches (for development, using simple check)
             if (!isValidPassword(loginRequest.getPassword(), employee)) {
@@ -68,9 +78,11 @@ public class AuthController {
             response.put("user", employeeDto);
             response.put("message", "Login successful");
             
+            log.info("Login successful for email: {}", loginRequest.getEmail());
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
+            log.error("Login failed for email: {} - {}", loginRequest.getEmail(), e.getMessage());
             return ResponseEntity.internalServerError().body(Map.of(
                 "error", "Login failed: " + e.getMessage()
             ));
@@ -219,18 +231,53 @@ public class AuthController {
 
     // BCrypt password validation
     private boolean isValidPassword(String inputPassword, Employee employee) {
-        // For existing users with simple hashes, fall back to role-based check
-        if (employee.getPasswordHash() != null && employee.getPasswordHash().startsWith("hash_")) {
-            String roleName = employee.getRole() != null ? employee.getRole().getName() : "";
-            switch (roleName) {
-                case "ADMIN": return "admin123".equals(inputPassword);
-                case "MANAGER": return "manager123".equals(inputPassword);
-                case "EMPLOYEE": return "employee123".equals(inputPassword);
-                default: return "password123".equals(inputPassword);
-            }
+        
+        String stored = employee.getPasswordHash();
+        
+        // 1. No password at all -> allow phone / default
+        if (stored == null || stored.isBlank()) {
+            return legacyLoginAndUpgrade(employee, inputPassword);
         }
-        // For BCrypt hashes, use BCrypt matcher
-        return passwordEncoder.matches(inputPassword, employee.getPasswordHash());
+        
+        // 2. BCrypt password
+        if (stored.startsWith("$2a$") || stored.startsWith("$2b$")) {
+            return passwordEncoder.matches(inputPassword, stored);
+        }
+        
+        // 3. Legacy plain-text password (VERY IMPORTANT FIX)
+        if (stored.equals(inputPassword)) {
+            upgradePassword(employee, inputPassword);
+            return true;
+        }
+        
+        // 4. Phone number login fallback
+        if (employee.getPhone() != null && employee.getPhone().equals(inputPassword)) {
+            upgradePassword(employee, inputPassword);
+            return true;
+        }
+        
+        return false;
+    }
+    
+    private boolean legacyLoginAndUpgrade(Employee employee, String inputPassword) {
+        
+        if (employee.getPhone() != null && employee.getPhone().equals(inputPassword)) {
+            upgradePassword(employee, inputPassword);
+            return true;
+        }
+        
+        if ("DEFAULT@123".equals(inputPassword)) {
+            upgradePassword(employee, inputPassword);
+            return true;
+        }
+        
+        return false;
+    }
+    
+    // Auto-upgrade password to BCrypt (IMPORTANT)
+    private void upgradePassword(Employee employee, String rawPassword) {
+        employee.setPasswordHash(passwordEncoder.encode(rawPassword));
+        employeeService.save(employee);
     }
 
     // Simple token generation (in production, use JWT)
@@ -255,10 +302,14 @@ public class AuthController {
 
     // Convert Employee to EmployeeDto
     private EmployeeDto convertToDto(Employee employee) {
+        String fullName = (employee.getFirstName() != null ? employee.getFirstName() : "") + 
+                       (employee.getLastName() != null && !employee.getLastName().isEmpty() ? " " + employee.getLastName() : "");
+        
         return EmployeeDto.builder()
                 .id(employee.getId())
                 .firstName(employee.getFirstName())
                 .lastName(employee.getLastName())
+                .fullName(fullName.trim())
                 .email(employee.getEmail())
                 .phone(employee.getPhone())
                 .employeeId(employee.getEmployeeId())
@@ -279,22 +330,18 @@ public class AuthController {
     // Request DTO for login
     public static class LoginRequest {
         private String email;
-        private String mobile;
         private String password;
-        private Long organizationId;
+        private String organization;
 
         // Getters and Setters
         public String getEmail() { return email; }
         public void setEmail(String email) { this.email = email; }
         
-        public String getMobile() { return mobile; }
-        public void setMobile(String mobile) { this.mobile = mobile; }
-        
         public String getPassword() { return password; }
         public void setPassword(String password) { this.password = password; }
         
-        public Long getOrganizationId() { return organizationId; }
-        public void setOrganizationId(Long organizationId) { this.organizationId = organizationId; }
+        public String getOrganization() { return organization; }
+        public void setOrganization(String organization) { this.organization = organization; }
     }
 
     // Request DTO for registration

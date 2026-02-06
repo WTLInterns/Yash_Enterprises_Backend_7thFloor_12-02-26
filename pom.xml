@@ -90,6 +90,12 @@
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>com.google.firebase</groupId>
+            <artifactId>firebase-admin</artifactId>
+            <version>9.2.0</version>
+        </dependency>
+
         <!-- Apache POI for Excel functionality -->
         <dependency>
             <groupId>org.apache.poi</groupId>

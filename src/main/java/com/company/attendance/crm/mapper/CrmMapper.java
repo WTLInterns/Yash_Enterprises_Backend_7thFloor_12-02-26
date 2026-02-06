@@ -10,6 +10,7 @@ import com.company.attendance.crm.entity.Product;
 import com.company.attendance.entity.Client;
 import com.company.attendance.entity.Employee;
 import com.company.attendance.repository.EmployeeRepository;
+import com.company.attendance.repository.ClientRepository;
 import org.springframework.stereotype.Component;
 
 import java.time.ZoneOffset;
@@ -19,9 +20,11 @@ import java.util.Optional;
 public class CrmMapper {
 
   private final EmployeeRepository employeeRepository;
+  private final ClientRepository clientRepository;
 
-  public CrmMapper(EmployeeRepository employeeRepository) {
+  public CrmMapper(EmployeeRepository employeeRepository, ClientRepository clientRepository) {
     this.employeeRepository = employeeRepository;
+    this.clientRepository = clientRepository;
   }
 
   private String employeeName(Integer employeeId) {
@@ -125,6 +128,20 @@ public class CrmMapper {
     dto.setEmail(client.getEmail());
     dto.setContactPhone(client.getContactPhone());
     dto.setAddress(client.getAddress());
+    
+    // Geocoding fields
+    dto.setLatitude(client.getLatitude());
+    dto.setLongitude(client.getLongitude());
+    dto.setCity(client.getCity());
+    dto.setPincode(client.getPincode());
+    dto.setState(client.getState());
+    dto.setCountry(client.getCountry());
+    
+    // Contact details
+    dto.setContactName(client.getContactName());
+    dto.setContactNumber(client.getContactNumber());
+    dto.setCountryCode(client.getCountryCode());
+    
     dto.setNotes(client.getNotes());
     dto.setActive(client.getIsActive());
 
@@ -138,9 +155,9 @@ public class CrmMapper {
     dto.setUpdatedBy(client.getUpdatedBy() != null ? client.getUpdatedBy().intValue() : null);
     dto.setOwnerId(client.getOwnerId() != null ? client.getOwnerId().intValue() : null);
 
-    dto.setCreatedByName(employeeName(dto.getCreatedBy()));
-    dto.setUpdatedByName(employeeName(dto.getUpdatedBy()));
-    dto.setOwnerName(employeeName(dto.getOwnerId()));
+    dto.setCreatedByName(employeeName(client.getCreatedBy() != null ? client.getCreatedBy().intValue() : null));
+    dto.setUpdatedByName(employeeName(client.getUpdatedBy() != null ? client.getUpdatedBy().intValue() : null));
+    dto.setOwnerName(employeeName(client.getOwnerId() != null ? client.getOwnerId().intValue() : null));
 
     return dto;
   }
@@ -153,12 +170,27 @@ public class CrmMapper {
     client.setEmail(dto.getEmail());
     client.setContactPhone(dto.getContactPhone());
     client.setAddress(dto.getAddress());
+    
+    // Geocoding fields
+    client.setLatitude(dto.getLatitude());
+    client.setLongitude(dto.getLongitude());
+    client.setCity(dto.getCity());
+    client.setPincode(dto.getPincode());
+    client.setState(dto.getState());
+    client.setCountry(dto.getCountry());
+    
+    // Contact details
+    client.setContactName(dto.getContactName());
+    client.setContactNumber(dto.getContactNumber());
+    client.setCountryCode(dto.getCountryCode());
+    
     client.setNotes(dto.getNotes());
     client.setIsActive(dto.getActive());
     client.setCustomFields(dto.getCustomFields());
     client.setOwnerId(dto.getOwnerId() != null ? dto.getOwnerId().longValue() : null);
     client.setCreatedBy(dto.getCreatedBy() != null ? dto.getCreatedBy().longValue() : null);
     client.setUpdatedBy(dto.getUpdatedBy() != null ? dto.getUpdatedBy().longValue() : null);
+    
     return client;
   }
 
@@ -192,10 +224,22 @@ public class CrmMapper {
     dto.setUpdatedBy(deal.getUpdatedBy());
     dto.setCreatedByName(employeeName(deal.getCreatedBy()));
     dto.setUpdatedByName(employeeName(deal.getUpdatedBy()));
-    dto.setOwnerName(employeeName(deal.getCreatedBy()));
+    
+    // Owner should come from the Client, not the Deal
+    Client client = deal.getClient();
+    if (client == null && deal.getClientId() != null) {
+      client = clientRepository.findById(deal.getClientId()).orElse(null);
+    }
+    
+    if (client != null && client.getOwnerId() != null) {
+      dto.setOwnerName(employeeName(client.getOwnerId().intValue()));
+      dto.setClientName(client.getName());
+    } else {
+      dto.setOwnerName(null);
+      dto.setClientName(null);
+    }
 
     // Optional display fields if relations loaded
-    dto.setClientName(deal.getClient() != null ? deal.getClient().getName() : null);
     dto.setBankName(deal.getBank() != null ? deal.getBank().getName() : null);
 
     // Keep customFields default if absent

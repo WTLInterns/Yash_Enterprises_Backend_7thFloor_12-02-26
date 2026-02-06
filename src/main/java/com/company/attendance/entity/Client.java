@@ -2,6 +2,8 @@ package com.company.attendance.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.EqualsAndHashCode;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -12,6 +14,8 @@ import java.util.List;
 @Entity
 @Table(name = "clients")
 @Data
+@Getter
+@Setter
 @EqualsAndHashCode(callSuper = false)
 public class Client {
     
@@ -27,6 +31,35 @@ public class Client {
     
     private String contactPhone;
     private String address;
+    
+    // ✅ NEW: Geocoding fields
+    @Column(name = "latitude")
+    private Double latitude;
+    
+    @Column(name = "longitude")
+    private Double longitude;
+    
+    @Column(name = "city")
+    private String city;
+    
+    @Column(name = "pincode")
+    private String pincode;
+    
+    @Column(name = "state")
+    private String state;
+    
+    @Column(name = "country")
+    private String country;
+    
+    // ✅ NEW: Contact details
+    @Column(name = "contact_name")
+    private String contactName;
+    
+    @Column(name = "contact_number")
+    private String contactNumber;
+    
+    @Column(name = "country_code")
+    private String countryCode;
     
     @Column(columnDefinition = "TEXT")
     private String notes;

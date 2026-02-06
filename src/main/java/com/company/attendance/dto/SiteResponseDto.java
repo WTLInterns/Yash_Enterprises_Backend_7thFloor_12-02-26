@@ -36,4 +36,12 @@ public class SiteResponseDto {
     private String city;
 
     private String pincode;
+
+    // ✅ NEW: Client ID for CRM structure
+    private Long clientId;
+
+    // ✅ NEW: Timestamps for UI
+    private java.time.LocalDateTime createdAt;
+
+    private java.time.LocalDateTime updatedAt;
 }

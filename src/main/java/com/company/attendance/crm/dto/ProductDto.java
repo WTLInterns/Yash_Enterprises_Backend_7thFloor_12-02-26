@@ -1,6 +1,8 @@
 package com.company.attendance.crm.dto;
 
 import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Min;
@@ -8,6 +10,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 @Data
+@Getter
+@Setter
 public class ProductDto {
     private Long id;
     

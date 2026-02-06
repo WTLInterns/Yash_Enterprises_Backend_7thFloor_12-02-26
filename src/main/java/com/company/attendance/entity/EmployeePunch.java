@@ -21,17 +21,36 @@ public class EmployeePunch {
     @JoinColumn(name = "employee_id", nullable = false)
     private Employee employee;
 
-    @Column(name = "punch_type", nullable = false)
-    @NotBlank
+    @ManyToOne
+    @JoinColumn(name = "task_id")
+    private Task task;
+
+    @Column(name = "punch_in_time")
+    private LocalDateTime punchInTime;
+
+    @Column(name = "punch_out_time")
+    private LocalDateTime punchOutTime;
+
+    @Column(name = "late_mark")
+    private Boolean lateMark = false;
+
+    @Column(name = "distance_from_customer")
+    private Double distanceFromCustomer;
+
+    @Column(name = "auto_punch")
+    private Boolean autoPunch = false;
+
+    // Legacy fields for backward compatibility
+    @Column(name = "punch_type")
     private String punchType; // IN, OUT, BREAK_IN, BREAK_OUT
 
-    @Column(name = "punch_time", nullable = false)
+    @Column(name = "punch_time")
     private LocalDateTime punchTime;
 
-    @Column(name = "latitude", nullable = false)
+    @Column(name = "latitude")
     private Double latitude;
 
-    @Column(name = "longitude", nullable = false)
+    @Column(name = "longitude")
     private Double longitude;
 
     @Column(name = "altitude")

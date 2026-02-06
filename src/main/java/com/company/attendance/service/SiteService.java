@@ -4,9 +4,11 @@ import com.company.attendance.dto.SiteRequestDto;
 import com.company.attendance.dto.SiteResponseDto;
 import com.company.attendance.dto.SiteImportResultDto;
 import com.company.attendance.entity.Site;
+import com.company.attendance.entity.Client;
 import com.company.attendance.exception.BadRequestException;
 import com.company.attendance.exception.ResourceNotFoundException;
 import com.company.attendance.repository.SiteRepository;
+import com.company.attendance.repository.ClientRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,12 +28,40 @@ import java.util.stream.Collectors;
 public class SiteService {
 
     private final SiteRepository siteRepository;
+    private final ClientRepository clientRepository;
+    private final GeocodingService geocodingService;
     private final DataFormatter dataFormatter = new DataFormatter();
 
     @Transactional
     public SiteResponseDto createSite(SiteRequestDto requestDto) {
         log.debug("Creating new site: {}", requestDto);
+        
+        // ✅ Validate client exists
+        if (requestDto.getClientId() == null) {
+            throw new BadRequestException("Client ID is required for site creation");
+        }
+        
+        Client client = clientRepository.findById(requestDto.getClientId())
+                .orElseThrow(() -> new ResourceNotFoundException("Client not found with id: " + requestDto.getClientId()));
+        
         Site site = mapToEntity(new Site(), requestDto);
+        
+        // ✅ Auto geocode if address is provided but lat/lng missing
+        if ((site.getLatitude() == null || site.getLongitude() == null) && 
+            (site.getAddress() != null || site.getCity() != null)) {
+            
+            String fullAddress = geocodingService.buildFullAddress(
+                site.getAddress(), site.getCity(), site.getPincode(), null, null
+            );
+            
+            GeocodingService.LatLng latLng = geocodingService.geocodeAddress(fullAddress);
+            if (latLng != null) {
+                site.setLatitude(latLng.getLat());
+                site.setLongitude(latLng.getLng());
+                log.info("Auto-geocoded site {} to lat: {}, lng: {}", site.getSiteName(), latLng.getLat(), latLng.getLng());
+            }
+        }
+        
         Site saved = siteRepository.save(site);
         return mapToResponseDto(saved);
     }
@@ -40,6 +70,15 @@ public class SiteService {
     public List<SiteResponseDto> getAllSites() {
         log.debug("Fetching all sites");
         return siteRepository.findAll()
+                .stream()
+                .map(this::mapToResponseDto)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<SiteResponseDto> getSitesByClientId(Long clientId) {
+        log.debug("Fetching sites for client: {}", clientId);
+        return siteRepository.findByClientId(clientId)
                 .stream()
                 .map(this::mapToResponseDto)
                 .collect(Collectors.toList());
@@ -340,6 +379,7 @@ public class SiteService {
         site.setLongitude(dto.getLongitude());
         site.setCity(dto.getCity());
         site.setPincode(dto.getPincode());
+        site.setClientId(dto.getClientId()); // ✅ NEW: Set client ID
         return site;
     }
 
@@ -357,6 +397,9 @@ public class SiteService {
                 .longitude(site.getLongitude())
                 .city(site.getCity())
                 .pincode(site.getPincode())
+                .clientId(site.getClientId()) // ✅ NEW: Include client ID
+                .createdAt(site.getCreatedAt())
+                .updatedAt(site.getUpdatedAt())
                 .build();
     }
 }

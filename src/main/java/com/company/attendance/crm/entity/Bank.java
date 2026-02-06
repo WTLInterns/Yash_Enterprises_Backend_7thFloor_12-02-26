@@ -2,6 +2,8 @@ package com.company.attendance.crm.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -12,6 +14,8 @@ import java.time.Instant;
 @Entity
 @Table(name = "banks")
 @Data
+@Getter
+@Setter
 public class Bank {
     
     @Id

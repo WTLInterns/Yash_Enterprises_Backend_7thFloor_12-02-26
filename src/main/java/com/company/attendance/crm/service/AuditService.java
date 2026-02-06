@@ -3,9 +3,13 @@ package com.company.attendance.crm.service;
 import com.company.attendance.entity.Employee;
 import com.company.attendance.repository.EmployeeRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.time.Instant;
 
@@ -17,6 +21,19 @@ public class AuditService {
     
     public Integer getCurrentUserId() {
         try {
+            // First try to get from X-User-Id header
+            ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            if (attrs != null) {
+                HttpServletRequest request = attrs.getRequest();
+                if (request != null) {
+                    String userIdHeader = request.getHeader("X-User-Id");
+                    if (userIdHeader != null && !userIdHeader.isEmpty()) {
+                        return Integer.parseInt(userIdHeader);
+                    }
+                }
+            }
+            
+            // Fallback to Spring Security context
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             if (authentication != null && authentication.isAuthenticated()) {
                 // Try to get user ID from authentication principal

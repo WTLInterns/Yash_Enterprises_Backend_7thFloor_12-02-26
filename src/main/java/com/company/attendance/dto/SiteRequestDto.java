@@ -3,6 +3,7 @@ package com.company.attendance.dto;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -52,4 +53,8 @@ public class SiteRequestDto {
 
     @Size(max = 20, message = "Pincode must be at most 20 characters")
     private String pincode;
+
+    // ✅ NEW: Client ID for CRM structure
+    @NotNull(message = "Client ID is required")
+    private Long clientId;
 }

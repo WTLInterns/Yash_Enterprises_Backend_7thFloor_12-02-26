@@ -17,6 +17,7 @@ public class EmployeeTrackingDto {
     private Double accuracy;
     private LocalDateTime timestamp;
     private String locationAddress;
+    private String resolvedAddress;
     private String trackingType;
     private String deviceInfo;
     private String ipAddress;

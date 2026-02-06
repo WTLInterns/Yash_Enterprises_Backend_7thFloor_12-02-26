@@ -12,6 +12,9 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     boolean existsByEmail(String email);
     Optional<Employee> findByPhone(String phone);
 
+    // Add this method to find admin users
+    List<Employee> findByRole_NameIn(List<String> roleNames);
+
     // Methods used by EmployeeService
     Optional<Employee> findByUserId(String userId);
     Optional<Employee> findByEmployeeId(String employeeId);
@@ -20,6 +23,8 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     boolean existsByEmployeeId(String employeeId);
     boolean existsById(Long id);
     List<Employee> findByTeamId(Long teamId);
+
+    List<Employee> findByRole_NameIgnoreCase(String roleName);
     
     // Add JOIN FETCH queries to load all relationships
     @Query("SELECT e FROM Employee e " +

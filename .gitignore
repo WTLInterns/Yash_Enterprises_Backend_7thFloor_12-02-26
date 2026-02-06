@@ -11,3 +11,7 @@ target/
 
 # OS files
 .DS_Store
+
+# Firebase credentials
+*.json
+src/main/resources/zoho-cf081-firebase-adminsdk-fbsvc-18684b62a9.json
