@@ -29,11 +29,8 @@ public class Product {
     private String code;
     private BigDecimal price;
     
-    @Column(name = "category_id")
-    private Long categoryId;
-    
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id", insertable = false, updatable = false)
+    @JoinColumn(name = "category_id")
     private com.company.attendance.crm.entity.ProductCategory category;
     
     private String description;
@@ -53,8 +50,8 @@ public class Product {
     private Instant updatedAt;
     
     @Column(name = "created_by")
-    private Integer createdBy;
+    private Long createdBy;
     
     @Column(name = "updated_by")
-    private Integer updatedBy;
+    private Long updatedBy;
 }

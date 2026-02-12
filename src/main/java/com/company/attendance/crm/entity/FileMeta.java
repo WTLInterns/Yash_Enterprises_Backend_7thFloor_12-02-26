@@ -8,17 +8,17 @@ import java.time.OffsetDateTime;
 public class FileMeta {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;
+    private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "deal_id")
     private Deal deal; // nullable: can be linked to note or deal
 
     @Column(name = "uploaded_by")
-    private Integer uploadedBy;
+    private Long uploadedBy;
 
     @Column(name = "created_by")
-    private Integer createdBy;
+    private Long createdBy;
 
     private String fileName;
     private Long fileSize;
@@ -34,14 +34,14 @@ public class FileMeta {
     }
 
     // getters/setters
-    public Integer getId() { return id; }
-    public void setId(Integer id) { this.id = id; }
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
     public Deal getDeal() { return deal; }
     public void setDeal(Deal deal) { this.deal = deal; }
-    public Integer getUploadedBy() { return uploadedBy; }
-    public void setUploadedBy(Integer uploadedBy) { this.uploadedBy = uploadedBy; }
-    public Integer getCreatedBy() { return createdBy; }
-    public void setCreatedBy(Integer createdBy) { this.createdBy = createdBy; }
+    public Long getUploadedBy() { return uploadedBy; }
+    public void setUploadedBy(Long uploadedBy) { this.uploadedBy = uploadedBy; }
+    public Long getCreatedBy() { return createdBy; }
+    public void setCreatedBy(Long createdBy) { this.createdBy = createdBy; }
     public String getFileName() { return fileName; }
     public void setFileName(String fileName) { this.fileName = fileName; }
     public Long getFileSize() { return fileSize; }

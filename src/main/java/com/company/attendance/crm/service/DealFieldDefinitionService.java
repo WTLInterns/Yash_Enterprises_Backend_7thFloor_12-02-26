@@ -24,7 +24,11 @@ public class DealFieldDefinitionService {
         return repo.findAll();
     }
 
-    public DealFieldDefinition update(Integer id, DealFieldDefinition incoming) {
+    public DealFieldDefinition get(Long id) {
+        return repo.findById(id).orElseThrow(() -> new IllegalArgumentException("Field definition not found"));
+    }
+
+    public DealFieldDefinition update(Long id, DealFieldDefinition incoming) {
         DealFieldDefinition db = repo.findById(id).orElseThrow(() -> new IllegalArgumentException("Field definition not found"));
         db.setFieldName(incoming.getFieldName());
         db.setFieldType(incoming.getFieldType());
@@ -34,7 +38,7 @@ public class DealFieldDefinitionService {
         return repo.save(db);
     }
 
-    public void delete(Integer id) {
+    public void delete(Long id) {
         repo.deleteById(id);
     }
 

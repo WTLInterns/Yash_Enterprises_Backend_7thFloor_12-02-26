@@ -30,13 +30,13 @@ public class ProductLineController {
     }
 
     @PutMapping("/{productId}")
-    public ProductLine update(@PathVariable Long dealId, @PathVariable Integer productId, @RequestBody ProductLine incoming){
-        return productLineService.update(dealId, productId, incoming);
+    public ProductLine update(@PathVariable Long productId, @RequestBody ProductLine incoming){
+        return productLineService.update(productId, incoming);
     }
 
     @DeleteMapping("/{productId}")
-    public ResponseEntity<Void> delete(@PathVariable Long dealId, @PathVariable Integer productId){
-        productLineService.delete(dealId, productId);
+    public ResponseEntity<Void> delete(@PathVariable Long productId){
+        productLineService.delete(productId);
         return ResponseEntity.noContent().build();
     }
 }

@@ -51,7 +51,7 @@ public class Activity {
     private OffsetDateTime reminder;
 
     @Column(name = "created_by")
-    private Integer createdBy;
+    private Long createdBy;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
@@ -100,8 +100,8 @@ public class Activity {
     public void setRepeatRule(String repeatRule) { this.repeatRule = repeatRule; }
     public OffsetDateTime getReminder() { return reminder; }
     public void setReminder(OffsetDateTime reminder) { this.reminder = reminder; }
-    public Integer getCreatedBy() { return createdBy; }
-    public void setCreatedBy(Integer createdBy) { this.createdBy = createdBy; }
+    public Long getCreatedBy() { return createdBy; }
+    public void setCreatedBy(Long createdBy) { this.createdBy = createdBy; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
     public Integer getModifiedBy() { return modifiedBy; }

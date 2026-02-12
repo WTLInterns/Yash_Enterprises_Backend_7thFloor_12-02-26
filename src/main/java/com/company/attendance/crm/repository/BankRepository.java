@@ -8,10 +8,10 @@ import org.springframework.data.domain.Pageable;
 
 import java.util.Optional;
 
-public interface BankRepository extends JpaRepository<Bank, Integer>, JpaSpecificationExecutor<Bank> {
+public interface BankRepository extends JpaRepository<Bank, Long>, JpaSpecificationExecutor<Bank> {
     boolean existsByNameIgnoreCase(String name);
     
-    default Bank findByIdSafe(Integer id) {
+    default Bank findByIdSafe(Long id) {
         return findById(id).orElseThrow(() ->
             new RuntimeException("Bank not found: " + id)
         );

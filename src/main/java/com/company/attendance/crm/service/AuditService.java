@@ -78,10 +78,10 @@ public class AuditService {
         return "Admin User";
     }
     
-    public String getUserName(Integer userId) {
+    public String getUserName(Long userId) {
         if (userId == null) return null;
         try {
-            return employeeRepository.findById(userId.longValue())
+            return employeeRepository.findById(userId)
                 .map(e -> {
                     String first = e.getFirstName();
                     String last  = e.getLastName();

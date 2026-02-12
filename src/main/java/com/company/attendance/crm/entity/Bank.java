@@ -72,10 +72,10 @@ public class Bank {
     private Instant updatedAt;
     
     @Column(name = "created_by")
-    private Integer createdBy;
+    private Long createdBy;
     
     @Column(name = "updated_by")
-    private Integer updatedBy;
+    private Long updatedBy;
     
     @Column(name = "is_active")
     private Boolean active;

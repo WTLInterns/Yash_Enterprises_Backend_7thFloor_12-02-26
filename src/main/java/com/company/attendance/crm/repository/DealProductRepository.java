@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
-public interface DealProductRepository extends JpaRepository<DealProduct, Integer> {
+public interface DealProductRepository extends JpaRepository<DealProduct, Long> {
     List<DealProduct> findByDeal(Deal deal);
     List<DealProduct> findByProduct(Product product);
 }

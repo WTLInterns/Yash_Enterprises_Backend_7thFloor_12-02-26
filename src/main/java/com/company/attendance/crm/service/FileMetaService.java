@@ -29,14 +29,24 @@ public class FileMetaService {
         return fileRepo.findByDeal(deal);
     }
 
-    public FileMeta create(Long dealId, FileMeta meta, Integer userId){
+    public FileMeta create(Long dealId, FileMeta meta, Long userId){
         Deal deal = dealRepository.findByIdSafe(dealId);
         meta.setDeal(deal);
         meta.setCreatedBy(userId);
         return fileRepo.save(meta);
     }
 
-    public FileMeta upload(Long dealId, MultipartFile file, Integer userId) throws IOException {
+    public FileMeta update(Long id, FileMeta incoming, Long userId){
+        FileMeta meta = fileRepo.findById(id).orElseThrow(() -> new IllegalArgumentException("File not found"));
+        meta.setFileName(incoming.getFileName());
+        meta.setFileSize(incoming.getFileSize());
+        meta.setContentType(incoming.getContentType());
+        meta.setStoragePath(incoming.getStoragePath());
+        meta.setCreatedBy(userId);
+        return fileRepo.save(meta);
+    }
+
+    public FileMeta upload(Long dealId, MultipartFile file, Long userId) throws IOException {
         Deal deal = dealRepository.findByIdSafe(dealId);
         // simple local storage under ./uploads
         Path uploadDir = Path.of("uploads");
@@ -56,14 +66,14 @@ public class FileMetaService {
         return fileRepo.save(meta);
     }
 
-    public void delete(Integer fileId){
-        fileRepo.findById(fileId).ifPresent(meta -> {
+    public void delete(Long id){
+        fileRepo.findById(id).ifPresent(meta -> {
             try { if (meta.getStoragePath() != null) Files.deleteIfExists(Path.of(meta.getStoragePath())); } catch (Exception ignored) {}
             fileRepo.delete(meta);
         });
     }
 
-    public FileMeta get(Integer fileId){
-        return fileRepo.findById(fileId).orElseThrow(() -> new IllegalArgumentException("File not found"));
+    public FileMeta get(Long id){
+        return fileRepo.findById(id).orElseThrow(() -> new IllegalArgumentException("File not found"));
     }
 }

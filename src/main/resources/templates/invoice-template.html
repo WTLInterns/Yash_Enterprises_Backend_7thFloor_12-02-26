@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Invoice ${invoiceNo}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 20mm;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            margin: 0;
+            padding: 0;
+            color: #000;
+            background: white;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        .invoice-container {
+            background: white;
+            max-width: 100%;
+            padding: 32px;
+            border: 1px solid #d1d5db;
+        }
+        
+        .header {
+            border-bottom: 2px solid #000;
+            padding-bottom: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        
+        .invoice-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #000;
+            margin-bottom: 8px;
+        }
+        
+        .invoice-details {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .invoice-detail-row {
+            display: flex;
+            font-size: 14px;
+        }
+        
+        .detail-label {
+            font-weight: 500;
+            width: 96px;
+        }
+        
+        .company-logo {
+            width: 128px;
+            height: 96px;
+            border: 1px solid #d1d5db;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            background: #f9fafb;
+        }
+        
+        .company-logo img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        
+        .billing-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            margin-bottom: 24px;
+        }
+        
+        .billing-section h3 {
+            font-weight: bold;
+            color: #000;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .billing-details {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .billing-details p {
+            margin: 0;
+            font-size: 14px;
+        }
+        
+        .billing-details .font-medium {
+            font-weight: 500;
+        }
+        
+        .billing-details .text-gray-600 {
+            color: #6b7280;
+        }
+        
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid #000;
+            margin-bottom: 24px;
+        }
+        
+        .items-table th,
+        .items-table td {
+            border: 1px solid #000;
+            padding: 8px;
+            text-align: left;
+            font-size: 14px;
+        }
+        
+        .items-table th {
+            background: #f3f4f6;
+            font-weight: bold;
+        }
+        
+        .items-table th.text-center,
+        .items-table td.text-center {
+            text-align: center;
+        }
+        
+        .items-table th.text-right,
+        .items-table td.text-right {
+            text-align: right;
+        }
+        
+        .item-name {
+            font-weight: 500;
+        }
+        
+        .item-description {
+            color: #6b7280;
+            font-size: 12px;
+            margin-top: 2px;
+        }
+        
+        .totals-section {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 24px;
+        }
+        
+        .totals-table {
+            width: 256px;
+            border-collapse: collapse;
+            border: 1px solid #000;
+        }
+        
+        .totals-table td {
+            border: 1px solid #000;
+            padding: 8px;
+            font-size: 14px;
+        }
+        
+        .totals-table td:first-child {
+            font-weight: 500;
+        }
+        
+        .totals-table td.text-right {
+            text-align: right;
+        }
+        
+        .totals-table .grand-total {
+            background: #f3f4f6;
+            font-weight: bold;
+        }
+        
+        .payment-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            margin-bottom: 24px;
+        }
+        
+        .payment-section h3 {
+            font-weight: bold;
+            color: #000;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .payment-details {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .payment-details p {
+            margin: 0;
+            font-size: 14px;
+        }
+        
+        .payment-details .font-medium {
+            font-weight: 500;
+        }
+        
+        .payment-details .text-gray-600 {
+            color: #6b7280;
+        }
+        
+        .qr-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            margin-top: 8px;
+        }
+        
+        .qr-container {
+            position: relative;
+        }
+        
+        .qr-code {
+            width: 128px;
+            height: 128px;
+            border: 2px solid #d1d5db;
+            border-radius: 8px;
+        }
+        
+        .qr-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .qr-text {
+            text-align: center;
+            font-size: 14px;
+            color: #6b7280;
+        }
+        
+        .qr-upi-id {
+            text-align: center;
+            font-size: 12px;
+            font-weight: 500;
+            color: #374151;
+        }
+        
+        .terms-section h3 {
+            font-weight: bold;
+            color: #000;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .terms-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .terms-list p {
+            margin: 0;
+            font-size: 14px;
+            color: #6b7280;
+        }
+        
+        .signature-section h3 {
+            font-weight: bold;
+            color: #000;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .signature-container {
+            display: flex;
+            justify-content: center;
+        }
+        
+        .signature-image {
+            width: 192px;
+            height: 96px;
+            object-fit: contain;
+            border: 1px solid #d1d5db;
+        }
+        
+        .footer {
+            text-align: center;
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 32px;
+            padding-top: 16px;
+            border-top: 1px solid #d1d5db;
+        }
+        
+        .no-items {
+            text-align: center;
+            color: #6b7280;
+            padding: 32px;
+        }
+    </style>
+</head>
+<body>
+    <div class="invoice-container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-content">
+                <div>
+                    <h1 class="invoice-title">${isProForma?string('PRO FORMA INVOICE', 'INVOICE')}</h1>
+                    <div class="invoice-details">
+                        <div class="invoice-detail-row">
+                            <span class="detail-label">Invoice No:</span>
+                            <span>${invoiceNo}</span>
+                        </div>
+                        <div class="invoice-detail-row">
+                            <span class="detail-label">Date:</span>
+                            <span>${invoiceDate}</span>
+                        </div>
+                        <div class="invoice-detail-row">
+                            <span class="detail-label">Due Date:</span>
+                            <span>${dueDate}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Company Logo -->
+                <div class="company-logo">
+                    <#if companyLogo??>
+                        <img src="${companyLogo}" alt="Company Logo" />
+                    <#else>
+                        <span style="color: #9ca3af; font-size: 12px;">LOGO</span>
+                    </#if>
+                </div>
+            </div>
+        </div>
+
+        <div class="billing-grid">
+            <!-- Billed By -->
+            <div class="billing-section">
+                <h3>BILLED BY</h3>
+                <div class="billing-details">
+                    <p class="font-medium">${billedByName}</p>
+                    <p class="text-gray-600">${billedByAddress}</p>
+                    <#if gstin??>
+                        <p class="text-gray-600">GSTIN: ${gstin}</p>
+                    </#if>
+                    <#if pan??>
+                        <p class="text-gray-600">PAN: ${pan}</p>
+                    </#if>
+                    <#if billedByEmail??>
+                        <p class="text-gray-600">Email: ${billedByEmail}</p>
+                    </#if>
+                </div>
+            </div>
+
+            <!-- Billed To -->
+            <div class="billing-section">
+                <h3>BILLED TO</h3>
+                <div class="billing-details">
+                    <p class="font-medium">${billedToName}</p>
+                    <p class="text-gray-600">${billedToAddress}</p>
+                    <#if billedToGstin??>
+                        <p class="text-gray-600">GSTIN: ${billedToGstin}</p>
+                    </#if>
+                    <#if billedToMobile??>
+                        <p class="text-gray-600">Mobile: ${billedToMobile}</p>
+                    </#if>
+                    <#if billedToEmail??>
+                        <p class="text-gray-600">Email: ${billedToEmail}</p>
+                    </#if>
+                </div>
+            </div>
+        </div>
+
+        <!-- Items Table -->
+        <div class="items-section">
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th class="text-left">#</th>
+                        <th class="text-left">ITEM DESCRIPTION</th>
+                        <#if includeGst??>
+                            <th class="text-center">GST RATE</th>
+                        </#if>
+                        <th class="text-center">QTY</th>
+                        <th class="text-right">RATE</th>
+                        <th class="text-right">AMOUNT</th>
+                        <#if includeGst??>
+                            <th class="text-right">CGST</th>
+                            <th class="text-right">SGST</th>
+                        </#if>
+                        <th class="text-right">TOTAL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <#if !items?? || (items?size == 0)>
+                        <tr>
+                            <td colspan="<#if includeGst??>9<#else>6</#if>" class="no-items">
+                                No items added
+                            </td>
+                        </tr>
+                    <#else>
+                        <#list items as item>
+                            <tr>
+                                <td class="text-left">${item_index + 1}</td>
+                                <td class="text-left">
+                                    <div class="item-name">${item.name}</div>
+                                    <#if item.description??>
+                                        <div class="item-description">${item.description}</div>
+                                    </#if>
+                                </td>
+                                <#if includeGst??>
+                                    <td class="text-center">18%</td>
+                                </#if>
+                                <td class="text-center">${item.qty}</td>
+                                <td class="text-right">₹${item.rate}</td>
+                                <td class="text-right">₹${item.qty * item.rate}</td>
+                                <#if includeGst??>
+                                    <td class="text-right">₹${(item.qty * item.rate) * 0.09}</td>
+                                    <td class="text-right">₹${(item.qty * item.rate) * 0.09}</td>
+                                </#if>
+                                <td class="text-right">
+                                    <#if includeGst??>
+                                        ₹${(item.qty * item.rate) + ((item.qty * item.rate) * 0.18)}
+                                    <#else>
+                                        ₹${item.qty * item.rate}
+                                    </#if>
+                                </td>
+                            </tr>
+                        </#list>
+                    </#if>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Total Section -->
+        <#if items?? && (items?size > 0)>
+            <div class="totals-section">
+                <table class="totals-table">
+                    <tbody>
+                        <tr>
+                            <td>SUBTOTAL</td>
+                            <td class="text-right">₹${subtotal}</td>
+                        </tr>
+                        <#if includeGst??>
+                            <tr>
+                                <td>CGST @ 9%</td>
+                                <td class="text-right">₹${cgst}</td>
+                            </tr>
+                            <tr>
+                                <td>SGST @ 9%</td>
+                                <td class="text-right">₹${sgst}</td>
+                            </tr>
+                        </#if>
+                        <tr class="grand-total">
+                            <td>GRAND TOTAL</td>
+                            <td class="text-right">₹${grandTotal}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </#if>
+
+        <!-- Bank Details -->
+        <#if accountName?? || upiId??>
+            <div class="payment-grid">
+                <#if accountName??>
+                    <div class="payment-section">
+                        <h3>BANK DETAILS</h3>
+                        <div class="payment-details">
+                            <p class="font-medium">${accountName}</p>
+                            <#if accountNumber??>
+                                <p class="text-gray-600">A/C No: ${accountNumber}</p>
+                            </#if>
+                            <#if ifsc??>
+                                <p class="text-gray-600">IFSC: ${ifsc}</p>
+                            </#if>
+                            <#if accountType??>
+                                <p class="text-gray-600">Type: ${accountType}</p>
+                            </#if>
+                            <#if bank??>
+                                <p class="text-gray-600">Bank: ${bank}</p>
+                            </#if>
+                        </div>
+                    </div>
+                </#if>
+
+                <#if upiId??>
+                    <div class="payment-section">
+                        <h3>UPI DETAILS</h3>
+                        <div class="payment-details">
+                            <p class="text-gray-600">UPI ID: ${upiId}</p>
+                            <p class="text-gray-600">Maximum ₹1,00,000 via UPI</p>
+                            <div class="qr-section">
+                                <div class="qr-container">
+                                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=128x128&data=${upiUri}" alt="UPI QR Code" class="qr-code" />
+                                    <div class="qr-overlay">₹${grandTotal}</div>
+                                </div>
+                                <div class="qr-text">
+                                    <p>Maximum ₹1,00,000 via UPI</p>
+                                    <p class="qr-upi-id">UPI ID: ${upiId}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </#if>
+            </div>
+        </#if>
+
+        <!-- Terms and Conditions -->
+        <#if terms??>
+            <div class="terms-section">
+                <h3>TERMS AND CONDITIONS</h3>
+                <div class="terms-list">
+                    <#list terms?split("\n") as line>
+                        <#if line?trim?has_content>
+                            <p>• ${line?trim}</p>
+                        </#if>
+                    </#list>
+                </div>
+            </div>
+        </#if>
+
+        <!-- Signature -->
+        <#if signature??>
+            <div class="signature-section">
+                <h3>AUTHORIZED SIGNATURE</h3>
+                <div class="signature-container">
+                    <img src="${signature}" alt="Signature" class="signature-image" />
+                </div>
+            </div>
+        </#if>
+
+        <!-- Footer -->
+        <div class="footer">
+            This is an electronically generated document, no signature is required.
+        </div>
+    </div>
+</body>
+</html>

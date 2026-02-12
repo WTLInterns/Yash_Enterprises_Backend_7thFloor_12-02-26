@@ -55,7 +55,7 @@ public class ActivityService {
         return new PageImpl<>(slice, pageable, all.size());
     }
 
-    public Activity create(Long dealId, Activity activity, Integer userId){
+    public Activity create(Long dealId, Activity activity, Long userId){
         Deal deal = dealRepository.findByIdSafe(dealId);
         activity.setDeal(deal);
         activity.setCreatedBy(userId);

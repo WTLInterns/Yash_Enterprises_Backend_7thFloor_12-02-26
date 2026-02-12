@@ -20,12 +20,12 @@ public class ProductCategoryService {
 
     public List<ProductCategory> list(){ return repo.findAll(); }
 
-    public ProductCategory update(Integer id, ProductCategory incoming){
+    public ProductCategory update(Long id, ProductCategory incoming){
         ProductCategory db = repo.findById(id).orElseThrow(() -> new IllegalArgumentException("category not found"));
         db.setName(incoming.getName());
         if (incoming.getActive() != null) db.setActive(incoming.getActive());
         return repo.save(db);
     }
 
-    public void delete(Integer id){ repo.deleteById(id); }
+    public void delete(Long id){ repo.deleteById(id); }
 }

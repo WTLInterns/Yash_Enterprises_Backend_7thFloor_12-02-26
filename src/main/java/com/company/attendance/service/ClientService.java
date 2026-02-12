@@ -1,6 +1,7 @@
 package com.company.attendance.service;
 
 import com.company.attendance.dto.ClientDto;
+import com.company.attendance.dto.ClientWithOwnerDto;
 import com.company.attendance.entity.Client;
 import com.company.attendance.entity.Case;
 import com.company.attendance.crm.entity.Deal;
@@ -13,6 +14,7 @@ import com.company.attendance.crm.repository.DealRepository;
 import com.company.attendance.crm.repository.DealProductRepository;
 import com.company.attendance.crm.repository.ActivityRepository;
 import com.company.attendance.crm.repository.NoteRepository;
+import com.company.attendance.repository.EmployeeRepository;
 import com.company.attendance.mapper.ClientMapper;
 import com.company.attendance.crm.mapper.CrmMapper;
 import com.company.attendance.crm.service.AuditService;
@@ -24,8 +26,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -45,6 +49,7 @@ public class ClientService {
     private final AuditService auditService;
     private final EntityManager entityManager;
     private final GeocodingService geocodingService;
+    private final EmployeeRepository employeeRepository;
 
     // CRM Entity methods - using UUID only
     public List<Client> getAllClientEntities() {
@@ -61,6 +66,55 @@ public class ClientService {
         log.info("Fetching client entity with ID: {}", id);
         return clientRepository.findById(id).orElse(null);
     }
+    
+    // ✅ NEW: Methods to get clients with owner information
+    public List<ClientWithOwnerDto> getAllClientsWithOwner() {
+        log.info("Fetching all clients with owner information");
+        List<Client> clients = clientRepository.findAll();
+        return clients.stream()
+                .map(client -> {
+                    ClientWithOwnerDto.OwnerInfo ownerInfo = getOwnerInfo(client.getOwnerId());
+                    return ClientWithOwnerDto.fromEntity(client, ownerInfo);
+                })
+                .collect(Collectors.toList());
+    }
+    
+    public List<ClientWithOwnerDto> getActiveClientsWithOwner() {
+        log.info("Fetching active clients with owner information");
+        List<Client> clients = clientRepository.findByIsActive(true);
+        return clients.stream()
+                .map(client -> {
+                    ClientWithOwnerDto.OwnerInfo ownerInfo = getOwnerInfo(client.getOwnerId());
+                    return ClientWithOwnerDto.fromEntity(client, ownerInfo);
+                })
+                .collect(Collectors.toList());
+    }
+    
+    public ClientWithOwnerDto getClientWithOwnerById(Long id) {
+        log.info("Fetching client with owner information for ID: {}", id);
+        Optional<Client> clientOpt = clientRepository.findById(id);
+        if (clientOpt.isPresent()) {
+            Client client = clientOpt.get();
+            ClientWithOwnerDto.OwnerInfo ownerInfo = getOwnerInfo(client.getOwnerId());
+            return ClientWithOwnerDto.fromEntity(client, ownerInfo);
+        }
+        return null;
+    }
+    
+    private ClientWithOwnerDto.OwnerInfo getOwnerInfo(Long ownerId) {
+        if (ownerId != null) {
+            return employeeRepository.findById(ownerId)
+                    .map(employee -> new ClientWithOwnerDto.OwnerInfo(
+                            employee.getId(),
+                            employee.getFullName(),
+                            employee.getFirstName(),
+                            employee.getLastName(),
+                            employee.getRole() != null ? employee.getRole().getName() : "Employee"
+                    ))
+                    .orElse(new ClientWithOwnerDto.OwnerInfo(null, "Unknown User", "", "", "Employee"));
+        }
+        return new ClientWithOwnerDto.OwnerInfo(null, "Unassigned", "", "", "Employee");
+    }
 
     public Client createClientEntity(Client client) {
         log.info("Creating new client entity: {}", client.getName());
@@ -70,9 +124,12 @@ public class ClientService {
             throw new RuntimeException("Email already exists: " + client.getEmail());
         }
         
-        // Set owner from logged-in user
-        if (client.getOwnerId() == null) {
-            client.setOwnerId(auditService.getCurrentUserId().longValue());
+        // ✅ FIXED: Set owner from logged-in user
+        Integer currentUserId = auditService.getCurrentUserId();
+        if (currentUserId != null) {
+            // Set legacy fields
+            client.setOwnerId(currentUserId.longValue());
+            client.setCreatedBy(currentUserId.longValue());
         }
         
         // ✅ Auto geocode if address is provided but lat/lng missing
@@ -174,7 +231,11 @@ public class ClientService {
         }
         
         // Always update owner to current logged-in user
-        existingClient.setOwnerId(auditService.getCurrentUserId().longValue());
+        Integer currentUserId = auditService.getCurrentUserId();
+        if (currentUserId != null) {
+            existingClient.setOwnerId(currentUserId.longValue());
+            existingClient.setUpdatedBy(currentUserId.longValue());
+        }
         
         // Update audit fields
         auditService.updateAuditFields(existingClient);

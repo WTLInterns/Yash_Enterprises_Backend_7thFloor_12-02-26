@@ -28,9 +28,9 @@ public class NoteController {
         this.employeeRepository = employeeRepository;
     }
 
-    private String employeeName(Integer employeeId) {
+    private String employeeName(Long employeeId) {
         if (employeeId == null) return "System";
-        Optional<Employee> emp = employeeRepository.findById(employeeId.longValue());
+        Optional<Employee> emp = employeeRepository.findById(employeeId);
         if (emp.isEmpty()) return "System";
         String first = emp.get().getFirstName() != null ? emp.get().getFirstName().trim() : "";
         String last = emp.get().getLastName() != null ? emp.get().getLastName().trim() : "";
@@ -66,18 +66,18 @@ public class NoteController {
         Object noteBody = body.get("body");
         note.setTitle(title != null ? String.valueOf(title) : null);
         note.setBody(noteBody != null ? String.valueOf(noteBody) : (text != null ? String.valueOf(text) : null));
-        Note created = noteService.create(dealId, note, userId);
+        Note created = noteService.create(dealId, note, userId != null ? userId.longValue() : null);
         return ResponseEntity.created(URI.create("/api/deals/"+dealId+"/notes/"+created.getId())).body(toDto(created));
     }
 
     @PutMapping("/{noteId}")
-    public NoteDto update(@PathVariable Long dealId, @PathVariable Integer noteId, @RequestBody Note note) {
-        return toDto(noteService.update(dealId, noteId, note));
+    public NoteDto update(@PathVariable Long dealId, @PathVariable Long noteId, @RequestBody Note note) {
+        return toDto(noteService.update(noteId, note));
     }
 
     @DeleteMapping("/{noteId}")
-    public ResponseEntity<Void> delete(@PathVariable Long dealId, @PathVariable Integer noteId) {
-        noteService.delete(dealId, noteId);
+    public ResponseEntity<Void> delete(@PathVariable Long dealId, @PathVariable Long noteId) {
+        noteService.delete(noteId);
         return ResponseEntity.noContent().build();
     }
 }

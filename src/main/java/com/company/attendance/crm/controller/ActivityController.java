@@ -30,7 +30,7 @@ public class ActivityController {
     @PostMapping
     public ResponseEntity<Activity> create(@PathVariable("dealId") Long dealId,
                                            @RequestBody Activity activity,
-                                           @RequestHeader(value = "X-User-Id", required = false) Integer userId) {
+                                           @RequestHeader(value = "X-User-Id", required = false) Long userId) {
         Activity created = activityService.create(dealId, activity, userId);
         return ResponseEntity.created(URI.create("/api/deals/" + dealId + "/activities/" + created.getId())).body(created);
     }

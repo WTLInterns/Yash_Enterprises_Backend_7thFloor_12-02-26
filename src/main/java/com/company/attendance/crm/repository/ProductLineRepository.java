@@ -5,6 +5,6 @@ import com.company.attendance.crm.entity.Deal;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
-public interface ProductLineRepository extends JpaRepository<ProductLine, Integer> {
+public interface ProductLineRepository extends JpaRepository<ProductLine, Long> {
     List<ProductLine> findByDeal(Deal deal);
 }

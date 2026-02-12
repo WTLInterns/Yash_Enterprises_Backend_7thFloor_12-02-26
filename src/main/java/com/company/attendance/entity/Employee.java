@@ -107,6 +107,14 @@ public class Employee {
     private String updatedBy;
     private LocalDateTime updatedAt;
 
+    // ✅ NEW: Helper method for full name
+    public String getFullName() {
+        if (lastName != null && !lastName.trim().isEmpty()) {
+            return (firstName + " " + lastName).trim();
+        }
+        return firstName != null ? firstName.trim() : "";
+    }
+
     public enum Status {
         ACTIVE, INACTIVE, TERMINATED
     }

@@ -16,6 +16,8 @@ public interface CustomerAddressRepository extends JpaRepository<CustomerAddress
     
     Optional<CustomerAddress> findByClientIdAndAddressType(Long clientId, CustomerAddress.AddressType addressType);
     
+    void deleteByClientId(Long clientId);
+    
     @Query("SELECT ca FROM CustomerAddress ca WHERE ca.clientId = :clientId AND ca.latitude IS NOT NULL AND ca.longitude IS NOT NULL")
     List<CustomerAddress> findWithCoordinatesByClientId(@Param("clientId") Long clientId);
     

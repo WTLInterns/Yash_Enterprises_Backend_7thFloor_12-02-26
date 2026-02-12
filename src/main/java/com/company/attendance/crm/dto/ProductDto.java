@@ -33,8 +33,8 @@ public class ProductDto {
     // Audit fields (read-only in frontend)
     private Instant createdAt;
     private Instant updatedAt;
-    private Integer createdBy;
-    private Integer updatedBy;
+    private Long createdBy;
+    private Long updatedBy;
     private String createdByName;
     private String updatedByName;
     private String ownerName;

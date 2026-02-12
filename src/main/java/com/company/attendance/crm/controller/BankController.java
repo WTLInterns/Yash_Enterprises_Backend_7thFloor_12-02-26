@@ -41,7 +41,7 @@ public class BankController {
         Bank created = bankService.create(bank);
         BankDto response = simpleCrmMapper.toBankDto(created);
         // Owner is whoever just created the bank
-        Integer ownerId = created.getUpdatedBy() != null ? created.getUpdatedBy() : created.getCreatedBy();
+        Long ownerId = created.getUpdatedBy() != null ? created.getUpdatedBy() : created.getCreatedBy();
         response.setOwnerName(auditService.getUserName(ownerId));
         response.setCreatedByName(auditService.getUserName(created.getCreatedBy()));
         response.setUpdatedByName(auditService.getUserName(created.getUpdatedBy()));
@@ -50,7 +50,7 @@ public class BankController {
 
     @GetMapping
     public Page<BankDto> list(@RequestParam(value = "active", required = false) Boolean active,
-                           @RequestParam(value = "ownerId", required = false) Integer ownerId,
+                           @RequestParam(value = "ownerId", required = false) Long ownerId,
                            @RequestParam(value = "q", required = false) String q,
                            Pageable pageable){
         // Default to active=true unless explicitly requested otherwise
@@ -59,7 +59,7 @@ public class BankController {
             List<BankDto> dtos = banks.getContent().stream()
                 .map(bank -> {
                     BankDto dto = simpleCrmMapper.toBankDto(bank);
-                    Integer owner = bank.getUpdatedBy() != null ? bank.getUpdatedBy() : bank.getCreatedBy();
+                    Long owner = bank.getUpdatedBy() != null ? bank.getUpdatedBy() : bank.getCreatedBy();
                     dto.setOwnerName(auditService.getUserName(owner));
                     dto.setCreatedByName(auditService.getUserName(bank.getCreatedBy()));
                     dto.setUpdatedByName(auditService.getUserName(bank.getUpdatedBy()));
@@ -73,7 +73,7 @@ public class BankController {
         List<BankDto> dtos = banks.getContent().stream()
             .map(bank -> {
                 BankDto dto = simpleCrmMapper.toBankDto(bank);
-                Integer owner = bank.getUpdatedBy() != null ? bank.getUpdatedBy() : bank.getCreatedBy();
+                Long owner = bank.getUpdatedBy() != null ? bank.getUpdatedBy() : bank.getCreatedBy();
                 dto.setOwnerName(auditService.getUserName(owner));
                 dto.setCreatedByName(auditService.getUserName(bank.getCreatedBy()));
                 dto.setUpdatedByName(auditService.getUserName(bank.getUpdatedBy()));
@@ -84,11 +84,11 @@ public class BankController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<BankDto> getById(@PathVariable Integer id) {
+    public ResponseEntity<BankDto> getById(@PathVariable Long id) {
         Bank bank = bankService.get(id)
             .orElseThrow(() -> new ResourceNotFoundException("Bank not found"));
         BankDto bankDto = simpleCrmMapper.toBankDto(bank);
-        Integer owner = bank.getUpdatedBy() != null ? bank.getUpdatedBy() : bank.getCreatedBy();
+        Long owner = bank.getUpdatedBy() != null ? bank.getUpdatedBy() : bank.getCreatedBy();
         bankDto.setOwnerName(auditService.getUserName(owner));
         bankDto.setCreatedByName(auditService.getUserName(bank.getCreatedBy()));
         bankDto.setUpdatedByName(auditService.getUserName(bank.getUpdatedBy()));
@@ -96,10 +96,10 @@ public class BankController {
     }
 
     @PutMapping("/{id}")
-    public BankDto update(@PathVariable Integer id, @RequestBody BankDto bankDto){
+    public BankDto update(@PathVariable Long id, @RequestBody BankDto bankDto){
         Bank updated = bankService.update(id, bankDto);
         BankDto dto = simpleCrmMapper.toBankDto(updated);
-        Integer owner = updated.getUpdatedBy() != null ? updated.getUpdatedBy() : updated.getCreatedBy();
+        Long owner = updated.getUpdatedBy() != null ? updated.getUpdatedBy() : updated.getCreatedBy();
         dto.setOwnerName(auditService.getUserName(owner));
         dto.setCreatedByName(auditService.getUserName(updated.getCreatedBy()));
         dto.setUpdatedByName(auditService.getUserName(updated.getUpdatedBy()));
@@ -107,12 +107,12 @@ public class BankController {
     }
 
     @PatchMapping("/{id}/status")
-    public Bank patchStatus(@PathVariable Integer id, @RequestParam("active") boolean active){
+    public Bank patchStatus(@PathVariable Long id, @RequestParam("active") boolean active){
         return bankService.patchStatus(id, active);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Integer id){
+    public ResponseEntity<Void> delete(@PathVariable Long id){
         bankService.delete(id);
         return ResponseEntity.noContent().build();
     }
@@ -149,7 +149,7 @@ public class BankController {
 
     // permissions helper
     @GetMapping("/{id}/permissions")
-    public ResponseEntity<Map<String, Boolean>> permissions(@PathVariable Integer id,
+    public ResponseEntity<Map<String, Boolean>> permissions(@PathVariable Long id,
                                                             @RequestHeader(value = "X-User-Role", required = false) String role,
                                                             @RequestHeader(value = "X-User-Id", required = false) Integer userId){
         return bankService.get(id).map(b -> {

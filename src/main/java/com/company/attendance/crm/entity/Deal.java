@@ -77,10 +77,10 @@ public class Deal {
     private LocalDateTime updatedAt;
     
     @Column(name = "created_by")
-    private Integer createdBy;
+    private Long createdBy;
     
     @Column(name = "updated_by")
-    private Integer updatedBy;
+    private Long updatedBy;
     
     @OneToMany(mappedBy = "deal", cascade = CascadeType.ALL, orphanRemoval = true)
     @OnDelete(action = OnDeleteAction.CASCADE)

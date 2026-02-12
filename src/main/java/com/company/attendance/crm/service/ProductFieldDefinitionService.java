@@ -20,11 +20,15 @@ public class ProductFieldDefinitionService {
         return defRepo.save(def);
     }
 
+    public ProductFieldDefinition get(Long id){
+        return defRepo.findById(id).orElseThrow(() -> new IllegalArgumentException("Field definition not found"));
+    }
+
     public List<ProductFieldDefinition> list(){
         return defRepo.findAll();
     }
 
-    public ProductFieldDefinition update(Integer id, ProductFieldDefinition incoming){
+    public ProductFieldDefinition update(Long id, ProductFieldDefinition incoming){
         ProductFieldDefinition db = defRepo.findById(id).orElseThrow(() -> new IllegalArgumentException("Field definition not found"));
         db.setFieldName(incoming.getFieldName());
         db.setFieldType(incoming.getFieldType());
@@ -34,7 +38,7 @@ public class ProductFieldDefinitionService {
         return defRepo.save(db);
     }
 
-    public void delete(Integer id){
+    public void delete(Long id){
         defRepo.deleteById(id);
     }
 

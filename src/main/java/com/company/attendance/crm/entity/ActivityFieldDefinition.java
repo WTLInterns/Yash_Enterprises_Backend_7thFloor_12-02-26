@@ -12,7 +12,7 @@ import java.util.List;
 public class ActivityFieldDefinition {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;
+    private Long id;
     @Column(name = "field_name", nullable = false) private String fieldName;
     @Column(name = "field_key", nullable = false) private String fieldKey;
     @Column(name = "field_type", nullable = false) private String fieldType; // TEXT, NUMBER, DATE, DATETIME, BOOLEAN, DROPDOWN, URL
@@ -29,8 +29,8 @@ public class ActivityFieldDefinition {
     @PrePersist
     public void prePersist(){ if (createdAt == null) createdAt = OffsetDateTime.now(); if (required == null) required = false; if (active == null) active = true; }
 
-    public Integer getId() { return id; }
-    public void setId(Integer id) { this.id = id; }
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
     public String getFieldName() { return fieldName; }
     public void setFieldName(String fieldName) { this.fieldName = fieldName; }
     public String getFieldKey() { return fieldKey; }

@@ -1,7 +1,6 @@
 package com.company.attendance.crm.entity;
 
 import jakarta.persistence.*;
-import java.util.UUID;
 
 @Entity
 @Table(name = "product_categories", uniqueConstraints = {
@@ -10,7 +9,7 @@ import java.util.UUID;
 public class ProductCategory {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;
+    private Long id;
 
     @Column(nullable = false)
     private String name;
@@ -20,8 +19,8 @@ public class ProductCategory {
     @PrePersist
     public void prePersist(){ if (active == null) active = true; }
 
-    public Integer getId() { return id; }
-    public void setId(Integer id) { this.id = id; }
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
     public Boolean getActive() { return active; }

@@ -21,7 +21,7 @@ public class ActivityFieldDefinitionService {
     public List<ActivityFieldDefinition> list(ActivityType type){
         return type == null ? repo.findAll() : repo.findByActivityTypeAndActiveTrue(type);
     }
-    public ActivityFieldDefinition update(Integer id, ActivityFieldDefinition incoming){
+    public ActivityFieldDefinition update(Long id, ActivityFieldDefinition incoming){
         ActivityFieldDefinition db = repo.findById(id).orElseThrow(() -> new IllegalArgumentException("not found"));
         db.setFieldName(incoming.getFieldName());
         db.setFieldType(incoming.getFieldType());
@@ -30,7 +30,7 @@ public class ActivityFieldDefinitionService {
         db.setActive(incoming.getActive());
         return repo.save(db);
     }
-    public void delete(Integer id){ repo.deleteById(id); }
+    public void delete(Long id){ repo.deleteById(id); }
 
     public boolean validateValue(ActivityType type, String fieldKey, String value){
         ActivityFieldDefinition def = repo.findByFieldKeyAndActivityType(fieldKey, type)

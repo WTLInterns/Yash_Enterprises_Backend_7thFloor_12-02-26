@@ -31,12 +31,12 @@ public class DealFieldDefinitionController {
     }
 
     @PutMapping("/{id}")
-    public DealFieldDefinition update(@PathVariable Integer id, @RequestBody DealFieldDefinition incoming) {
+    public DealFieldDefinition update(@PathVariable Long id, @RequestBody DealFieldDefinition incoming) {
         return service.update(id, incoming);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Integer id) {
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
         service.delete(id);
         return ResponseEntity.noContent().build();
     }

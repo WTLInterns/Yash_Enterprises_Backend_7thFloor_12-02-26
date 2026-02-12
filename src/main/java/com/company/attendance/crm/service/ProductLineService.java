@@ -32,11 +32,12 @@ public class ProductLineService {
         return productLineRepository.save(pl);
     }
 
-    public ProductLine update(Long dealId, Integer productId, ProductLine incoming){
-        ProductLine db = productLineRepository.findById(productId).orElseThrow(() -> new IllegalArgumentException("Product not found"));
-        if (db.getDeal() == null || db.getDeal().getId() == null || !db.getDeal().getId().equals(dealId)) {
-            throw new IllegalArgumentException("Product not in deal");
-        }
+    public ProductLine get(Long id){
+        return productLineRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Product not found"));
+    }
+
+    public ProductLine update(Long id, ProductLine incoming){
+        ProductLine db = productLineRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Product not found"));
         db.setProductName(incoming.getProductName());
         db.setListPrice(incoming.getListPrice());
         db.setQuantity(incoming.getQuantity());
@@ -45,11 +46,8 @@ public class ProductLineService {
         return productLineRepository.save(db);
     }
 
-    public void delete(Long dealId, Integer productId){
-        ProductLine db = productLineRepository.findById(productId).orElseThrow(() -> new IllegalArgumentException("Product not found"));
-        if (db.getDeal() == null || db.getDeal().getId() == null || !db.getDeal().getId().equals(dealId)) {
-            throw new IllegalArgumentException("Product not in deal");
-        }
+    public void delete(Long id){
+        ProductLine db = productLineRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Product not found"));
         productLineRepository.delete(db);
     }
 

@@ -47,9 +47,9 @@ public class ClientDto {
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", timezone = "UTC")
     private Instant updatedAt;
     
-    private Integer createdBy;
-    private Integer updatedBy;
-    private Integer ownerId;
+    private Long createdBy;
+    private Long updatedBy;
+    private Long ownerId;
     
     // Owner names for display
     private String createdByName;

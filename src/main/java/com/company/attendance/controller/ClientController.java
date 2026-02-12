@@ -119,10 +119,10 @@ public class ClientController {
         try {
             // Auto-set owner fields from authenticated user
             if (clientDto.getCreatedBy() == null) {
-                clientDto.setCreatedBy(auditService.getCurrentUserId());
+                clientDto.setCreatedBy(auditService.getCurrentUserId() != null ? auditService.getCurrentUserId().longValue() : null);
             }
             if (clientDto.getOwnerId() == null) {
-                clientDto.setOwnerId(auditService.getCurrentUserId());
+                clientDto.setOwnerId(auditService.getCurrentUserId() != null ? auditService.getCurrentUserId().longValue() : null);
             }
             
             Client client = crmMapper.toClientEntity(clientDto);

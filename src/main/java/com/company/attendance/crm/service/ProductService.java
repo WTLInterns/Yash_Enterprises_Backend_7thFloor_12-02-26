@@ -43,7 +43,7 @@ public class ProductService {
         return productRepository.findByActiveTrue(pageable);
     }
 
-    public Page<Product> search(Boolean active, String category, Integer ownerId, String q, Integer categoryId, Pageable pageable){
+    public Page<Product> search(Boolean active, String category, Integer ownerId, String q, Long categoryId, Pageable pageable){
         Specification<Product> spec = Specification.where(ProductSpecifications.active(active))
                 .and(ProductSpecifications.category(category))
                 .and(ProductSpecifications.owner(ownerId))
@@ -62,8 +62,9 @@ public class ProductService {
             .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
         
         // Validate foreign key exists
-        if (incoming.getCategoryId() != null && !categoryRepository.existsById(incoming.getCategoryId().intValue())) {
-            throw new InvalidForeignKeyException("Category not found with ID: " + incoming.getCategoryId());
+        if (incoming.getCategory() != null && incoming.getCategory().getId() != null && 
+            !categoryRepository.existsById(incoming.getCategory().getId())) {
+            throw new InvalidForeignKeyException("Category not found with ID: " + incoming.getCategory().getId());
         }
         
         // Note: ownerId should be sourced from authentication; no FK validation against Employee (Long id).
@@ -83,7 +84,7 @@ public class ProductService {
         // existing.setProductCategory(incoming.getProductCategory());
         existing.setPrice(incoming.getPrice());
         existing.setDescription(incoming.getDescription());
-        existing.setCategoryId(incoming.getCategoryId());
+        existing.setCategory(incoming.getCategory());
         
         // Keep createdAt intact, update updatedAt
         // existing.setCreatedAt() - Don't touch this

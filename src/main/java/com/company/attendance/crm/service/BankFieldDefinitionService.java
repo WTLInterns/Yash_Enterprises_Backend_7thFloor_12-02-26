@@ -17,7 +17,7 @@ public class BankFieldDefinitionService {
         return repo.save(d);
     }
     public List<BankFieldDefinition> list(){ return repo.findAll(); }
-    public BankFieldDefinition update(Integer id, BankFieldDefinition incoming){
+    public BankFieldDefinition update(Long id, BankFieldDefinition incoming){
         BankFieldDefinition db = repo.findById(id).orElseThrow(() -> new IllegalArgumentException("not found"));
         db.setFieldName(incoming.getFieldName());
         db.setFieldType(incoming.getFieldType());
@@ -26,7 +26,7 @@ public class BankFieldDefinitionService {
         db.setActive(incoming.getActive());
         return repo.save(db);
     }
-    public void delete(Integer id){ repo.deleteById(id); }
+    public void delete(Long id){ repo.deleteById(id); }
 
     public boolean validateValue(String fieldKey, String value){
         BankFieldDefinition def = repo.findByFieldKey(fieldKey).orElseThrow(() -> new IllegalArgumentException("Field not found"));

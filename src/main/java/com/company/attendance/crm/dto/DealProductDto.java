@@ -7,7 +7,7 @@ import java.time.OffsetDateTime;
 
 @Data
 public class DealProductDto {
-    private Integer id;
+    private Long id;
     private Long dealId;
 
     private Long productId;

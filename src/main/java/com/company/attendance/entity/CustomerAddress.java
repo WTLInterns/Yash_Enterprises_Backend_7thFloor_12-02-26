@@ -27,14 +27,29 @@ public class CustomerAddress {
     @Column(name = "address_type", nullable = false)
     private AddressType addressType;
     
-    @Column(name = "address_text", nullable = false)
-    private String addressText;
+    @Column(name = "address_line", nullable = false)
+    private String addressLine;
+    
+    @Column(name = "city")
+    private String city;
+    
+    @Column(name = "state")
+    private String state;        // ✅ ADD STATE
+    
+    @Column(name = "pincode")
+    private String pincode;
+    
+    @Column(name = "country")
+    private String country;      // ✅ ADD COUNTRY
     
     @Column(name = "latitude")
     private Double latitude;
     
     @Column(name = "longitude")
     private Double longitude;
+    
+    @Column(name = "is_primary")
+    private Boolean isPrimary = false;
     
     @Column(name = "is_editable")
     private Boolean editable = false;
@@ -48,6 +63,6 @@ public class CustomerAddress {
     private LocalDateTime updatedAt;
     
     public enum AddressType {
-        OFFICE, HOME, ADDR3, ADDR4
+        PRIMARY, BRANCH, POLICE, TAHSIL
     }
 }

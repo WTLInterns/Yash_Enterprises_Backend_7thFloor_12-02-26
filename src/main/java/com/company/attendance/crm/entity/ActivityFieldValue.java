@@ -1,14 +1,13 @@
 package com.company.attendance.crm.entity;
 
 import jakarta.persistence.*;
-import java.util.UUID;
 
 @Entity
 @Table(name = "activity_field_values", uniqueConstraints = @UniqueConstraint(name = "uk_activity_field_value", columnNames = {"activity_id","field_definition_id"}))
 public class ActivityFieldValue {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;
+    private Long id;
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "activity_id", nullable = false)
@@ -21,8 +20,8 @@ public class ActivityFieldValue {
     @Lob
     private String value;
 
-    public Integer getId() { return id; }
-    public void setId(Integer id) { this.id = id; }
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
     public Activity getActivity() { return activity; }
     public void setActivity(Activity activity) { this.activity = activity; }
     public ActivityFieldDefinition getFieldDefinition() { return fieldDefinition; }

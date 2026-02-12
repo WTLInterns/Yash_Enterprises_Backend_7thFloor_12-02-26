@@ -33,7 +33,7 @@ public class BankService {
         
         // Set owner from logged-in user
         if (bank.getCreatedBy() == null) {
-            bank.setCreatedBy(auditService.getCurrentUserId());
+            bank.setCreatedBy(auditService.getCurrentUserId() != null ? auditService.getCurrentUserId().longValue() : null);
         }
         
         // Set audit fields (createdBy, createdAt)
@@ -41,7 +41,7 @@ public class BankService {
         return bankRepository.save(bank);
     }
 
-    public Optional<Bank> get(Integer id) {
+    public Optional<Bank> get(Long id) {
         return bankRepository.findById(id);
     }
 
@@ -49,14 +49,14 @@ public class BankService {
         return bankRepository.findAll(pageable);
     }
 
-    public Page<Bank> search(Boolean active, Integer ownerId, String q, Pageable pageable){
+    public Page<Bank> search(Boolean active, Long ownerId, String q, Pageable pageable){
         Specification<Bank> spec = Specification.where(BankSpecifications.active(active))
                 .and(BankSpecifications.owner(ownerId))
                 .and(BankSpecifications.q(q));
         return bankRepository.findAll(spec, pageable);
     }
 
-    public Bank update(Integer id, BankDto dto) {
+    public Bank update(Long id, BankDto dto) {
         // Find existing bank
         Bank existing = bankRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Bank not found"));
@@ -89,7 +89,7 @@ public class BankService {
         
         // Update owner if not set
         if (existing.getCreatedBy() == null) {
-            existing.setCreatedBy(auditService.getCurrentUserId());
+            existing.setCreatedBy(auditService.getCurrentUserId() != null ? auditService.getCurrentUserId().longValue() : null);
         }
         
         // Update audit fields (updatedBy, updatedAt)
@@ -98,13 +98,13 @@ public class BankService {
         return bankRepository.save(existing);
     }
 
-    public Bank patchStatus(Integer id, boolean active){
+    public Bank patchStatus(Long id, boolean active){
         Bank db = bankRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Bank not found"));
         db.setActive(active);
         return bankRepository.save(db);
     }
 
-    public void delete(Integer id){
+    public void delete(Long id){
         Bank b = bankRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Bank not found"));
         b.setActive(false);

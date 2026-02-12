@@ -8,7 +8,7 @@ import java.time.OffsetDateTime;
 public class EmailRecord {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;
+    private Long id;
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "deal_id", nullable = false)
@@ -30,8 +30,8 @@ public class EmailRecord {
     private String status; // SENT, FAILED, DRAFT
 
     // getters/setters
-    public Integer getId() { return id; }
-    public void setId(Integer id) { this.id = id; }
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
     public Deal getDeal() { return deal; }
     public void setDeal(Deal deal) { this.deal = deal; }
     public String getToAddress() { return toAddress; }

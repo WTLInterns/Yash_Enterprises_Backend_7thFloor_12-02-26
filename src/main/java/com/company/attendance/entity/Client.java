@@ -78,6 +78,7 @@ public class Client {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
     
+    // Legacy fields for backward compatibility
     private Long createdBy;
     private Long updatedBy;
     private Long ownerId;

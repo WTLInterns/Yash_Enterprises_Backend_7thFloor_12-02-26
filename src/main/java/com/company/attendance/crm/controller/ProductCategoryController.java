@@ -27,12 +27,12 @@ public class ProductCategoryController {
     public List<ProductCategory> list(){ return service.list(); }
 
     @PutMapping("/{id}")
-    public ProductCategory update(@PathVariable Integer id, @RequestBody ProductCategory incoming){
+    public ProductCategory update(@PathVariable Long id, @RequestBody ProductCategory incoming){
         return service.update(id, incoming);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Integer id){
+    public ResponseEntity<Void> delete(@PathVariable Long id){
         service.delete(id);
         return ResponseEntity.noContent().build();
     }

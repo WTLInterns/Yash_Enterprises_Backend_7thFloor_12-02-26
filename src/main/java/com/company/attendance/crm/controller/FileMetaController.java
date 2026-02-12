@@ -30,12 +30,12 @@ public class FileMetaController {
     @PostMapping(value = "/api/deals/{dealId}/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public FileMeta upload(@PathVariable Long dealId,
                            @RequestPart("file") MultipartFile file,
-                           @RequestHeader(value = "X-User-Id", required = false) Integer userId) throws Exception {
+                           @RequestHeader(value = "X-User-Id", required = false) Long userId) throws Exception {
         return fileService.upload(dealId, file, userId);
     }
 
     @GetMapping("/api/files/{fileId}")
-    public ResponseEntity<Resource> download(@PathVariable Integer fileId) throws MalformedURLException {
+    public ResponseEntity<Resource> download(@PathVariable Long fileId) throws MalformedURLException {
         FileMeta meta = fileService.get(fileId);
         Path path = Path.of(meta.getStoragePath());
         Resource res = new UrlResource(path.toUri());
@@ -46,7 +46,7 @@ public class FileMetaController {
     }
 
     @DeleteMapping("/api/files/{fileId}")
-    public ResponseEntity<Void> delete(@PathVariable Integer fileId){
+    public ResponseEntity<Void> delete(@PathVariable Long fileId){
         fileService.delete(fileId);
         return ResponseEntity.noContent().build();
     }

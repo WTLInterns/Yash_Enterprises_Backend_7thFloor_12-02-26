@@ -5,7 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
 
-public interface DealFieldDefinitionRepository extends JpaRepository<DealFieldDefinition, Integer> {
+public interface DealFieldDefinitionRepository extends JpaRepository<DealFieldDefinition, Long> {
     boolean existsByFieldKeyIgnoreCase(String fieldKey);
     Optional<DealFieldDefinition> findByFieldKey(String fieldKey);
 }

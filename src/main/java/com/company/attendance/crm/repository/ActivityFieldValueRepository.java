@@ -8,7 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 import java.util.Optional;
 
-public interface ActivityFieldValueRepository extends JpaRepository<ActivityFieldValue, Integer> {
+public interface ActivityFieldValueRepository extends JpaRepository<ActivityFieldValue, Long> {
     List<ActivityFieldValue> findByActivity(Activity activity);
     Optional<ActivityFieldValue> findByActivityAndFieldDefinition(Activity activity, ActivityFieldDefinition def);
 }

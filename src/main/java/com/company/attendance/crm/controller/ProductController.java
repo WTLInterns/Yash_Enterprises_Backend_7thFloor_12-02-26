@@ -78,7 +78,7 @@ public class ProductController {
                 .collect(Collectors.toList());
             return new PageImpl<>(dtos, pageable, products.getTotalElements());
         }
-        Page<Product> products = productService.search(effectiveActive, category, ownerId, q, categoryId != null ? categoryId.intValue() : null, pageable);
+        Page<Product> products = productService.search(effectiveActive, category, ownerId, q, categoryId, pageable);
         List<ProductDto> dtos = products.getContent().stream()
             .map(product -> {
                 ProductDto dto = crmMapper.toProductDto(product);
@@ -99,7 +99,7 @@ public class ProductController {
                                 Pageable pageable){
         // Default to active=true unless explicitly requested otherwise
         Boolean effectiveActive = (active == null ? Boolean.TRUE : active);
-        return productService.search(effectiveActive, category, ownerId, q, categoryId != null ? categoryId.intValue() : null, pageable);
+        return productService.search(effectiveActive, category, ownerId, q, categoryId, pageable);
     }
 
     @GetMapping("/{id}")
@@ -150,7 +150,7 @@ public class ProductController {
         }
     }
     
-    private String getUserName(Integer userId) {
+    private String getUserName(Long userId) {
         if (userId == null) return null;
         try {
             // In real app, fetch from user service

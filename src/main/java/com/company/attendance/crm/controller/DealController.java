@@ -59,9 +59,9 @@ public class DealController {
     this.mapper = mapper;
   }
 
-  private String employeeName(Integer employeeId) {
+  private String employeeName(Long employeeId) {
     if (employeeId == null) return "System";
-    Optional<Employee> emp = employeeRepository.findById(employeeId.longValue());
+    Optional<Employee> emp = employeeRepository.findById(employeeId);
     if (emp.isEmpty()) return "System";
     String first = emp.get().getFirstName() != null ? emp.get().getFirstName().trim() : "";
     String last = emp.get().getLastName() != null ? emp.get().getLastName().trim() : "";
@@ -72,7 +72,7 @@ public class DealController {
   private String employeeNameFromChangedBy(String changedBy) {
     if (changedBy == null || changedBy.isBlank()) return "System";
     try {
-      return employeeName(Integer.valueOf(changedBy));
+      return employeeName(Long.valueOf(changedBy));
     } catch (NumberFormatException ex) {
       return "System";
     }
@@ -177,7 +177,7 @@ public class DealController {
   public ResponseEntity<DealDto> changeStage(
     @PathVariable Long dealId,
     @RequestBody Map<String, String> body,
-    @RequestHeader(value = "X-User-Id", required = false) Integer headerUserId
+    @RequestHeader(value = "X-User-Id", required = false) Long headerUserId
   ) {
     Deal deal = dealRepository.findByIdSafe(dealId);
     String stageRaw = body.get("newStage");
@@ -198,7 +198,7 @@ public class DealController {
 
     Deal saved = dealRepository.save(deal);
 
-    Integer userId = headerUserId != null ? headerUserId : auditService.getCurrentUserId();
+    Long userId = headerUserId != null ? headerUserId : auditService.getCurrentUserId();
     DealStageHistory h = new DealStageHistory();
     h.setDeal(saved);
     h.setPreviousStage(prev);

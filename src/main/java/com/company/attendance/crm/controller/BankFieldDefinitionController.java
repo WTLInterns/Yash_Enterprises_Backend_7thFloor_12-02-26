@@ -26,12 +26,12 @@ public class BankFieldDefinitionController {
     public List<BankFieldDefinition> list(){ return service.list(); }
 
     @PutMapping("/{id}")
-    public BankFieldDefinition update(@PathVariable Integer id, @RequestBody BankFieldDefinition incoming){
+    public BankFieldDefinition update(@PathVariable Long id, @RequestBody BankFieldDefinition incoming){
         return service.update(id, incoming);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Integer id){
+    public ResponseEntity<Void> delete(@PathVariable Long id){
         service.delete(id);
         return ResponseEntity.noContent().build();
     }

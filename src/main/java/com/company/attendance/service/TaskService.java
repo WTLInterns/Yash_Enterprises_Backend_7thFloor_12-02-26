@@ -53,16 +53,27 @@ public class TaskService {
             // Get client name and address for notification
             String clientName = "Unknown Client";
             String clientAddress = "";
+            
             if (saved.getClientId() != null) {
                 Client client = clientRepository.findById(saved.getClientId()).orElse(null);
                 if (client != null) {
                     clientName = client.getName();
-                    clientAddress = client.getAddress() != null ? client.getAddress() : "";
                 }
             }
             
-            // Create professional task assignment notification
-            String title = "📋 New Task: " + saved.getTaskName();
+            if (saved.getCustomerAddressId() != null) {
+                CustomerAddress address = customerAddressRepository
+                    .findById(saved.getCustomerAddressId())
+                    .orElse(null);
+
+                if (address != null) {
+                    clientAddress = address.getAddressType() + ": " +
+                            address.getAddressLine() +
+                            (address.getCity() != null ? ", " + address.getCity() : "");
+                }
+            }
+            
+            String title = String.format("📋 New Task: %s", saved.getTaskName());
             String body = String.format("Assigned: %s - Customer: %s%s - Status: %s", 
                     saved.getTaskName(),
                     clientName,
@@ -78,7 +89,7 @@ public class TaskService {
                     "status", saved.getStatus().toString(),
                     "message", String.format(
                             "📋 New Task Assignment:\n" +
-                            "┌─ Task: %s\n" +
+                            "├─ Task: %s\n" +
                             "├─ Customer: %s\n" +
                             "├─ Address: %s\n" +
                             "├─ Status: %s\n" +
@@ -151,11 +162,23 @@ public class TaskService {
             // Get client name and address for notification
             String clientName = "Unknown Client";
             String clientAddress = "";
+            
             if (saved.getClientId() != null) {
                 Client client = clientRepository.findById(saved.getClientId()).orElse(null);
                 if (client != null) {
                     clientName = client.getName();
-                    clientAddress = client.getAddress() != null ? client.getAddress() : "";
+                }
+            }
+            
+            if (saved.getCustomerAddressId() != null) {
+                CustomerAddress address = customerAddressRepository
+                    .findById(saved.getCustomerAddressId())
+                    .orElse(null);
+
+                if (address != null) {
+                    clientAddress = address.getAddressType() + ": " +
+                            address.getAddressLine() +
+                            (address.getCity() != null ? ", " + address.getCity() : "");
                 }
             }
             
@@ -236,11 +259,23 @@ public class TaskService {
                 // Get client name and address for notification
                 String clientName = "Unknown Client";
                 String clientAddress = "";
+                
                 if (task.getClientId() != null) {
                     Client client = clientRepository.findById(task.getClientId()).orElse(null);
                     if (client != null) {
                         clientName = client.getName();
-                        clientAddress = client.getAddress() != null ? client.getAddress() : "";
+                    }
+                }
+                
+                if (task.getCustomerAddressId() != null) {
+                    CustomerAddress address = customerAddressRepository
+                        .findById(task.getCustomerAddressId())
+                        .orElse(null);
+
+                    if (address != null) {
+                        clientAddress = address.getAddressType() + ": " +
+                                address.getAddressLine() +
+                                (address.getCity() != null ? ", " + address.getCity() : "");
                     }
                 }
 

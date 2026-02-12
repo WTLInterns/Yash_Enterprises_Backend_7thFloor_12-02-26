@@ -30,12 +30,12 @@ public class ActivityFieldDefinitionController {
     }
 
     @PutMapping("/{id}")
-    public ActivityFieldDefinition update(@PathVariable Integer id, @RequestBody ActivityFieldDefinition incoming){
+    public ActivityFieldDefinition update(@PathVariable Long id, @RequestBody ActivityFieldDefinition incoming){
         return service.update(id, incoming);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Integer id){
+    public ResponseEntity<Void> delete(@PathVariable Long id){
         service.delete(id);
         return ResponseEntity.noContent().build();
     }

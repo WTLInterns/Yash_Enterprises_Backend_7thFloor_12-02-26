@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 import java.util.Optional;
 
-public interface ActivityFieldDefinitionRepository extends JpaRepository<ActivityFieldDefinition, Integer> {
+public interface ActivityFieldDefinitionRepository extends JpaRepository<ActivityFieldDefinition, Long> {
     boolean existsByFieldKeyIgnoreCaseAndActivityType(String fieldKey, ActivityType activityType);
     Optional<ActivityFieldDefinition> findByFieldKeyAndActivityType(String fieldKey, ActivityType activityType);
     List<ActivityFieldDefinition> findByActivityTypeAndActiveTrue(ActivityType activityType);

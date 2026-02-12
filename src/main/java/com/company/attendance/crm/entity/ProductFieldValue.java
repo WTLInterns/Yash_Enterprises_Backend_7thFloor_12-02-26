@@ -1,7 +1,6 @@
 package com.company.attendance.crm.entity;
 
 import jakarta.persistence.*;
-import java.util.UUID;
 
 @Entity
 @Table(name = "product_field_values", uniqueConstraints = {
@@ -10,7 +9,7 @@ import java.util.UUID;
 public class ProductFieldValue {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;
+    private Long id;
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
@@ -23,8 +22,8 @@ public class ProductFieldValue {
     @Lob
     private String value; // store as string/JSON
 
-    public Integer getId() { return id; }
-    public void setId(Integer id) { this.id = id; }
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
     public Product getProduct() { return product; }
     public void setProduct(Product product) { this.product = product; }
     public ProductFieldDefinition getFieldDefinition() { return fieldDefinition; }

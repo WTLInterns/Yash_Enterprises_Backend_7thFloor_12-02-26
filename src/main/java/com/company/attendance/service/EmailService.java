@@ -115,5 +115,36 @@ public class EmailService {
             throw new RuntimeException("Failed to send login details email", e);
         }
     }
+    
+    // 📧 Send invoice email with PDF attachment
+    public void sendInvoiceEmail(
+            String toEmail,
+            String customerName,
+            String invoiceNo,
+            byte[] pdfBytes
+    ) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+
+            helper.setTo(toEmail);
+            helper.setSubject("Invoice " + invoiceNo);
+            helper.setText(
+                    "Dear " + customerName + ",\n\n" +
+                    "Please find attached your invoice.\n\n" +
+                    "Regards,\nYash Enterprises"
+            );
+
+            helper.addAttachment(
+                    "Invoice_" + invoiceNo + ".pdf",
+                    new org.springframework.core.io.ByteArrayResource(pdfBytes)
+            );
+
+            mailSender.send(message);
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to send invoice email", e);
+        }
+    }
 }
 

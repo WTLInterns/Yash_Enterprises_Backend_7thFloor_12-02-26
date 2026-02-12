@@ -7,8 +7,8 @@ public class BankSpecifications {
     public static Specification<Bank> active(Boolean active){
         return (root, q, cb) -> active == null ? cb.conjunction() : cb.equal(root.get("active"), active);
     }
-    public static Specification<Bank> owner(Integer ownerId){
-        return (root, q, cb) -> ownerId == null ? cb.conjunction() : cb.equal(root.get("ownerId"), ownerId);
+    public static Specification<Bank> owner(Long ownerId){
+        return (root, q, cb) -> ownerId == null ? cb.conjunction() : cb.equal(root.get("createdBy"), ownerId);
     }
     public static Specification<Bank> q(String term){
         return (root, q, cb) -> term == null || term.isBlank() ? cb.conjunction() : cb.or(

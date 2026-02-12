@@ -7,6 +7,7 @@ import com.company.attendance.crm.dto.ProductDto;
 import com.company.attendance.crm.entity.Bank;
 import com.company.attendance.crm.entity.Deal;
 import com.company.attendance.crm.entity.Product;
+import com.company.attendance.crm.entity.ProductCategory;
 import com.company.attendance.entity.Client;
 import com.company.attendance.entity.Employee;
 import com.company.attendance.repository.EmployeeRepository;
@@ -27,9 +28,9 @@ public class CrmMapper {
     this.clientRepository = clientRepository;
   }
 
-  private String employeeName(Integer employeeId) {
+  private String employeeName(Long employeeId) {
     if (employeeId == null) return null;
-    Optional<Employee> emp = employeeRepository.findById(employeeId.longValue());
+    Optional<Employee> emp = employeeRepository.findById(employeeId);
     if (emp.isEmpty()) return null;
     String first = emp.get().getFirstName() != null ? emp.get().getFirstName().trim() : "";
     String last = emp.get().getLastName() != null ? emp.get().getLastName().trim() : "";
@@ -88,7 +89,7 @@ public class CrmMapper {
     dto.setName(product.getName());
     dto.setCode(product.getCode());
     dto.setDescription(product.getDescription());
-    dto.setCategoryId(product.getCategoryId());
+    dto.setCategoryId(product.getCategory() != null ? product.getCategory().getId() : null);
     dto.setPrice(product.getPrice());
     dto.setActive(product.getActive());
     dto.setCreatedAt(product.getCreatedAt());
@@ -110,7 +111,12 @@ public class CrmMapper {
     product.setName(dto.getName());
     product.setCode(dto.getCode());
     product.setDescription(dto.getDescription());
-    product.setCategoryId(dto.getCategoryId());
+    // Set category relationship if categoryId is provided
+    if (dto.getCategoryId() != null) {
+        ProductCategory category = new ProductCategory();
+        category.setId(dto.getCategoryId());
+        product.setCategory(category);
+    }
     product.setPrice(dto.getPrice());
     product.setActive(dto.getActive());
     if (dto.getCustomFields() != null) {
@@ -151,18 +157,18 @@ public class CrmMapper {
     if (client.getUpdatedAt() != null) {
       dto.setUpdatedAt(client.getUpdatedAt().toInstant(ZoneOffset.UTC));
     }
-    dto.setCreatedBy(client.getCreatedBy() != null ? client.getCreatedBy().intValue() : null);
-    dto.setUpdatedBy(client.getUpdatedBy() != null ? client.getUpdatedBy().intValue() : null);
-    dto.setOwnerId(client.getOwnerId() != null ? client.getOwnerId().intValue() : null);
+    dto.setCreatedBy(client.getCreatedBy());
+    dto.setUpdatedBy(client.getUpdatedBy());
+    dto.setOwnerId(client.getOwnerId());
 
-    dto.setCreatedByName(employeeName(client.getCreatedBy() != null ? client.getCreatedBy().intValue() : null));
-    dto.setUpdatedByName(employeeName(client.getUpdatedBy() != null ? client.getUpdatedBy().intValue() : null));
-    dto.setOwnerName(employeeName(client.getOwnerId() != null ? client.getOwnerId().intValue() : null));
+    dto.setCreatedByName(employeeName(client.getCreatedBy()));
+    dto.setUpdatedByName(employeeName(client.getUpdatedBy()));
+    dto.setOwnerName(employeeName(client.getOwnerId()));
 
     return dto;
-  }
+}
 
-  public Client toClientEntity(ClientDto dto) {
+public Client toClientEntity(ClientDto dto) {
     if (dto == null) return null;
     Client client = new Client();
     client.setId(dto.getId());
@@ -187,9 +193,9 @@ public class CrmMapper {
     client.setNotes(dto.getNotes());
     client.setIsActive(dto.getActive());
     client.setCustomFields(dto.getCustomFields());
-    client.setOwnerId(dto.getOwnerId() != null ? dto.getOwnerId().longValue() : null);
-    client.setCreatedBy(dto.getCreatedBy() != null ? dto.getCreatedBy().longValue() : null);
-    client.setUpdatedBy(dto.getUpdatedBy() != null ? dto.getUpdatedBy().longValue() : null);
+    client.setOwnerId(dto.getOwnerId());
+    client.setCreatedBy(dto.getCreatedBy());
+    client.setUpdatedBy(dto.getUpdatedBy());
     
     return client;
   }
@@ -232,7 +238,7 @@ public class CrmMapper {
     }
     
     if (client != null && client.getOwnerId() != null) {
-      dto.setOwnerName(employeeName(client.getOwnerId().intValue()));
+      dto.setOwnerName(employeeName(client.getOwnerId()));
       dto.setClientName(client.getName());
     } else {
       dto.setOwnerName(null);

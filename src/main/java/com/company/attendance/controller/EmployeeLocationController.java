@@ -384,7 +384,7 @@ public class EmployeeLocationController {
                             if (activeTask.getCustomerAddressId() != null) {
                                 CustomerAddress custAddr = locationBasedAttendanceService.getCustomerAddressByTaskId(activeTask.getId());
                                 if (custAddr != null) {
-                                    customerAddressDisplay = custAddr.getAddressText();
+                                    customerAddressDisplay = custAddr.getAddressLine() + ", " + custAddr.getCity();
                                 }
                             }
                             

@@ -8,7 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 import java.util.Optional;
 
-public interface ProductFieldValueRepository extends JpaRepository<ProductFieldValue, Integer> {
+public interface ProductFieldValueRepository extends JpaRepository<ProductFieldValue, Long> {
     List<ProductFieldValue> findByProduct(Product product);
     Optional<ProductFieldValue> findByProductAndFieldDefinition(Product product, ProductFieldDefinition def);
 }

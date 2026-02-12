@@ -29,12 +29,12 @@ public class ProductFieldDefinitionController {
     }
 
     @PutMapping("/{id}")
-    public ProductFieldDefinition update(@PathVariable Integer id, @RequestBody ProductFieldDefinition incoming){
+    public ProductFieldDefinition update(@PathVariable Long id, @RequestBody ProductFieldDefinition incoming){
         return service.update(id, incoming);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Integer id){
+    public ResponseEntity<Void> delete(@PathVariable Long id){
         service.delete(id);
         return ResponseEntity.noContent().build();
     }

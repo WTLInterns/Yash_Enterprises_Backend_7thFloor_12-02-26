@@ -75,7 +75,7 @@ public class DealProductService {
     }
 
     public DealProductDto update(Long dealId, Long dealProductId, DealProductRequestDto incoming){
-        DealProduct db = dealProductRepository.findById(dealProductId.intValue()).orElseThrow(() -> new IllegalArgumentException("DealProduct not found"));
+        DealProduct db = dealProductRepository.findById(dealProductId).orElseThrow(() -> new IllegalArgumentException("DealProduct not found"));
         if (db.getDeal() == null || db.getDeal().getId() == null || !db.getDeal().getId().equals(dealId)) {
             throw new IllegalArgumentException("DealProduct not in deal");
         }
@@ -91,7 +91,7 @@ public class DealProductService {
     }
 
     public void delete(Long dealId, Long dealProductId){
-        DealProduct db = dealProductRepository.findById(dealProductId.intValue()).orElseThrow(() -> new IllegalArgumentException("DealProduct not found"));
+        DealProduct db = dealProductRepository.findById(dealProductId).orElseThrow(() -> new IllegalArgumentException("DealProduct not found"));
         if (db.getDeal() == null || db.getDeal().getId() == null || !db.getDeal().getId().equals(dealId)) {
             throw new IllegalArgumentException("DealProduct not in deal");
         }
