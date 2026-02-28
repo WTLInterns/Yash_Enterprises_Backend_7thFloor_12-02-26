@@ -34,6 +34,17 @@ public class DealDto {
     
     private LocalDate closingDate;
     private String stage;
+    private String department;
+    
+    // 🔥 HELPER: Get stage code for frontend consistency
+    public String getStageCode() {
+        return this.stage;
+    }
+    
+    // 🔥 HELPER: Set stage code for frontend consistency  
+    public void setStageCode(String stageCode) {
+        this.stage = stageCode;
+    }
     
     private String customFields;
     private Boolean active = true;

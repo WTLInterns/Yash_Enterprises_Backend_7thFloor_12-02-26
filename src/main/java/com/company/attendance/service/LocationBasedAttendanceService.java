@@ -31,6 +31,9 @@ import java.util.Optional;
 @Slf4j
 public class LocationBasedAttendanceService {
     
+    // ✅ SINGLE SOURCE OF TRUTH FOR GEOFENCE RADIUS
+    private static final double GEOFENCE_RADIUS_METERS = 200.0; // PRODUCTION
+    
     private final EmployeePunchRepository employeePunchRepository;
     private final TaskRepository taskRepository;
     private final EmployeeRepository employeeRepository;
@@ -65,10 +68,56 @@ public class LocationBasedAttendanceService {
                 return;
             }
             
-            // For now, skip location validation since Task doesn't have customerAddressId
-            // TODO: Add customer address relationship to Task entity
-            log.debug("Task location validation skipped - Task entity needs customer address relationship");
-            return;
+            // ✅ FIXED: Now validate task location with customer address
+            if (activeTask.getCustomerAddressId() == null) {
+                log.debug("Task has no customer address assigned - skipping location validation");
+                return;
+            }
+            
+            // Get customer address for geofence validation
+            CustomerAddress customerAddress = activeTask.getCustomerAddress();
+            if (customerAddress == null || customerAddress.getLatitude() == null || customerAddress.getLongitude() == null) {
+                log.debug("Customer address coordinates not found - skipping location validation");
+                return;
+            }
+            
+            // Get latest employee location
+            Optional<EmployeeTracking> latestLocationOpt = employeeTrackingRepository.findFirstByEmployee_IdOrderByTimestampDesc(employeeId);
+            if (latestLocationOpt.isEmpty()) {
+                log.debug("No employee location found for geofence validation");
+                return;
+            }
+            EmployeeTracking latestLocation = latestLocationOpt.get();
+            
+            // Calculate distance from customer location
+            double distance = calculateDistance(
+                latestLocation.getLatitude(), 
+                latestLocation.getLongitude(),
+                customerAddress.getLatitude(), 
+                customerAddress.getLongitude()
+            );
+            
+            boolean isWithinGeofence = distance <= GEOFENCE_RADIUS_METERS;
+            
+            log.info("Geofence validation - Employee: {}, Distance: {}m, Within: {}", 
+                employeeId, Math.round(distance), isWithinGeofence);
+            
+            // Update punch record with geofence info
+            Optional<EmployeePunch> activePunchOpt = employeePunchRepository.findFirstByEmployee_IdAndPunchOutTimeIsNullOrderByPunchInTimeDesc(employeeId);
+            
+            // ✅ RESTORED: Auto punch creation when inside geofence
+            if (isWithinGeofence && activePunchOpt.isEmpty()) {
+                log.info("Auto punching in employee {} at customer location (distance: {}m)", employeeId, Math.round(distance));
+                autoPunchIn(employeeId, activeTask.getId(), distance, 
+                    latestLocation.getLatitude(), latestLocation.getLongitude());
+            }
+            
+            if (activePunchOpt.isPresent()) {
+                EmployeePunch activePunch = activePunchOpt.get();
+                activePunch.setIsWithinGeofence(isWithinGeofence);
+                activePunch.setDistanceFromCustomer(distance);
+                employeePunchRepository.save(activePunch);
+            }
             
         } catch (Exception e) {
             log.error("Error in checkAutoPunch for employee {}: {}", employeeId, e.getMessage(), e);
@@ -123,10 +172,34 @@ public class LocationBasedAttendanceService {
      * Validate task operations - must be within 200m
      */
     public boolean validateTaskLocation(Long taskId, double employeeLat, double employeeLng) {
-        // For now, return true since Task doesn't have customer address relationship
-        // TODO: Implement proper location validation when Task has customerAddressId
-        log.debug("Task location validation bypassed - Task entity needs customer address relationship");
-        return true;
+        try {
+            // Get task and customer address
+            Task task = taskRepository.findById(taskId).orElse(null);
+            if (task == null || task.getCustomerAddressId() == null) {
+                log.warn("Task {} has no customer address configured", taskId);
+                return false; // FAIL CLOSED
+            }
+            
+            CustomerAddress customerAddress = getCustomerAddressByTaskId(taskId);
+            if (customerAddress == null || customerAddress.getLatitude() == null || customerAddress.getLongitude() == null) {
+                log.warn("Customer address coordinates missing for task {}", taskId);
+                return false; // FAIL CLOSED
+            }
+            
+            // Calculate distance
+            double distance = calculateDistance(employeeLat, employeeLng, 
+                customerAddress.getLatitude(), customerAddress.getLongitude());
+            
+            boolean withinGeofence = distance <= 200; // PRODUCTION: 200m
+            log.debug("Task location validation - Task: {}, Distance: {}m, Valid: {}", 
+                taskId, Math.round(distance), withinGeofence);
+            
+            return withinGeofence;
+            
+        } catch (Exception e) {
+            log.error("Error validating task location for task {}: {}", taskId, e.getMessage());
+            return false; // FAIL CLOSED
+        }
     }
     
     /**
@@ -137,12 +210,12 @@ public class LocationBasedAttendanceService {
     }
     
     /**
-     * 10 PM Auto Punch-Out (Scheduler)
+     * 12 AM Midnight Auto Punch-Out (Scheduler)
      */
-    @Scheduled(cron = "0 0 22 * * ?")
+    @Scheduled(cron = "0 0 0 * * ?")
     @Transactional
     public void autoPunchOutAll() {
-        log.info("Running 10 PM auto punch-out scheduler");
+        log.info("Running 12 AM midnight auto punch-out scheduler");
         
         List<EmployeePunch> activePunches = employeePunchRepository.findAllActivePunches();
         
@@ -303,5 +376,36 @@ public class LocationBasedAttendanceService {
             log.error("Error getting customer address for task {}: {}", taskId, e.getMessage());
             return null;
         }
+    }
+    
+    /**
+     * Calculate distance between two points using Haversine formula
+     * @param lat1 Latitude of point 1
+     * @param lon1 Longitude of point 1  
+     * @param lat2 Latitude of point 2
+     * @param lon2 Longitude of point 2
+     * @return Distance in meters
+     */
+    private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+        // Earth's radius in meters
+        final double EARTH_RADIUS = 6371000.0;
+        
+        // Convert to radians
+        double lat1Rad = Math.toRadians(lat1);
+        double lon1Rad = Math.toRadians(lon1);
+        double lat2Rad = Math.toRadians(lat2);
+        double lon2Rad = Math.toRadians(lon2);
+        
+        // Differences
+        double dLat = lat2Rad - lat1Rad;
+        double dLon = lon2Rad - lon1Rad;
+        
+        // Haversine formula
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                   Math.cos(lat1Rad) * Math.cos(lat2Rad) *
+                   Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        
+        return EARTH_RADIUS * c;
     }
 }

@@ -31,6 +31,10 @@ public class Task {
     // Task Type
     private String customTaskType;   // "Default Task", "Collect Payment", etc.
 
+    // 🔥 Department field (STRING)
+    @Column(name = "department")
+    private String department;  // "PPE", "PPO", "PSD", etc.
+
     // Assignment
     @Column(name = "assigned_to_employee_id")
     private Long assignedToEmployeeId;
@@ -80,6 +84,11 @@ public class Task {
 
     @Column(name = "customer_address_id")
     private Long customerAddressId;
+
+    // ✅ FIXED: Add CustomerAddress relationship for geofence validation
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_address_id", insertable = false, updatable = false)
+    private CustomerAddress customerAddress;
 
     // Metadata
     private String internalTaskId;

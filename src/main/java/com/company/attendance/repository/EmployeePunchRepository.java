@@ -23,6 +23,11 @@ public interface EmployeePunchRepository extends JpaRepository<EmployeePunch, Lo
     List<EmployeePunch> findActivePunchesByEmployeeId(@Param("employeeId") Long employeeId);
     
     /**
+     * Find single active punch for employee (no punch_out_time)
+     */
+    Optional<EmployeePunch> findFirstByEmployee_IdAndPunchOutTimeIsNullOrderByPunchInTimeDesc(Long employeeId);
+    
+    /**
      * Find all active punches (for auto punch-out)
      */
     @Query("SELECT ep FROM EmployeePunch ep WHERE ep.punchOutTime IS NULL")

@@ -1,6 +1,5 @@
 package com.company.attendance.crm.entity;
 
-import com.company.attendance.crm.enums.DealStage;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
@@ -62,8 +61,11 @@ public class Deal {
     @Column(name = "outstanding_amount")
     private BigDecimal outstandingAmount;
     
-    @Enumerated(EnumType.STRING)
-    private DealStage stage;
+    @Column(name = "stage_code", nullable = false)
+    private String stageCode;
+    
+    @Column(name = "department", nullable = false)
+    private String department;
     
     @Column(name = "is_active")
     private Boolean active = true;

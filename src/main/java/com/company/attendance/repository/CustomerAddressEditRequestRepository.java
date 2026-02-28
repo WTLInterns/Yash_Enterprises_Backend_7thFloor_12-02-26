@@ -15,7 +15,7 @@ public interface CustomerAddressEditRequestRepository extends JpaRepository<Cust
     /**
      * Find requests by status
      */
-    List<CustomerAddressEditRequest> findByStatus(CustomerAddressEditRequest.RequestStatus status);
+    List<CustomerAddressEditRequest> findByStatusOrderByCreatedAtDesc(CustomerAddressEditRequest.RequestStatus status);
 
     /**
      * Find pending request by address
@@ -29,7 +29,7 @@ public interface CustomerAddressEditRequestRepository extends JpaRepository<Cust
     /**
      * Find requests by employee
      */
-    List<CustomerAddressEditRequest> findByRequestedByEmployeeId(Long employeeId);
+    List<CustomerAddressEditRequest> findByRequestedByEmployeeIdOrderByCreatedAtDesc(Long employeeId);
 
     /**
      * Find requests by employee and status
@@ -40,14 +40,19 @@ public interface CustomerAddressEditRequestRepository extends JpaRepository<Cust
     );
 
     /**
+     * Find all requests with address details for admin panel
+     */
+    @Query("SELECT req FROM CustomerAddressEditRequest req ORDER BY req.createdAt DESC")
+    List<CustomerAddressEditRequest> findAllOrderByCreatedAtDesc();
+
+    /**
      * Count requests by status
      */
     @Query("SELECT COUNT(req) FROM CustomerAddressEditRequest req WHERE req.status = :status")
     long countByStatus(@Param("status") CustomerAddressEditRequest.RequestStatus status);
 
-    /**
-     * Find recent requests
-     */
-    @Query("SELECT req FROM CustomerAddressEditRequest req ORDER BY req.createdAt DESC")
-    List<CustomerAddressEditRequest> findAllOrderByCreatedAtDesc();
+    // 🔥 DEPARTMENT-AWARE QUERIES
+    List<CustomerAddressEditRequest> findByDepartmentOrderByCreatedAtDesc(String department);
+
+    List<CustomerAddressEditRequest> findByCreatedByTlIdAndDepartmentOrderByCreatedAtDesc(Long tlId, String department);
 }

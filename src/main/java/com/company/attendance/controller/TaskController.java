@@ -53,6 +53,23 @@ public class TaskController {
             );
         }
 
+        // ✅ FIX 1: Enrich address fields in toEnrichedDto
+        if (task.getCustomerAddress() != null) {
+            dto.setCustomerAddressId(task.getCustomerAddress().getId());
+            
+            String addressText = task.getCustomerAddress().getAddressType() + ": ";
+            if (task.getCustomerAddress().getAddressLine() != null) {
+                addressText += task.getCustomerAddress().getAddressLine();
+            }
+            if (task.getCustomerAddress().getCity() != null) {
+                addressText += ", " + task.getCustomerAddress().getCity();
+            }
+            if (task.getCustomerAddress().getPincode() != null) {
+                addressText += " - " + task.getCustomerAddress().getPincode();
+            }
+            dto.setAddress(addressText);
+        }
+
         if (task.getCustomFieldValues() != null) {
             List<TaskCustomFieldValueDto> customFieldDtos = task.getCustomFieldValues().stream()
                     .map(value -> {
@@ -75,37 +92,114 @@ public class TaskController {
     }
 
     @GetMapping
-    public ResponseEntity<List<TaskDto>> listTasks() {
-        List<TaskDto> dtos = taskService.findAll().stream().map(task -> {
+    public ResponseEntity<List<TaskDto>> listTasks(
+            @RequestParam(value = "department", required = false) String departmentParam,
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Role", required = false) String userRole,
+            @RequestHeader(value = "X-User-Department", required = false) String userDepartment) {
+        
+        try {
+            // 🔥 HEADER FALLBACK: Derive from employeeId if headers missing
+            String derivedUserRole = userRole;
+            String derivedUserDepartment = userDepartment;
+            
+            if (userRole == null || userDepartment == null) {
+                if (userId == null) {
+                    return ResponseEntity.badRequest().body(List.of());
+                }
+                
+                var employee = employeeRepository.findById(Long.valueOf(userId))
+                    .orElse(null);
+                
+                if (employee != null) {
+                    derivedUserRole = employee.getRole() != null ? employee.getRole().getName() : null;
+                    derivedUserDepartment = employee.getDepartment() != null ? employee.getDepartment().getName() : null;
+                }
+            }
+            
+            List<Task> tasks;
+            
+            // 🔥 DEPARTMENT-AWARE FILTERING
+            switch (derivedUserRole != null ? derivedUserRole.toUpperCase() : "UNKNOWN") {
+                case "ADMIN":
+                case "MANAGER":
+                    // ADMIN/MANAGER: Can filter by department or see all
+                    if (departmentParam != null && !departmentParam.isEmpty()) {
+                        tasks = taskService.findByDepartment(departmentParam);
+                    } else {
+                        tasks = taskService.findAll();
+                    }
+                    break;
+                    
+                case "TL":
+                    // TL sees tasks from their department only
+                    if (derivedUserDepartment != null) {
+                        tasks = taskService.findByDepartment(derivedUserDepartment);
+                    } else {
+                        tasks = List.of();
+                    }
+                    break;
+                    
+                case "EMPLOYEE":
+                    // Employee sees only tasks assigned to them
+                    if (userId == null) {
+                        return ResponseEntity.badRequest().body(List.of());
+                    }
+                    tasks = taskService.getTasksForEmployee(Long.valueOf(userId));
+                    break;
+                    
+                default:
+                    tasks = List.of();
+            }
+            
+            List<TaskDto> dtos = tasks.stream().map(task -> {
             TaskDto dto = taskMapper.toDto(task);
 
-            // Add client name using relation
             if (task.getClient() != null) {
                 dto.setClientName(task.getClient().getName());
             }
 
-            // Add assigned employee name using relation
             if (task.getAssignedToEmployee() != null) {
                 dto.setAssignedToEmployeeName(
                     task.getAssignedToEmployee().getFirstName() + " " + task.getAssignedToEmployee().getLastName()
                 );
             }
 
-            // Add created by employee name using relation
             if (task.getCreatedByEmployee() != null) {
                 dto.setCreatedByEmployeeName(
                     task.getCreatedByEmployee().getFirstName() + " " + task.getCreatedByEmployee().getLastName()
                 );
             }
 
-            // Add custom field values
+            // ✅ FIX 1: Enrich address fields
+            if (task.getCustomerAddress() != null) {
+                dto.setCustomerAddressId(task.getCustomerAddress().getId());
+                
+                String addressText = task.getCustomerAddress().getAddressType() + ": ";
+                if (task.getCustomerAddress().getAddressLine() != null) {
+                    addressText += task.getCustomerAddress().getAddressLine();
+                }
+                if (task.getCustomerAddress().getCity() != null) {
+                    addressText += ", " + task.getCustomerAddress().getCity();
+                }
+                if (task.getCustomerAddress().getPincode() != null) {
+                    addressText += " - " + task.getCustomerAddress().getPincode();
+                }
+                dto.setAddress(addressText);
+            }
+
             if (task.getCustomFieldValues() != null) {
                 List<TaskCustomFieldValueDto> customFieldDtos = task.getCustomFieldValues().stream()
                         .map(value -> {
                             TaskCustomFieldValueDto valueDto = new TaskCustomFieldValueDto();
-                            valueDto.setTaskCustomFieldId(value.getField().getId());
-                            valueDto.setFieldKey(value.getField().getFieldKey());
-                            valueDto.setFieldLabel(value.getField().getFieldLabel());
+                            if (value.getField() != null) {
+                                valueDto.setTaskCustomFieldId(value.getField().getId());
+                                valueDto.setFieldId(value.getField().getId());
+                                valueDto.setFieldKey(value.getField().getFieldKey());
+                                valueDto.setFieldLabel(value.getField().getFieldLabel());
+                                valueDto.setFieldType(value.getField().getFieldType());
+                                valueDto.setRequired(value.getField().getRequired());
+                            }
                             valueDto.setValue(value.getValue());
                             return valueDto;
                         }).toList();
@@ -115,6 +209,17 @@ public class TaskController {
             return dto;
         }).toList();
 
+        return ResponseEntity.ok(dtos);
+        } catch (Exception e) {
+            log.error("Error fetching tasks: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body(List.of());
+        }
+    }
+
+    @GetMapping("/employee/{employeeId}")
+    public ResponseEntity<List<TaskDto>> getTasksForEmployee(@PathVariable Long employeeId) {
+        List<Task> tasks = taskService.getTasksForEmployee(employeeId);
+        List<TaskDto> dtos = tasks.stream().map(this::toEnrichedDto).toList();
         return ResponseEntity.ok(dtos);
     }
 
@@ -140,6 +245,23 @@ public class TaskController {
             dto.setCreatedByEmployeeName(
                 task.getCreatedByEmployee().getFirstName() + " " + task.getCreatedByEmployee().getLastName()
             );
+        }
+
+        // ✅ FIX 1: Enrich address fields for single task
+        if (task.getCustomerAddress() != null) {
+            dto.setCustomerAddressId(task.getCustomerAddress().getId());
+            
+            String addressText = task.getCustomerAddress().getAddressType() + ": ";
+            if (task.getCustomerAddress().getAddressLine() != null) {
+                addressText += task.getCustomerAddress().getAddressLine();
+            }
+            if (task.getCustomerAddress().getCity() != null) {
+                addressText += ", " + task.getCustomerAddress().getCity();
+            }
+            if (task.getCustomerAddress().getPincode() != null) {
+                addressText += " - " + task.getCustomerAddress().getPincode();
+            }
+            dto.setAddress(addressText);
         }
 
         // Add custom field values
@@ -211,13 +333,51 @@ public class TaskController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<TaskDto> updateTask(@PathVariable Long id, @Valid @RequestBody TaskDto dto) {
+    public ResponseEntity<TaskDto> updateTask(
+            @PathVariable Long id, 
+            @Valid @RequestBody TaskDto dto,
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Role", required = false) String userRole,
+            @RequestHeader(value = "X-User-Department", required = false) String userDepartment) {
         try {
+            // 🔥 HEADER FALLBACK: Derive from employeeId if headers missing
+            String derivedUserRole = userRole;
+            String derivedUserDepartment = userDepartment;
+            
+            if (userRole == null || userDepartment == null) {
+                if (userId == null) {
+                    return ResponseEntity.status(403).body(null);
+                }
+                
+                var employee = employeeRepository.findById(Long.valueOf(userId))
+                    .orElse(null);
+                
+                if (employee != null) {
+                    derivedUserRole = employee.getRole() != null ? employee.getRole().getName() : null;
+                    derivedUserDepartment = employee.getDepartment() != null ? employee.getDepartment().getName() : null;
+                }
+            }
+            
+            // 🔥 DEPARTMENT AUTHORIZATION: Check if user can update this task
+            Task existingTask = taskService.getById(id);
+            String taskDepartment = existingTask.getAssignedToEmployee() != null ? 
+                (existingTask.getAssignedToEmployee().getDepartment() != null ? 
+                 existingTask.getAssignedToEmployee().getDepartment().getName() : null) : null;
+            
+            if (taskDepartment == null) {
+                return ResponseEntity.status(404).body(null);
+            }
+            
+            // Only ADMIN can update cross-department, others must match department
+            if (!"ADMIN".equals(derivedUserRole) && !taskDepartment.equals(derivedUserDepartment)) {
+                return ResponseEntity.status(403).body(null);
+            }
+            
             Task task = taskMapper.toEntity(dto);
 
-            // Handle custom field values
-            task.getCustomFieldValues().clear();
-            if (dto.getCustomFieldValues() != null) {
+            // Handle custom field values - SAFETY FIX
+            if (dto.getCustomFieldValues() != null && !dto.getCustomFieldValues().isEmpty()) {
+                task.getCustomFieldValues().clear();
                 dto.getCustomFieldValues().forEach(valueDto -> {
                     Long fieldId = valueDto.getTaskCustomFieldId() != null ? valueDto.getTaskCustomFieldId() : valueDto.getFieldId();
                     if (fieldId == null) {

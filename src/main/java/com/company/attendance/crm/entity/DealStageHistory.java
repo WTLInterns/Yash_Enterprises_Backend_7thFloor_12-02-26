@@ -1,6 +1,5 @@
 package com.company.attendance.crm.entity;
 
-import com.company.attendance.crm.enums.DealStage;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import org.hibernate.annotations.OnDelete;
@@ -20,13 +19,11 @@ public class DealStageHistory {
     @JsonIgnore
     private Deal deal;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "previous_stage")
-    private DealStage previousStage;
+    private String previousStage;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "new_stage")
-    private DealStage newStage;
+    private String newStage;
 
     @Column(name = "changed_by", length = 36)
     private String changedBy;
@@ -47,10 +44,10 @@ public class DealStageHistory {
     public void setId(Long id) { this.id = id; }
     public Deal getDeal() { return deal; }
     public void setDeal(Deal deal) { this.deal = deal; }
-    public DealStage getPreviousStage() { return previousStage; }
-    public void setPreviousStage(DealStage previousStage) { this.previousStage = previousStage; }
-    public DealStage getNewStage() { return newStage; }
-    public void setNewStage(DealStage newStage) { this.newStage = newStage; }
+    public String getPreviousStage() { return previousStage; }
+    public void setPreviousStage(String previousStage) { this.previousStage = previousStage; }
+    public String getNewStage() { return newStage; }
+    public void setNewStage(String newStage) { this.newStage = newStage; }
     public String getChangedBy() { return changedBy; }
     public void setChangedBy(String changedBy) { this.changedBy = changedBy; }
     public OffsetDateTime getChangedAt() { return changedAt; }

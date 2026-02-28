@@ -9,10 +9,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -23,6 +25,7 @@ public class NotificationService {
     private final AppNotificationRepository notificationRepository;
     private final EmployeeRepository employeeRepository;
     private final ObjectMapper objectMapper;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Value("${firebase.enabled:true}")
     private boolean firebaseEnabled;
@@ -113,5 +116,54 @@ public class NotificationService {
     @Transactional
     public void deleteAllNotifications(Long employeeId) {
         notificationRepository.deleteAllByRecipientEmployeeId(employeeId);
+    }
+
+    /**
+     * ADD THIS NEW METHOD INSIDE EXISTING CLASS
+     * Send role-based notification with WebSocket support
+     */
+    @Transactional
+    public void sendRoleBasedNotification(String role, String title, String message, String type, Long refId) {
+        try {
+            if ("ADMIN".equals(role)) {
+                // Find all admin employees (EFFICIENT: Database-level filtering)
+                List<Employee> adminEmployees = employeeRepository.findByRole_Name("ADMIN");
+                
+                // Create notification for each admin
+                for (Employee admin : adminEmployees) {
+                    AppNotification notification = new AppNotification();
+                    notification.setRecipientEmployeeId(admin.getId());
+                    notification.setTitle(title);
+                    notification.setBody(message);
+                    notification.setType(type);
+                    notification.setRefType("ADDRESS_EDIT");
+                    notification.setRefId(refId);
+                    notification.setChannel("WEB");
+                    notification.setCreatedAt(LocalDateTime.now());
+                    
+                    notificationRepository.save(notification);
+                }
+                
+                // Send WebSocket to admin topic
+                messagingTemplate.convertAndSend("/topic/admin-notifications", Map.of(
+                    "title", title,
+                    "message", message,
+                    "type", type,
+                    "refId", refId,
+                    "role", role,
+                    "timestamp", LocalDateTime.now().toString()
+                ));
+                
+                log.info("Admin notification sent: {} - {} admins notified", title, adminEmployees.size());
+                
+            } else if ("EMPLOYEE".equals(role)) {
+                // For employee notifications, we need specific employee ID
+                // This will be handled by existing notifyEmployeeMobile method
+                log.info("Employee notification requested: {} - use notifyEmployeeMobile for specific employee", title);
+            }
+            
+        } catch (Exception e) {
+            log.error("Failed to send role-based notification: {}", e.getMessage(), e);
+        }
     }
 }

@@ -3,6 +3,7 @@ package com.company.attendance.repository;
 import com.company.attendance.entity.Client;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -13,7 +14,14 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
     
     Optional<Client> findByEmail(String email);
     
+    Optional<Client> findByName(String name);
+    
     List<Client> findByIsActive(Boolean isActive);
+    
+    /**
+     * 🔥 DEPARTMENT-AWARE: Find clients by their IDs (for department filtering via Deal)
+     */
+    List<Client> findByIdInAndIsActiveTrue(List<Long> ids);
     
     @Query("SELECT COUNT(c) FROM Client c WHERE c.isActive = true")
     long countActiveClients();

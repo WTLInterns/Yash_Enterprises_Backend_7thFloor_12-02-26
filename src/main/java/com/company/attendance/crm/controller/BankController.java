@@ -141,7 +141,7 @@ public class BankController {
             row.put("dealId", d.getId());
             row.put("dealName", d.getName());
             row.put("amount", d.getValueAmount());
-            row.put("stage", d.getStage() != null ? d.getStage().name() : null);
+            row.put("stage", d.getStageCode());
             resp.add(row);
         }
         return resp;

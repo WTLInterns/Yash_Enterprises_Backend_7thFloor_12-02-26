@@ -51,9 +51,6 @@ public class CustomerAddress {
     @Column(name = "is_primary")
     private Boolean isPrimary = false;
     
-    @Column(name = "is_editable")
-    private Boolean editable = false;
-    
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

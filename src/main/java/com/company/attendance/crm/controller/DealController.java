@@ -139,10 +139,13 @@ public class DealController {
     deal.setDescription(dealDto.getDescription());
     deal.setRequiredAmount(dealDto.getRequiredAmount());
     deal.setOutstandingAmount(dealDto.getOutstandingAmount());
-    if (dealDto.getStage() != null) {
-      try {
-        deal.setStage(com.company.attendance.crm.enums.DealStage.valueOf(dealDto.getStage()));
-      } catch (IllegalArgumentException ignored) {}
+    // 🔥 FIXED: Only update stage if explicitly provided (prevent wiping stage)
+    if (dealDto.getStage() != null && !dealDto.getStage().trim().isEmpty()) {
+      deal.setStageCode(dealDto.getStage());
+    }
+    // 🔥 FIXED: Only update department if explicitly provided (prevent wiping department)
+    if (dealDto.getDepartment() != null && !dealDto.getDepartment().trim().isEmpty()) {
+      deal.setDepartment(dealDto.getDepartment());
     }
     deal.setActive(dealDto.getActive());
 
@@ -163,8 +166,8 @@ public class DealController {
     List<Map<String, Object>> body = history.stream().map(h -> {
       Map<String, Object> m = new HashMap<>();
       m.put("id", h.getId() != null ? h.getId().toString() : null);
-      m.put("previousStage", h.getPreviousStage() != null ? h.getPreviousStage().name() : null);
-      m.put("newStage", h.getNewStage() != null ? h.getNewStage().name() : null);
+      m.put("previousStage", h.getPreviousStage());
+      m.put("newStage", h.getNewStage());
       m.put("changedAt", h.getChangedAt() != null ? h.getChangedAt().toString() : null);
       m.put("changedBy", h.getChangedBy());
       m.put("changedByName", employeeNameFromChangedBy(h.getChangedBy()));
@@ -189,20 +192,31 @@ public class DealController {
       return ResponseEntity.badRequest().build();
     }
 
-    com.company.attendance.crm.enums.DealStage prev = deal.getStage();
-    try {
-      deal.setStage(com.company.attendance.crm.enums.DealStage.valueOf(stageRaw));
-    } catch (IllegalArgumentException ex) {
-      return ResponseEntity.badRequest().build();
+    String prevStageCode = deal.getStageCode();
+    deal.setStageCode(stageRaw);
+    if (body.get("department") != null) {
+      deal.setDepartment(body.get("department"));
     }
 
     Deal saved = dealRepository.save(deal);
 
-    Long userId = headerUserId != null ? headerUserId : auditService.getCurrentUserId();
+    // ✅ FIX: Try body userId first, then header, then audit service
+    Long userId = null;
+    if (body.get("userId") != null) {
+      try {
+        userId = Long.valueOf(body.get("userId"));
+      } catch (NumberFormatException e) {
+        // ignore
+      }
+    }
+    if (userId == null) {
+      userId = headerUserId != null ? headerUserId : auditService.getCurrentUserId();
+    }
+    
     DealStageHistory h = new DealStageHistory();
     h.setDeal(saved);
-    h.setPreviousStage(prev);
-    h.setNewStage(saved.getStage());
+    h.setPreviousStage(prevStageCode);
+    h.setNewStage(saved.getStageCode());
     h.setChangedBy(userId != null ? String.valueOf(userId) : null);
     h.setChangedAt(OffsetDateTime.now());
     dealStageHistoryRepository.save(h);
@@ -223,7 +237,7 @@ public class DealController {
         m.put("type", "STAGE");
         m.put("time", h.getChangedAt() != null ? h.getChangedAt().toString() : null);
         m.put("actor", employeeNameFromChangedBy(h.getChangedBy()));
-        m.put("message", h.getNewStage() != null ? ("Stage changed to " + h.getNewStage().name()) : "Stage changed");
+        m.put("message", h.getNewStage() != null ? ("Stage changed to " + h.getNewStage()) : "Stage changed");
         return m;
       })
       .collect(Collectors.toList());

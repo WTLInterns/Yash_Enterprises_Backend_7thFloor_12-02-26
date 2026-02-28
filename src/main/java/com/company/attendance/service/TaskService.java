@@ -111,6 +111,24 @@ public class TaskService {
     public List<Task> findAll() {
         return taskRepository.findAll();
     }
+    
+    /**
+     * 🔥 DEPARTMENT-AWARE: Find all tasks in a department
+     */
+    public List<Task> findByDepartment(String department) {
+        return taskRepository.findByDepartmentOrderByIdDesc(department);
+    }
+    
+    /**
+     * 🔥 DEPARTMENT-AWARE: Find all tasks created by a TL in their department
+     */
+    public List<Task> findByCreatedByTlIdAndDepartment(Long tlId, String department) {
+        return taskRepository.findTasksCreatedByTlInDepartment(tlId, department);
+    }
+
+    public List<Task> getTasksForEmployee(Long employeeId) {
+        return taskRepository.findByAssignedToEmployeeIdOrderByIdDesc(employeeId);
+    }
 
     public Task getById(Long id) {
         return taskRepository.findById(id)
@@ -126,6 +144,7 @@ public class TaskService {
         existing.setTaskName(updated.getTaskName());
         existing.setTaskDescription(updated.getTaskDescription());
         existing.setCustomTaskType(updated.getCustomTaskType());
+        existing.setDepartment(updated.getDepartment()); // 🔥 Update department
 
         existing.setAssignedToEmployeeId(updated.getAssignedToEmployeeId());
         existing.setCreatedByEmployeeId(updated.getCreatedByEmployeeId());
@@ -227,6 +246,12 @@ public class TaskService {
         try {
             Task task = taskRepository.findById(taskId)
                     .orElseThrow(() -> new RuntimeException("Task not found with ID: " + taskId));
+
+            // 🔒 SECURITY: Validate task ownership
+            Long assignedToEmployeeId = task.getAssignedToEmployeeId();
+            if (assignedToEmployeeId == null || !assignedToEmployeeId.equals(employeeId)) {
+                throw new RuntimeException("Access denied: You are not assigned to this task");
+            }
 
             // Validate status
             TaskStatus taskStatus;

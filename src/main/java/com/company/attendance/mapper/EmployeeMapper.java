@@ -2,9 +2,12 @@ package com.company.attendance.mapper;
 
 import com.company.attendance.dto.EmployeeDto;
 import com.company.attendance.entity.Employee;
+import org.mapstruct.AfterMapping;
+import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
+import org.mapstruct.NullValuePropertyMappingStrategy;
 
 @Mapper(componentModel = "spring")
 public interface EmployeeMapper {
@@ -34,7 +37,7 @@ public interface EmployeeMapper {
     @Mapping(target = "organizationId", source = "organization.id")
     @Mapping(target = "organizationName", source = "organization.name")
     @Mapping(target = "departmentId", source = "department.id")
-    @Mapping(target = "departmentName", source = "department.name")
+    @Mapping(target = "departmentName", expression = "java(entity.getDepartment() != null ? entity.getDepartment().getName() : entity.getDepartmentName())")
     @Mapping(target = "shiftId", source = "shift.id")
     @Mapping(target = "shiftName", source = "shift.name")
     @Mapping(target = "createdAt", ignore = true)
@@ -45,9 +48,17 @@ public interface EmployeeMapper {
 
     @Mapping(target = "passwordHash", ignore = true)
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "userId", ignore = true)
-    @Mapping(target = "employeeId", ignore = true)
+    @Mapping(target = "role", ignore = true)
+    @Mapping(target = "team", ignore = true)
+    @Mapping(target = "designation", ignore = true)
+    @Mapping(target = "reportingManager", ignore = true)
+    @Mapping(target = "organization", ignore = true)
+    @Mapping(target = "department", ignore = true)
+    @Mapping(target = "shift", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "createdBy", ignore = true)
+    @Mapping(target = "updatedBy", ignore = true)
+    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     void updateEntityFromDto(EmployeeDto dto, @MappingTarget Employee entity);
 }

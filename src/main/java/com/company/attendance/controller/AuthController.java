@@ -8,9 +8,15 @@ import com.company.attendance.service.EmployeeService;
 import com.company.attendance.service.RoleService;
 import com.company.attendance.service.OrganizationService;
 import com.company.attendance.repository.EmployeeRepository;
+import com.company.attendance.security.JwtService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -32,55 +38,52 @@ public class AuthController {
     private final OrganizationService organizationService;
     private final PasswordEncoder passwordEncoder;
     private final EmployeeRepository employeeRepository;
+    private final AuthenticationManager authenticationManager;
+    private final JwtService jwtService;
     
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
-        log.info("Login attempt for email: {}", loginRequest.getEmail());
-        
         try {
-            // Find employee by email
-            String email = loginRequest.getEmail();
-            
-            if (email == null || email.trim().isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of(
-                    "error", "Email is required"
-                ));
-            }
+            log.info("Login attempt for email: {}", loginRequest.getEmail());
 
-            Optional<Employee> employeeOpt = employeeService.findByEmail(email);
+            // Authenticate the user using Spring Security
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            loginRequest.getEmail(),
+                            loginRequest.getPassword()
+                    )
+            );
 
-            if (employeeOpt.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of(
-                    "error", "Invalid credentials"
-                ));
-            }
+            // Get employee details with department
+            Employee employee = employeeRepository.findByEmailWithDepartment(loginRequest.getEmail())
+                    .orElseThrow(() -> new BadCredentialsException("User not found"));
 
-            Employee employee = employeeOpt.get();
-            
-            // Log current FCM tokens
-            log.info("Employee {} current FCM tokens - Mobile: {}, Web: {}", 
-                    employee.getId(),
-                    employee.getFcmTokenMobile() != null ? employee.getFcmTokenMobile().substring(0, Math.min(20, employee.getFcmTokenMobile().length())) + "..." : "NULL",
-                    employee.getFcmTokenWeb() != null ? employee.getFcmTokenWeb().substring(0, Math.min(20, employee.getFcmTokenWeb().length())) + "..." : "NULL");
-            
-            // Check if password matches (for development, using simple check)
-            if (!isValidPassword(loginRequest.getPassword(), employee)) {
-                return ResponseEntity.badRequest().body(Map.of(
-                    "error", "Invalid credentials"
-                ));
-            }
+            // Extract role information (normalize to uppercase)
+            String roleName = employee.getRole() != null
+                    ? employee.getRole().getName().toUpperCase().trim()
+                    : "EMPLOYEE";
 
-            // Create response with user data and token
+            // Generate JWT token
+            String token = jwtService.generateToken(loginRequest.getEmail(), roleName);
+
+            // Create response with user data and JWT token
             EmployeeDto employeeDto = convertToDto(employee);
             
             Map<String, Object> response = new HashMap<>();
-            response.put("token", generateToken(employee));
+            response.put("token", token);
             response.put("user", employeeDto);
+            response.put("role", roleName);
+            response.put("employeeId", employee.getId());
             response.put("message", "Login successful");
             
-            log.info("Login successful for email: {}", loginRequest.getEmail());
+            log.info("Login successful for email: {}, role: {}", loginRequest.getEmail(), roleName);
             return ResponseEntity.ok(response);
             
+        } catch (AuthenticationException e) {
+            log.warn("Login failed for email: {}", loginRequest.getEmail());
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "Invalid credentials"
+            ));
         } catch (Exception e) {
             log.error("Login failed for email: {} - {}", loginRequest.getEmail(), e.getMessage());
             return ResponseEntity.internalServerError().body(Map.of(
@@ -318,8 +321,9 @@ public class AuthController {
                 .roleName(employee.getRole() != null ? employee.getRole().getName() : null)
                 .teamId(employee.getTeam() != null ? employee.getTeam().getId() : null)
                 .teamName(employee.getTeam() != null ? employee.getTeam().getName() : null)
+                // ✅ CRITICAL FIX: Handle both FK department and string departmentName for TL
                 .departmentId(employee.getDepartment() != null ? employee.getDepartment().getId() : null)
-                .departmentName(employee.getDepartment() != null ? employee.getDepartment().getName() : null)
+                .departmentName(employee.getDepartment() != null ? employee.getDepartment().getName() : employee.getDepartmentName())
                 .status(employee.getStatus().name())
                 .profileImageUrl(employee.getProfileImageUrl())
                 .hiredAt(employee.getHiredAt())

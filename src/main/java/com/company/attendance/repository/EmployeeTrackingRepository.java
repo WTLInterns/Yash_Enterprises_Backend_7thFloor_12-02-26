@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface EmployeeTrackingRepository extends JpaRepository<EmployeeTracking, Long> {
@@ -42,6 +43,11 @@ public interface EmployeeTrackingRepository extends JpaRepository<EmployeeTracki
 
     @Query("SELECT et FROM EmployeeTracking et WHERE et.employee.id = :employeeId ORDER BY et.id DESC")
     List<EmployeeTracking> findLatestForEmployee(@Param("employeeId") Long employeeId);
+
+    /**
+     * Find the latest tracking record for a specific employee
+     */
+    Optional<EmployeeTracking> findFirstByEmployee_IdOrderByTimestampDesc(Long employeeId);
 
     @Query("SELECT et FROM EmployeeTracking et WHERE et.latitude BETWEEN :latMin AND :latMax AND et.longitude BETWEEN :lonMin AND :lonMax")
     List<EmployeeTracking> findTrackingInArea(@Param("latMin") Double latMin, @Param("latMax") Double latMax, 

@@ -217,7 +217,8 @@ public Client toClientEntity(ClientDto dto) {
     dto.setDescription(deal.getDescription());
     dto.setRequiredAmount(deal.getRequiredAmount());
     dto.setOutstandingAmount(deal.getOutstandingAmount());
-    dto.setStage(deal.getStage() != null ? deal.getStage().name() : null);
+    dto.setStage(deal.getStageCode());
+    dto.setDepartment(deal.getDepartment());
     dto.setActive(deal.getActive());
 
     if (deal.getCreatedAt() != null) {
@@ -270,11 +271,8 @@ public Client toClientEntity(ClientDto dto) {
     deal.setDescription(dto.getDescription());
     deal.setRequiredAmount(dto.getRequiredAmount());
     deal.setOutstandingAmount(dto.getOutstandingAmount());
-    if (dto.getStage() != null) {
-      try {
-        deal.setStage(com.company.attendance.crm.enums.DealStage.valueOf(dto.getStage()));
-      } catch (IllegalArgumentException ignored) {}
-    }
+    deal.setStageCode(dto.getStage());
+    deal.setDepartment(dto.getDepartment());
     deal.setActive(dto.getActive());
     return deal;
   }

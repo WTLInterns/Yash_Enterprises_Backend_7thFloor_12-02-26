@@ -23,12 +23,22 @@ import java.util.stream.Collectors;
 public class EmployeeController {
 
     private final EmployeeService employeeService;
+    @Autowired
     private final EmployeeMapper employeeMapper;
 
     @GetMapping
-    public ResponseEntity<List<EmployeeDto>> listEmployees() {
+public ResponseEntity<List<EmployeeDto>> listEmployees() {
         List<Employee> employees = employeeService.findAll();
         List<EmployeeDto> dtos = employees.stream()
+                .map(employeeMapper::toDto)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
+    }
+
+    @GetMapping("/managers")
+    public ResponseEntity<List<EmployeeDto>> getManagers() {
+        List<Employee> managers = employeeService.findByRole("MANAGER");
+        List<EmployeeDto> dtos = managers.stream()
                 .map(employeeMapper::toDto)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(dtos);
@@ -74,6 +84,17 @@ public class EmployeeController {
             // Generate employeeId if not provided
             if (dto.getEmployeeId() == null || dto.getEmployeeId().trim().isEmpty()) {
                 dto.setEmployeeId("EMP_" + System.currentTimeMillis());
+            }
+            
+            // 🔥 DEPARTMENT VALIDATION: TL must have department
+            if ("TL".equals(dto.getRoleName()) && dto.getDepartmentId() == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Department is required for TL role"));
+            }
+            
+            // 🔥 DEPARTMENT ENFORCEMENT: Non-TL roles get derived department (prevent client tampering)
+            if (!"TL".equals(dto.getRoleName()) && dto.getDepartmentId() != null) {
+                // For non-TL roles, ignore client-side department and let service derive it
+                dto.setDepartmentId(null);
             }
             
             Employee employee = employeeService.createFromDto(dto);

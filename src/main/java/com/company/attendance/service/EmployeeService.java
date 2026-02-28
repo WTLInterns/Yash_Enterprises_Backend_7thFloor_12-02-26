@@ -98,10 +98,20 @@ public class EmployeeService {
             employee.setOrganization(organization);
         }
         
-        if (dto.getDepartmentId() != null) {
-            Department department = departmentRepository.findById(dto.getDepartmentId()).orElse(null);
-            System.out.println("Setting department: " + department);
-            employee.setDepartment(department);
+        // ✅ CRITICAL FIX: Handle TL department logic
+        if (employee.getRole() != null && "TL".equalsIgnoreCase(employee.getRole().getName())) {
+            // TL → department comes from CRM (string like "PPO", "PPE", "HLC")
+            employee.setDepartment(null);
+            employee.setDepartmentName(dto.getDepartmentName());
+            System.out.println("Setting TL departmentName: " + dto.getDepartmentName());
+        } else {
+            // Non-TL → normal HR department (FK relationship)
+            if (dto.getDepartmentId() != null) {
+                Department department = departmentRepository.findById(dto.getDepartmentId()).orElse(null);
+                System.out.println("Setting department: " + department);
+                employee.setDepartment(department);
+            }
+            employee.setDepartmentName(null);
         }
         
         if (dto.getShiftId() != null) {
@@ -187,6 +197,10 @@ public class EmployeeService {
 
     public List<Employee> findAll() {
         return employeeRepository.findAllWithRelationships();
+    }
+
+    public List<Employee> findByRole(String roleName) {
+        return employeeRepository.findByRole_Name(roleName);
     }
 
     public List<Employee> findByIsActive(Boolean isActive) {
@@ -276,11 +290,24 @@ public class EmployeeService {
             }
         }
         
-        if (dto.getDepartmentId() != null) {
-            Department department = departmentRepository.findById(dto.getDepartmentId()).orElse(null);
-            if (department != null && !department.equals(existing.getDepartment())) {
-                System.out.println("Updating department from '" + existing.getDepartment() + "' to '" + department + "'");
-                existing.setDepartment(department);
+        // ✅ CRITICAL FIX: Handle TL department logic for UPDATE
+        if (existing.getRole() != null && "TL".equalsIgnoreCase(existing.getRole().getName())) {
+            // TL update → use departmentName string
+            String newDepartmentName = dto.getDepartmentName();
+            if (newDepartmentName != null && !newDepartmentName.equals(existing.getDepartmentName())) {
+                System.out.println("Updating TL departmentName from '" + existing.getDepartmentName() + "' to '" + newDepartmentName + "'");
+                existing.setDepartment(null);
+                existing.setDepartmentName(newDepartmentName);
+            }
+        } else {
+            // Non-TL update → use department FK
+            if (dto.getDepartmentId() != null) {
+                Department department = departmentRepository.findById(dto.getDepartmentId()).orElse(null);
+                if (department != null && !department.equals(existing.getDepartment())) {
+                    System.out.println("Updating department from '" + existing.getDepartment() + "' to '" + department + "'");
+                    existing.setDepartment(department);
+                    existing.setDepartmentName(null); // Clear departmentName for non-TL
+                }
             }
         }
         

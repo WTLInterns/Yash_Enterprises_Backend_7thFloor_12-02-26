@@ -9,11 +9,22 @@ import java.util.Optional;
 
 public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     Optional<Employee> findByEmail(String email);
+    
+    // ✅ ADD THIS: Find employee with all relationships for login
+    @Query("SELECT e FROM Employee e " +
+           "LEFT JOIN FETCH e.role " +
+           "LEFT JOIN FETCH e.department " +
+           "WHERE e.email = :email")
+    Optional<Employee> findByEmailWithDepartment(String email);
+    
     boolean existsByEmail(String email);
     Optional<Employee> findByPhone(String phone);
 
     // Add this method to find admin users
     List<Employee> findByRole_NameIn(List<String> roleNames);
+    
+    // ADD THIS: Find employees by specific role name (more efficient)
+    List<Employee> findByRole_Name(String roleName);
 
     // Methods used by EmployeeService
     Optional<Employee> findByUserId(String userId);

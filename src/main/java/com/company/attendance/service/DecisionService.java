@@ -51,11 +51,8 @@ public class DecisionService {
             List<EmployeePunch> activePunches = employeePunchRepository.findActivePunchesByEmployeeId(employeeId);
             EmployeePunch activePunch = activePunches.isEmpty() ? null : activePunches.get(0);
             
-            // Get active task
-            Task activeTask = null;
-            if (activePunch != null && activePunch.getTask() != null) {
-                activeTask = activePunch.getTask();
-            }
+            // Get active task (independent of punch - same logic as LocationBasedAttendanceService)
+            Task activeTask = taskRepository.findActiveTaskByEmployeeId(employeeId);
             
             // Connection status
             String connectionStatus = latest != null ? "ONLINE" : "OFFLINE";
@@ -79,7 +76,7 @@ public class DecisionService {
                         latest.getLatitude(), latest.getLongitude(),
                         customerAddress.getLatitude(), customerAddress.getLongitude()
                     );
-                    withinGeofence = distanceToCustomer <= 200;
+                    withinGeofence = distanceToCustomer <= 200; // PRODUCTION: Aligned with LocationBasedAttendanceService
                     locationStatus = withinGeofence ? "IN_RANGE" : "OUT_OF_RANGE";
                     customerLocationConfigured = true;
                 } else {

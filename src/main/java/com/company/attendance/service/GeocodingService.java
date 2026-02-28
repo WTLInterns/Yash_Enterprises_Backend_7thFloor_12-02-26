@@ -84,7 +84,12 @@ public class GeocodingService {
 
     private String reverseGeocodeWithGoogle(Double latitude, Double longitude) {
         try {
-            String url = String.format("%s?latlng=%s,%s&key=%s", apiUrl, latitude, longitude, apiKey);
+            String url = UriComponentsBuilder
+                .fromHttpUrl(apiUrl)
+                .queryParam("latlng", latitude + "," + longitude)
+                .queryParam("key", apiKey)
+                .build()
+                .toUriString();
             
             log.debug("Calling Google Reverse Geocoding API: {}", url);
             

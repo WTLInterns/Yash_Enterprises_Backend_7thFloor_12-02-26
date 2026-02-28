@@ -21,6 +21,9 @@ public class TaskDto {
 
     private String customTaskType;
 
+    // 🔥 Department field (STRING)
+    private String department;
+
     private Long assignedToEmployeeId;
     private String assignedToEmployeeName;
 

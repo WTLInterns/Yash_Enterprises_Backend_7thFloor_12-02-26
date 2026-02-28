@@ -8,6 +8,7 @@ import com.company.attendance.crm.mapper.CrmMapper;
 import com.company.attendance.crm.service.AuditService;
 import com.company.attendance.dto.ClientDto;
 import com.company.attendance.service.ClientService;
+import com.company.attendance.repository.EmployeeRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,12 +33,36 @@ public class ClientController {
     private final DealRepository dealRepository;
     private final CrmMapper crmMapper;
     private final AuditService auditService;
+    private final EmployeeRepository employeeRepository;
 
     @GetMapping
-    public ResponseEntity<List<com.company.attendance.crm.dto.ClientDto>> listClients() {
-        log.info("GET /api/clients - Fetching active clients");
+    public ResponseEntity<List<com.company.attendance.crm.dto.ClientDto>> listClients(
+            @RequestParam(required = false) String department,
+            @RequestParam(required = false) String stage) {
+        log.info("GET /api/clients - Fetching clients with filters department={}, stage={}", department, stage);
         try {
-            List<Client> clients = clientService.getActiveClientEntities();
+            List<Client> clients;
+            
+            if (department != null && stage != null) {
+                // Filter by deals with both department and stage criteria
+                List<Deal> deals = dealRepository.findByDepartmentAndStage(department, stage);
+                List<Long> clientIds = deals.stream().map(Deal::getClientId).distinct().toList();
+                clients = clientIds.stream()
+                    .map(id -> clientService.getClientEntityById(id))
+                    .filter(client -> client != null && client.getIsActive())
+                    .collect(Collectors.toList());
+            } else if (department != null) {
+                // Filter by department only
+                List<Deal> deals = dealRepository.findByDepartment(department);
+                List<Long> clientIds = deals.stream().map(Deal::getClientId).distinct().toList();
+                clients = clientIds.stream()
+                    .map(id -> clientService.getClientEntityById(id))
+                    .filter(client -> client != null && client.getIsActive())
+                    .collect(Collectors.toList());
+            } else {
+                clients = clientService.getActiveClientEntities();
+            }
+            
             List<com.company.attendance.crm.dto.ClientDto> dtos = clients.stream()
                 .map(crmMapper::toClientDto)
                 .collect(Collectors.toList());
@@ -107,7 +132,7 @@ public class ClientController {
         dto.name = deal.getName();
         dto.valueAmount = deal.getValueAmount();
         dto.closingDate = deal.getClosingDate();
-        dto.stage = deal.getStage() != null ? deal.getStage().name() : null;
+        dto.stage = deal.getStageCode();
         dto.notesCount = 0;
         dto.activitiesCount = 0;
         return ResponseEntity.ok(dto);

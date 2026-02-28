@@ -82,6 +82,10 @@ public class Employee {
     @JoinColumn(name = "department_id")
     private Department department;
 
+    // ✅ TL DEPARTMENT: Store department as string for TL roles (PPO, PPE, HLC, etc.)
+    @Column(name = "department_name")
+    private String departmentName;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "shift_id")
     private Shift shift;
