@@ -26,6 +26,9 @@ public class DealDto {
     @Min(value = 0, message = "Value amount must be greater than or equal to 0")
     private BigDecimal valueAmount;
     
+    // 🔥 NEW: Calculated value from products (for Customers page display)
+    private BigDecimal calculatedValue;
+    
     @Min(value = 0, message = "Required amount must be greater than or equal to 0")
     private BigDecimal requiredAmount;
     

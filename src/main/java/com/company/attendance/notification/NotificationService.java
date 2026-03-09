@@ -24,6 +24,7 @@ public class NotificationService {
 
     private final AppNotificationRepository notificationRepository;
     private final EmployeeRepository employeeRepository;
+    private final EmployeeFcmTokenRepository fcmTokenRepository;
     private final ObjectMapper objectMapper;
     private final SimpMessagingTemplate messagingTemplate;
 
@@ -41,6 +42,12 @@ public class NotificationService {
     @Transactional
     public void notifyEmployee(Long employeeId, String channel, String title, String body, String type, String refType, Long refId, Map<String, String> data) {
         try {
+            log.info("🔥 [EMPLOYEE NOTIFICATION] notifyEmployee called:");
+            log.info("🔥 [EMPLOYEE NOTIFICATION] - EmployeeId: {}", employeeId);
+            log.info("🔥 [EMPLOYEE NOTIFICATION] - Channel: {}", channel);
+            log.info("🔥 [EMPLOYEE NOTIFICATION] - Title: {}", title);
+            log.info("🔥 [EMPLOYEE NOTIFICATION] - Firebase Enabled: {}", firebaseEnabled);
+
             final AppNotification saved = notificationRepository.save(
                     AppNotification.builder()
                             .recipientEmployeeId(employeeId)
@@ -54,40 +61,59 @@ public class NotificationService {
                             .build()
             );
 
-            log.info("Notification saved for employeeId={}, channel={}, type={}", employeeId, channel, type);
+            log.info("🔥 [EMPLOYEE NOTIFICATION] Notification saved for employeeId={}, channel={}, type={}", employeeId, channel, type);
 
             Employee emp = employeeRepository.findById(employeeId).orElse(null);
-            if (emp == null) return;
-
-            String token = null;
-            if ("MOBILE".equalsIgnoreCase(channel)) {
-                token = emp.getFcmTokenMobile();
-            } else if ("WEB".equalsIgnoreCase(channel)) {
-                token = emp.getFcmTokenWeb();
+            if (emp == null) {
+                log.warn("🔥 [EMPLOYEE NOTIFICATION] Employee not found with ID: {}", employeeId);
+                return;
             }
+            
+            log.info("🔥 [EMPLOYEE NOTIFICATION] Found employee: {} (ID: {})", emp.getFullName(), emp.getId());
 
-            if (token == null || token.isBlank()) {
-                log.warn("No {} token found for employeeId={}", channel, employeeId);
+            // 🔥 NEW: Get all tokens for the employee and platform
+            List<EmployeeFcmToken> tokens = fcmTokenRepository.findByEmployeeIdAndPlatform(employeeId, channel);
+            log.info("🔥 [EMPLOYEE NOTIFICATION] Found {} {} tokens for employeeId={}", tokens.size(), channel, employeeId);
+            
+            if (tokens.isEmpty()) {
+                log.warn("🔥 [EMPLOYEE NOTIFICATION] No {} tokens found for employeeId={} - Employee: {}", channel, employeeId, emp.getFullName());
                 return;
             }
 
             if (!firebaseEnabled) {
+                log.warn("🔥 [EMPLOYEE NOTIFICATION] Firebase is disabled - skipping FCM send");
                 return;
             }
 
-            try {
-                Message.Builder builder = Message.builder()
-                        .setToken(token)
-                        .setNotification(Notification.builder().setTitle(title).setBody(body).build());
-
-                if (data != null) {
-                    builder.putAllData(data);
+            // 🔥 NEW: Send to all tokens for this employee/platform
+            for (EmployeeFcmToken tokenEntity : tokens) {
+                String token = tokenEntity.getToken();
+                if (token == null || token.isBlank()) {
+                    continue;
                 }
 
-                FirebaseMessaging.getInstance().send(builder.build());
-            } catch (Exception e) {
-                log.warn("FCM send failed (employeeId={}, channel={}): {}", employeeId, channel, e.getMessage());
-                // keep DB notification even if push fails
+                try {
+                    Message.Builder builder = Message.builder()
+                            .setToken(token)
+                            .setNotification(Notification.builder().setTitle(title).setBody(body).build());
+
+                    if (data != null) {
+                        builder.putAllData(data);
+                    }
+
+                    FirebaseMessaging.getInstance().send(builder.build());
+                    log.info("FCM notification sent to employeeId={}, channel={}, tokenId={}", employeeId, channel, tokenEntity.getId());
+                } catch (Exception e) {
+                    log.warn("FCM send failed (employeeId={}, channel={}, tokenId={}): {}", employeeId, channel, tokenEntity.getId(), e.getMessage());
+                    // Optionally delete invalid token
+                    try {
+                        fcmTokenRepository.delete(tokenEntity);
+                        log.info("Deleted invalid FCM token: tokenId={}", tokenEntity.getId());
+                    } catch (Exception deleteEx) {
+                        log.warn("Failed to delete invalid token: {}", deleteEx.getMessage());
+                    }
+                    // keep DB notification even if push fails
+                }
             }
         } catch (Exception e) {
             log.error("Failed to save notification: {}", e.getMessage());
@@ -119,51 +145,120 @@ public class NotificationService {
     }
 
     /**
-     * ADD THIS NEW METHOD INSIDE EXISTING CLASS
      * Send role-based notification with WebSocket support
      */
     @Transactional
     public void sendRoleBasedNotification(String role, String title, String message, String type, Long refId) {
         try {
-            if ("ADMIN".equals(role)) {
-                // Find all admin employees (EFFICIENT: Database-level filtering)
-                List<Employee> adminEmployees = employeeRepository.findByRole_Name("ADMIN");
+            log.info("🔥 [FIREBASE] sendRoleBasedNotification called:");
+            log.info("🔥 [FIREBASE] - Role: {}", role);
+            log.info("🔥 [FIREBASE] - Title: {}", title);
+            log.info("🔥 [FIREBASE] - Message: {}", message);
+            log.info("🔥 [FIREBASE] - Type: {}", type);
+            log.info("🔥 [FIREBASE] - RefId: {}", refId);
+            log.info("🔥 [FIREBASE] - Firebase Enabled: {}", firebaseEnabled);
+
+            if ("MANAGER".equals(role)) {
+                // Find all manager employees
+                List<Employee> managerEmployees = employeeRepository.findByRole_Name("MANAGER");
+                log.info("🔥 [FIREBASE] Found {} manager employees", managerEmployees.size());
                 
-                // Create notification for each admin
-                for (Employee admin : adminEmployees) {
+                for (Employee manager : managerEmployees) {
+                    log.info("🔥 [FIREBASE] Sending to manager: {} (ID: {})", manager.getFullName(), manager.getId());
+                    
+                    // Create notification for each manager
                     AppNotification notification = new AppNotification();
-                    notification.setRecipientEmployeeId(admin.getId());
+                    notification.setRecipientEmployeeId(manager.getId());
+                    notification.setRecipientRole(role);
                     notification.setTitle(title);
                     notification.setBody(message);
                     notification.setType(type);
-                    notification.setRefType("ADDRESS_EDIT");
+                    notification.setRefType(type);
                     notification.setRefId(refId);
                     notification.setChannel("WEB");
                     notification.setCreatedAt(LocalDateTime.now());
                     
                     notificationRepository.save(notification);
+                    
+                    // Send Firebase notification
+                    notifyEmployeeWeb(manager.getId(), title, message, type, type, refId, null);
+                    notifyEmployeeMobile(manager.getId(), title, message, type, type, refId, null);
                 }
                 
-                // Send WebSocket to admin topic
-                messagingTemplate.convertAndSend("/topic/admin-notifications", Map.of(
+                // Send WebSocket notification
+                messagingTemplate.convertAndSend("/topic/notifications/role/MANAGER", Map.of(
                     "title", title,
-                    "message", message,
+                    "body", message,
                     "type", type,
                     "refId", refId,
                     "role", role,
                     "timestamp", LocalDateTime.now().toString()
                 ));
                 
-                log.info("Admin notification sent: {} - {} admins notified", title, adminEmployees.size());
+                log.info("✅ [FIREBASE] Manager notification sent: {} - {} managers notified", title, managerEmployees.size());
                 
-            } else if ("EMPLOYEE".equals(role)) {
-                // For employee notifications, we need specific employee ID
-                // This will be handled by existing notifyEmployeeMobile method
-                log.info("Employee notification requested: {} - use notifyEmployeeMobile for specific employee", title);
+            } else {
+                log.warn("🔥 [FIREBASE] Unsupported role for notification: {}", role);
             }
             
         } catch (Exception e) {
-            log.error("Failed to send role-based notification: {}", e.getMessage(), e);
+            log.error("❌ [FIREBASE] Error in sendRoleBasedNotification", e);
+        }
+    }
+
+    @Transactional
+    public void sendDepartmentNotification(String department, String title, String message, String type, Long refId) {
+        try {
+            log.info("🔥 [DEPARTMENT NOTIFICATION] sendDepartmentNotification called:");
+            log.info("🔥 [DEPARTMENT NOTIFICATION] - Department: {}", department);
+            log.info("🔥 [DEPARTMENT NOTIFICATION] - Title: {}", title);
+            log.info("🔥 [DEPARTMENT NOTIFICATION] - Message: {}", message);
+            log.info("🔥 [DEPARTMENT NOTIFICATION] - Type: {}", type);
+            log.info("🔥 [DEPARTMENT NOTIFICATION] - RefId: {}", refId);
+            log.info("🔥 [DEPARTMENT NOTIFICATION] - Firebase Enabled: {}", firebaseEnabled);
+
+            // 🔥 NEW: Find all employees in this department for Firebase notifications
+            List<Employee> departmentEmployees = employeeRepository.findByDepartment_Name(department);
+            log.info("🔥 [DEPARTMENT NOTIFICATION] Found {} employees in {} department", departmentEmployees.size(), department);
+            
+            // Create a single department-level notification (no employee lookup needed)
+            AppNotification notification = AppNotification.builder()
+                    .recipientEmployeeId(null) // No specific employee
+                    .recipientDepartment(department) // Set department for filtering
+                    .title(title)
+                    .body(message)
+                    .type(type)
+                    .refType(type) // Use the type parameter dynamically
+                    .refId(refId)
+                    .channel("WEB")
+                    .createdAt(LocalDateTime.now())
+                    .build();
+            
+            notificationRepository.save(notification);
+            log.info("🔥 [DEPARTMENT NOTIFICATION] Saved department notification to database");
+            
+            // 🔥 NEW: Send Firebase notifications to all department employees
+            for (Employee emp : departmentEmployees) {
+                log.info("🔥 [DEPARTMENT NOTIFICATION] Sending Firebase to employee: {} (ID: {})", emp.getFullName(), emp.getId());
+                notifyEmployeeWeb(emp.getId(), title, message, type, type, refId, null);
+                notifyEmployeeMobile(emp.getId(), title, message, type, type, refId, null);
+            }
+            
+            // 🔥 NEW: Send ONLY to department-specific topic (NO DUPLICATES)
+            messagingTemplate.convertAndSend("/topic/notifications/department/" + department, Map.of(
+                "title", title,
+                "body", message,
+                "type", type,
+                "refId", refId,
+                "department", department,
+                "timestamp", LocalDateTime.now().toString()
+            ));
+            
+            log.info("✅ [DEPARTMENT NOTIFICATION] Department notification sent: {} - {} department ({} employees notified via Firebase)", 
+                title, department, departmentEmployees.size());
+            
+        } catch (Exception e) {
+            log.error("❌ [DEPARTMENT NOTIFICATION] Error in sendDepartmentNotification", e);
         }
     }
 }

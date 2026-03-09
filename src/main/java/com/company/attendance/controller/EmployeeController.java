@@ -91,6 +91,11 @@ public ResponseEntity<List<EmployeeDto>> listEmployees() {
                 return ResponseEntity.badRequest().body(Map.of("error", "Department is required for TL role"));
             }
             
+            // 🔥 TL VALIDATION: EMPLOYEE must have TL assigned
+            if ("EMPLOYEE".equals(dto.getRoleName()) && dto.getTlId() == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Team Lead (TL) is required for EMPLOYEE role"));
+            }
+            
             // 🔥 DEPARTMENT ENFORCEMENT: Non-TL roles get derived department (prevent client tampering)
             if (!"TL".equals(dto.getRoleName()) && dto.getDepartmentId() != null) {
                 // For non-TL roles, ignore client-side department and let service derive it

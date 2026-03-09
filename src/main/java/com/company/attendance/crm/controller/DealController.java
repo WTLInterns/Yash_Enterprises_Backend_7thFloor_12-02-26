@@ -10,16 +10,20 @@ import com.company.attendance.crm.repository.DealStageHistoryRepository;
 import com.company.attendance.crm.repository.NoteRepository;
 import com.company.attendance.crm.service.DealService;
 import com.company.attendance.crm.service.AuditService;
+import com.company.attendance.crm.service.StageService;
+import com.company.attendance.crm.service.ProductLineService;
+import com.company.attendance.notification.NotificationService;
 import com.company.attendance.entity.Employee;
 import com.company.attendance.repository.EmployeeRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
 import java.net.URI;
 import java.time.OffsetDateTime;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
@@ -38,6 +42,9 @@ public class DealController {
   private final EmployeeRepository employeeRepository;
   private final AuditService auditService;
   private final CrmMapper mapper;
+  private final StageService stageService;
+  private final NotificationService notificationService;
+  private final ProductLineService productLineService;
 
   public DealController(
     DealService dealService,
@@ -47,7 +54,10 @@ public class DealController {
     ActivityRepository activityRepository,
     EmployeeRepository employeeRepository,
     AuditService auditService,
-    CrmMapper mapper
+    CrmMapper mapper,
+    StageService stageService,
+    NotificationService notificationService,
+    ProductLineService productLineService
   ) {
     this.dealService = dealService;
     this.dealRepository = dealRepository;
@@ -57,6 +67,9 @@ public class DealController {
     this.employeeRepository = employeeRepository;
     this.auditService = auditService;
     this.mapper = mapper;
+    this.stageService = stageService;
+    this.notificationService = notificationService;
+    this.productLineService = productLineService;
   }
 
   private String employeeName(Long employeeId) {
@@ -81,7 +94,21 @@ public class DealController {
   @GetMapping
   public Page<DealDto> list(Pageable pageable) {
     Page<Deal> page = dealService.list(pageable);
-    List<DealDto> content = page.getContent().stream().map(mapper::toDealDto).collect(Collectors.toList());
+    List<DealDto> content = page.getContent().stream().map(deal -> {
+      DealDto dto = mapper.toDealDto(deal);
+      // 🔥 NEW: Calculate and set calculatedValue from products
+      try {
+        BigDecimal calculatedTotal = productLineService.grandTotal(deal.getId());
+        if (calculatedTotal != null && calculatedTotal.compareTo(BigDecimal.ZERO) > 0) {
+          dto.setCalculatedValue(calculatedTotal);
+        } else {
+          dto.setCalculatedValue(deal.getValueAmount());
+        }
+      } catch (Exception e) {
+        dto.setCalculatedValue(deal.getValueAmount());
+      }
+      return dto;
+    }).collect(Collectors.toList());
     return new PageImpl<>(content, pageable, page.getTotalElements());
   }
 
@@ -139,11 +166,9 @@ public class DealController {
     deal.setDescription(dealDto.getDescription());
     deal.setRequiredAmount(dealDto.getRequiredAmount());
     deal.setOutstandingAmount(dealDto.getOutstandingAmount());
-    // 🔥 FIXED: Only update stage if explicitly provided (prevent wiping stage)
     if (dealDto.getStage() != null && !dealDto.getStage().trim().isEmpty()) {
       deal.setStageCode(dealDto.getStage());
     }
-    // 🔥 FIXED: Only update department if explicitly provided (prevent wiping department)
     if (dealDto.getDepartment() != null && !dealDto.getDepartment().trim().isEmpty()) {
       deal.setDepartment(dealDto.getDepartment());
     }
@@ -192,15 +217,38 @@ public class DealController {
       return ResponseEntity.badRequest().build();
     }
 
+    String prevDepartment = deal.getDepartment();
     String prevStageCode = deal.getStageCode();
+
+    // Set the new stage
     deal.setStageCode(stageRaw);
-    if (body.get("department") != null) {
-      deal.setDepartment(body.get("department"));
+
+    // AUTO MOVE TO ACCOUNT if final stage reached OR if stage is "ACCOUNT"
+    if ("ACCOUNT".equalsIgnoreCase(stageRaw) || stageService.shouldTransitionToAccount(prevDepartment, stageRaw)) {
+      // 🔥 FIXED: Prevent duplicate notifications if already in ACCOUNT
+      if ("ACCOUNT".equalsIgnoreCase(prevDepartment)) {
+        System.out.println("Deal is already in ACCOUNT department, skipping transfer notifications");
+        deal.setStageCode(stageRaw);
+      } else {
+        deal.setDepartment("ACCOUNT");
+        deal.setStageCode(stageService.getFirstAccountStage());
+        System.out.println("AUTO TRANSITION: Deal " + dealId + 
+          " moved from " + prevDepartment + "/" + prevStageCode + 
+          " to ACCOUNT/" + deal.getStageCode());
+      }
+    } else if (body.get("department") != null) {
+      // Manual department change (only if not auto-transitioned)
+      // 🔥 FIXED: Prevent duplicate notifications if already in target department
+      if (body.get("department").equalsIgnoreCase(prevDepartment)) {
+        System.out.println("Deal is already in target department " + body.get("department") + ", skipping transfer notifications");
+      } else {
+        deal.setDepartment(body.get("department"));
+      }
     }
 
     Deal saved = dealRepository.save(deal);
 
-    // ✅ FIX: Try body userId first, then header, then audit service
+    // FIX: Try body userId first, then header, then audit service
     Long userId = null;
     if (body.get("userId") != null) {
       try {
@@ -220,6 +268,92 @@ public class DealController {
     h.setChangedBy(userId != null ? String.valueOf(userId) : null);
     h.setChangedAt(OffsetDateTime.now());
     dealStageHistoryRepository.save(h);
+
+    // SEND NOTIFICATIONS when deal is transferred to ACCOUNT
+    if ("ACCOUNT".equalsIgnoreCase(saved.getDepartment()) && !"ACCOUNT".equalsIgnoreCase(prevDepartment)) {
+      try {
+        System.out.println("===== SENDING NOTIFICATIONS FOR DEAL TRANSFER =====");
+        System.out.println("Deal ID: " + saved.getId());
+        System.out.println("Client ID: " + saved.getClientId());
+        System.out.println("Previous Department: " + prevDepartment);
+        System.out.println("New Department: ACCOUNT");
+        
+        // 🔥 FIXED: Calculate deal value from products with proper fallback
+        BigDecimal dealValue = saved.getValueAmount();
+        try {
+            // Try to get calculated grand total from products
+            BigDecimal calculatedTotal = productLineService.grandTotal(saved.getId());
+            if (calculatedTotal != null && calculatedTotal.compareTo(BigDecimal.ZERO) > 0) {
+                dealValue = calculatedTotal;
+                System.out.println("Deal Value (calculated from products): " + dealValue);
+            } else {
+                System.out.println("Deal Value (using fallback - no product totals): " + dealValue);
+            }
+        } catch (Exception e) {
+            System.out.println("Deal Value (fallback to valueAmount due to error): " + dealValue);
+            System.out.println("Could not calculate from products: " + e.getMessage());
+        }
+        
+        System.out.println("Customer Name: " + saved.getName());
+        
+        String title = "Deal Sent to Accounts";
+        String message = "Deal for customer '" + saved.getName() +
+                      "' (Rs." + (dealValue != null ? dealValue : "0") +
+                      ") moved from " + prevDepartment +
+                      " to ACCOUNT by " + employeeName(userId);
+
+        Map<String, String> data = Map.of(
+            "dealId", String.valueOf(saved.getId()),
+            "clientId", String.valueOf(saved.getClientId()),
+            "fromDepartment", prevDepartment,
+            "toDepartment", "ACCOUNT",
+            "dealValue", String.valueOf(dealValue),
+            "customerName", saved.getName()
+        );
+
+        // Notify ADMIN (role-based)
+        System.out.println("Sending ADMIN notification...");
+        notificationService.sendRoleBasedNotification(
+            "ADMIN",
+            title,
+            message,
+            "DEAL_TRANSFER",
+            saved.getId()
+        );
+        System.out.println("✅ ADMIN notification sent");
+
+        // Notify MANAGER (role-based)
+        System.out.println("Sending MANAGER notification...");
+        notificationService.sendRoleBasedNotification(
+            "MANAGER",
+            title,
+            message,
+            "DEAL_TRANSFER",
+            saved.getId()
+        );
+        System.out.println("✅ MANAGER notification sent");
+
+        // Notify ACCOUNT department (department-based)
+        System.out.println("Sending ACCOUNT department notification...");
+        notificationService.sendDepartmentNotification(
+            "ACCOUNT",
+            title,
+            message,
+            "DEAL_TRANSFER",
+            saved.getId()
+        );
+        System.out.println("✅ ACCOUNT department notification sent");
+
+        System.out.println("===== ALL NOTIFICATIONS SENT SUCCESSFULLY =====");
+        System.out.println("NOTIFICATIONS SENT: Deal " + saved.getId() + 
+          " transfer to ACCOUNT notified to ADMIN, MANAGER, ACCOUNT department");
+      } catch (Exception e) {
+        System.err.println("===== NOTIFICATION SENDING FAILED =====");
+        System.err.println("FAILED TO SEND NOTIFICATIONS: " + e.getMessage());
+        e.printStackTrace();
+        // Continue even if notifications fail
+      }
+    }
 
     return ResponseEntity.ok(mapper.toDealDto(saved));
   }

@@ -40,6 +40,12 @@ public interface EmployeeMapper {
     @Mapping(target = "departmentName", expression = "java(entity.getDepartment() != null ? entity.getDepartment().getName() : entity.getDepartmentName())")
     @Mapping(target = "shiftId", source = "shift.id")
     @Mapping(target = "shiftName", source = "shift.name")
+    // ✅ NEW: Map TL info for EMPLOYEE role
+    @Mapping(target = "tlId", source = "tl.id")
+    @Mapping(target = "tlFirstName", source = "tl.firstName")
+    @Mapping(target = "tlLastName", source = "tl.lastName")
+    @Mapping(target = "tlFullName", expression = "java(entity.getTl() != null ? entity.getTl().getFullName() : null)")
+    @Mapping(target = "tlDepartmentName", expression = "java(entity.getTl() != null ? (entity.getTl().getDepartmentName() != null ? entity.getTl().getDepartmentName() : (entity.getTl().getDepartment() != null ? entity.getTl().getDepartment().getName() : null)) : null)")
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "createdBy", ignore = true)

@@ -18,8 +18,14 @@ public class AppNotification {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     private Long recipientEmployeeId;
+
+    @Column(length = 64)
+    private String recipientRole;
+
+    @Column(length = 64)
+    private String recipientDepartment;
 
     @Column(nullable = false, length = 32)
     private String channel; // MOBILE / WEB

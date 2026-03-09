@@ -275,14 +275,39 @@ public class CustomerAddressEditController {
             
             editRequest = editRequestRepository.save(editRequest);
             
-            // ADD THIS: Notify admins about new address edit request
+            // 🔥 Notify ADMIN, MANAGER, and specific department about new address edit request
+            String notificationTitle = "New Address Edit Request";
+            String notificationMessage = String.format("Employee #%d submitted address change request for ID: %d (Department: %s)", 
+                employeeId, addressId, derivedUserDepartment);
+            
+            // Notify all ADMIN users
             notificationService.sendRoleBasedNotification(
                 "ADMIN", 
-                "New Address Edit Request", 
-                "Employee #" + employeeId + " submitted address change request for ID: " + addressId, 
+                notificationTitle, 
+                notificationMessage, 
                 "ADDRESS_EDIT_REQUEST", 
                 editRequest.getId()
             );
+            
+            // Notify all MANAGER users
+            notificationService.sendRoleBasedNotification(
+                "MANAGER", 
+                notificationTitle, 
+                notificationMessage, 
+                "ADDRESS_EDIT_REQUEST", 
+                editRequest.getId()
+            );
+            
+            // Notify specific department (PPE, PPO, etc.)
+            if (derivedUserDepartment != null && !derivedUserDepartment.trim().isEmpty()) {
+                notificationService.sendDepartmentNotification(
+                    derivedUserDepartment,
+                    notificationTitle,
+                    notificationMessage,
+                    "ADDRESS_EDIT_REQUEST",
+                    editRequest.getId()
+                );
+            }
             
             log.info("Address edit request created: {} by employee {} for address {}", 
                 editRequest.getId(), employeeId, addressId);

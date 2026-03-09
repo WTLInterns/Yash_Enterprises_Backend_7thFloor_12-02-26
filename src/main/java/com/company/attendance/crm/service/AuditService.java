@@ -122,4 +122,8 @@ public class AuditService {
             // Ignore if fields don't exist
         }
     }
+    
+    public Employee getCurrentUser(Integer userId) {
+        return employeeRepository.findById(userId.longValue()).orElse(null);
+    }
 }

@@ -11,6 +11,8 @@
         <java.version>17</java.version>
         <spring-boot.version>3.2.4</spring-boot.version>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -150,6 +152,7 @@
                     <source>17</source>
                     <target>17</target>
                     <parameters>true</parameters>
+                    <encoding>UTF-8</encoding>
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.projectlombok</groupId>

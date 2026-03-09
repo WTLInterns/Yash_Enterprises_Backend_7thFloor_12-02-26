@@ -38,6 +38,13 @@ public class EmployeeDto {
     private Long reportingManagerId;
     private String reportingManagerName;
 
+    // ✅ NEW: TL info for EMPLOYEE role
+    private Long tlId;
+    private String tlFirstName;
+    private String tlLastName;
+    private String tlFullName;
+    private String tlDepartmentName;
+
     private Long organizationId;
     private String organizationName;
 

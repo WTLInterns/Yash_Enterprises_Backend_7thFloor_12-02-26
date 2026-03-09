@@ -26,6 +26,12 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     // ADD THIS: Find employees by specific role name (more efficient)
     List<Employee> findByRole_Name(String roleName);
 
+    // 🔥 NEW: Find employees by department object
+    List<Employee> findByDepartment_Name(String departmentName);
+    
+    // 🔥 NEW: Find employees by department name string
+    List<Employee> findByDepartmentName(String departmentName);
+
     // Methods used by EmployeeService
     Optional<Employee> findByUserId(String userId);
     Optional<Employee> findByEmployeeId(String employeeId);

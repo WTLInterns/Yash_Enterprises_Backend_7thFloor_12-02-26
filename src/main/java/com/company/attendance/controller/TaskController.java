@@ -132,9 +132,10 @@ public class TaskController {
                     break;
                     
                 case "TL":
-                    // TL sees tasks from their department only
+                    // 🔥 NEW: TL sees tasks created FOR their department (cross-department tasks)
+                    // TL can create tasks for any department, but only sees tasks assigned TO their department
                     if (derivedUserDepartment != null) {
-                        tasks = taskService.findByDepartment(derivedUserDepartment);
+                        tasks = taskService.findByTargetDepartment(derivedUserDepartment);
                     } else {
                         tasks = List.of();
                     }

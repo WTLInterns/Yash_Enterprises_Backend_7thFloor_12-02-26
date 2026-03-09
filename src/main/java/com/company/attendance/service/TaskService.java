@@ -120,6 +120,14 @@ public class TaskService {
     }
     
     /**
+     * 🔥 NEW: Find all tasks created FOR a target department (cross-department tasks)
+     * This allows departments to see tasks assigned TO them from other departments
+     */
+    public List<Task> findByTargetDepartment(String targetDepartment) {
+        return taskRepository.findByDepartmentOrderByIdDesc(targetDepartment);
+    }
+    
+    /**
      * 🔥 DEPARTMENT-AWARE: Find all tasks created by a TL in their department
      */
     public List<Task> findByCreatedByTlIdAndDepartment(Long tlId, String department) {

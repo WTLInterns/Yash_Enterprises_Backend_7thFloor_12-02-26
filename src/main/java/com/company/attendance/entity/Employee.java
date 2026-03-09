@@ -74,6 +74,12 @@ public class Employee {
     @JoinColumn(name = "reporting_manager_id")
     private Employee reportingManager;
 
+    // ✅ TEAM LEAD: New field for TL assignment (separate from Reporting Manager)
+    // Used when role = EMPLOYEE to assign department ownership
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tl_id")
+    private Employee tl;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "organization_id")
     private Organization organization;

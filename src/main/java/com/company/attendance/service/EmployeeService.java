@@ -92,6 +92,13 @@ public class EmployeeService {
             employee.setReportingManager(reportingManager);
         }
         
+        // ✅ NEW: Handle TL assignment for EMPLOYEE role
+        if (dto.getTlId() != null) {
+            Employee tl = employeeRepository.findById(dto.getTlId()).orElse(null);
+            System.out.println("Setting TL: " + tl);
+            employee.setTl(tl);
+        }
+        
         if (dto.getOrganizationId() != null) {
             Organization organization = organizationRepository.findById(dto.getOrganizationId()).orElse(null);
             System.out.println("Setting organization: " + organization);
@@ -112,6 +119,13 @@ public class EmployeeService {
                 employee.setDepartment(department);
             }
             employee.setDepartmentName(null);
+            
+            // ✅ ENSURE TL IS SET FOR EMPLOYEE ROLE
+            if (employee.getRole() != null && "EMPLOYEE".equalsIgnoreCase(employee.getRole().getName()) && dto.getTlId() != null) {
+                Employee tl = employeeRepository.findById(dto.getTlId()).orElse(null);
+                System.out.println("Setting TL for EMPLOYEE: " + tl);
+                employee.setTl(tl);
+            }
         }
         
         if (dto.getShiftId() != null) {
@@ -282,6 +296,15 @@ public class EmployeeService {
             }
         }
         
+        // ✅ NEW: Handle TL assignment for EMPLOYEE role during update
+        if (dto.getTlId() != null) {
+            Employee tl = employeeRepository.findById(dto.getTlId()).orElse(null);
+            if (tl != null && !tl.equals(existing.getTl())) {
+                System.out.println("Updating TL from '" + existing.getTl() + "' to '" + tl + "'");
+                existing.setTl(tl);
+            }
+        }
+        
         if (dto.getOrganizationId() != null) {
             Organization organization = organizationRepository.findById(dto.getOrganizationId()).orElse(null);
             if (organization != null && !organization.equals(existing.getOrganization())) {
@@ -307,6 +330,15 @@ public class EmployeeService {
                     System.out.println("Updating department from '" + existing.getDepartment() + "' to '" + department + "'");
                     existing.setDepartment(department);
                     existing.setDepartmentName(null); // Clear departmentName for non-TL
+                }
+            }
+            
+            // ✅ ENSURE TL IS UPDATED FOR EMPLOYEE ROLE
+            if (existing.getRole() != null && "EMPLOYEE".equalsIgnoreCase(existing.getRole().getName()) && dto.getTlId() != null) {
+                Employee tl = employeeRepository.findById(dto.getTlId()).orElse(null);
+                if (tl != null && !tl.equals(existing.getTl())) {
+                    System.out.println("Updating TL for EMPLOYEE from '" + existing.getTl() + "' to '" + tl + "'");
+                    existing.setTl(tl);
                 }
             }
         }
