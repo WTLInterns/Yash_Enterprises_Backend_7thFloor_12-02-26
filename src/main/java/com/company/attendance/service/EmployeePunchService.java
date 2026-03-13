@@ -22,6 +22,8 @@ public class EmployeePunchService {
     private final EmployeePunchRepository punchRepository;
     private final EmployeeRepository employeeRepository;
     private final GeofenceZoneRepository geofenceRepository;
+    private final GeocodingService geocodingService;
+    private final AttendanceService attendanceService;
 
     public EmployeePunch savePunch(EmployeePunchDto dto) {
         Employee employee = employeeRepository.findById(dto.getEmployeeId())
@@ -50,7 +52,7 @@ public class EmployeePunchService {
                 .longitude(dto.getLongitude())
                 .altitude(dto.getAltitude())
                 .accuracy(dto.getAccuracy())
-                .locationAddress(dto.getLocationAddress())
+                .locationAddress(resolveAddress(dto.getLocationAddress(), dto.getLatitude(), dto.getLongitude()))
                 .isWithinGeofence(isWithinGeofence)
                 .geofenceId(geofenceId)
                 .deviceInfo(dto.getDeviceInfo())
@@ -61,7 +63,26 @@ public class EmployeePunchService {
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        return punchRepository.save(punch);
+        EmployeePunch saved = punchRepository.save(punch);
+
+        // Derived attendance update (summary table)
+        try {
+            attendanceService.upsertFromLegacyPunchEvent(saved);
+        } catch (Exception ignored) {
+            // Do not fail punch if attendance derivation fails
+        }
+
+        return saved;
+    }
+
+    private String resolveAddress(String provided, Double latitude, Double longitude) {
+        if (provided != null && !provided.isBlank()) {
+            return provided;
+        }
+        if (latitude == null || longitude == null) {
+            return null;
+        }
+        return geocodingService.reverseGeocode(latitude, longitude);
     }
 
     public List<EmployeePunch> findByEmployeeId(Long employeeId) {

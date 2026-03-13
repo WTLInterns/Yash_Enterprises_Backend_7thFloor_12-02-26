@@ -33,6 +33,13 @@ public class Attendance {
     private BigDecimal outLocationLat;
     private BigDecimal outLocationLng;
 
+    // Derived fields
+    @Column(precision = 10, scale = 2)
+    private BigDecimal totalHours;
+
+    @Column(precision = 10, scale = 3)
+    private BigDecimal totalKm;
+
     @Enumerated(EnumType.STRING)
     private Status status;
 
@@ -42,7 +49,14 @@ public class Attendance {
     private Boolean isLunchOut;
 
     public enum Status {
-        PUNCHED_IN, PUNCHED_OUT, ABSENT, ON_LEAVE
+        // Punch lifecycle (legacy / internal)
+        PUNCHED_IN, PUNCHED_OUT,
+
+        // Attendance status (business)
+        PRESENT, HALF_DAY, ABSENT, ON_LEAVE,
+
+        // Dashboard / HR statuses
+        PENDING, HOLIDAY, WEEKLY_OFF
     }
 
     // Explicit getter used by AttendanceService (defensive if Lombok is not processed)

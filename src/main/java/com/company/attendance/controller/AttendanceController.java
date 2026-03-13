@@ -13,7 +13,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
+/*
  * Attendance REST endpoints
  */
 @RestController
@@ -36,7 +36,12 @@ public class AttendanceController {
                                                    @RequestParam LocalDate from,
                                                    @RequestParam LocalDate to) {
         List<Attendance> list = attendanceService.findAttendanceOfEmployee(employeeId, from, to);
-        List<AttendanceDto> dtos = list.stream().map(attendanceMapper::toDto).collect(Collectors.toList());
+        List<AttendanceDto> dtos = attendanceService.toDtosEnriched(list);
         return ResponseEntity.ok(dtos);
+    }
+
+    @GetMapping("/today/{employeeId}")
+    public ResponseEntity<AttendanceDto> today(@PathVariable("employeeId") Long employeeId) {
+        return ResponseEntity.ok(attendanceService.getTodaySummary(employeeId));
     }
 }

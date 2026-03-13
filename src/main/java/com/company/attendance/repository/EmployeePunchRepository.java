@@ -49,6 +49,9 @@ public interface EmployeePunchRepository extends JpaRepository<EmployeePunch, Lo
     @Query("SELECT ep FROM EmployeePunch ep WHERE ep.employee.id = :employeeId AND DATE(ep.punchTime) = :date ORDER BY ep.punchTime ASC")
     List<EmployeePunch> findByEmployeeIdAndDate(@Param("employeeId") Long employeeId, @Param("date") LocalDate date);
 
+    @Query("SELECT COUNT(ep) FROM EmployeePunch ep WHERE ep.employee.id = :employeeId AND DATE(ep.punchTime) = :date")
+    long countByEmployeeIdAndDate(@Param("employeeId") Long employeeId, @Param("date") LocalDate date);
+
     @Query("SELECT ep FROM EmployeePunch ep WHERE ep.punchTime >= :start ORDER BY ep.punchTime DESC")
     List<EmployeePunch> findRecentPunches(@Param("start") LocalDateTime start);
 

@@ -12,10 +12,14 @@ public class AttendanceDto {
     private LocalDate date;
     private OffsetDateTime punchInTime;
     private OffsetDateTime punchOutTime;
+    private String punchInAddress;
+    private String punchOutAddress;
     private BigDecimal inLocationLat;
     private BigDecimal inLocationLng;
     private BigDecimal outLocationLat;
     private BigDecimal outLocationLng;
+    private BigDecimal totalHours;
+    private BigDecimal totalKm;
     private String status;
     private String note;
     private String deviceInfo;
