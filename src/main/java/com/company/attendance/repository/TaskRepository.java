@@ -21,6 +21,11 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
      * Find all tasks assigned to an employee ordered by ID desc
      */
     List<Task> findByAssignedToEmployeeIdOrderByIdDesc(Long employeeId);
+
+    List<Task> findByClientIdAndAssignedToEmployeeIdOrderByIdDesc(
+        Long clientId,
+        Long assignedToEmployeeId
+    );
     
     /**
      * 🔥 DEPARTMENT-AWARE: Find all tasks in a department

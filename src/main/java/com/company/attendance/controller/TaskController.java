@@ -224,6 +224,16 @@ public class TaskController {
         return ResponseEntity.ok(dtos);
     }
 
+    @GetMapping("/client/{clientId}/employee/{employeeId}")
+    public ResponseEntity<List<TaskDto>> getTasksForEmployeeAndClient(
+            @PathVariable Long clientId,
+            @PathVariable Long employeeId
+    ) {
+        List<Task> tasks = taskService.getTasksForEmployeeAndClient(clientId, employeeId);
+        List<TaskDto> dtos = tasks.stream().map(this::toEnrichedDto).toList();
+        return ResponseEntity.ok(dtos);
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<TaskDto> getTask(@PathVariable Long id) {
         Task task = taskService.getById(id);

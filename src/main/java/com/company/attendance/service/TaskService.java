@@ -138,6 +138,13 @@ public class TaskService {
         return taskRepository.findByAssignedToEmployeeIdOrderByIdDesc(employeeId);
     }
 
+    public List<Task> getTasksForEmployeeAndClient(Long clientId, Long employeeId) {
+        return taskRepository.findByClientIdAndAssignedToEmployeeIdOrderByIdDesc(
+                clientId,
+                employeeId
+        );
+    }
+
     public Task getById(Long id) {
         return taskRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Task not found"));
