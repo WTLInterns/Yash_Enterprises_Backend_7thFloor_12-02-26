@@ -1,23 +1,87 @@
 package com.company.attendance.service;
 import com.company.attendance.entity.Expense;
+import com.company.attendance.entity.Employee;
 import com.company.attendance.repository.ExpenseRepository;
+import com.company.attendance.repository.EmployeeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 public class ExpenseService {
     private final ExpenseRepository expenseRepository;
+    private final EmployeeRepository employeeRepository;
 
     public Expense save(Expense expense) {
-        return expenseRepository.save(expense);
+        // Debug logging
+        System.out.println("🔥 [EXPENSE SERVICE] Saving expense: " + expense);
+        System.out.println("🔥 [EXPENSE SERVICE] Employee ID: " + expense.getEmployeeId());
+        System.out.println("🔥 [EXPENSE SERVICE] Employee Name: " + expense.getEmployeeName());
+        System.out.println("🔥 [EXPENSE SERVICE] Department: " + expense.getDepartmentName());
+        
+        // Auto-fill missing fields
+        if (expense.getExpenseDate() == null) {
+            expense.setExpenseDate(LocalDate.now());
+            System.out.println("🔥 [EXPENSE SERVICE] Auto-filled date: " + expense.getExpenseDate());
+        }
+        if (expense.getExpenseTime() == null) {
+            expense.setExpenseTime(LocalTime.now());
+            System.out.println("🔥 [EXPENSE SERVICE] Auto-filled time: " + expense.getExpenseTime());
+        }
+        if (expense.getStatus() == null) {
+            expense.setStatus("PENDING");
+            System.out.println("🔥 [EXPENSE SERVICE] Auto-filled status: " + expense.getStatus());
+        }
+        
+        // Auto-fill employee name and department if employeeId is provided
+        if (expense.getEmployeeId() != null && 
+            (expense.getEmployeeName() == null || expense.getEmployeeName().isEmpty() ||
+             expense.getDepartmentName() == null || expense.getDepartmentName().isEmpty())) {
+            
+            System.out.println("🔥 [EXPENSE SERVICE] Looking up employee for ID: " + expense.getEmployeeId());
+            Optional<Employee> employee = employeeRepository.findById(expense.getEmployeeId());
+            if (employee.isPresent()) {
+                Employee emp = employee.get();
+                String fullName = emp.getFirstName() + " " + emp.getLastName();
+                String deptName = emp.getDepartment() != null ? emp.getDepartment().getName() : null;
+                System.out.println("🔥 [EXPENSE SERVICE] Found employee: " + fullName + ", Dept: " + deptName);
+                
+                if (expense.getEmployeeName() == null || expense.getEmployeeName().isEmpty()) {
+                    expense.setEmployeeName(fullName);
+                    System.out.println("🔥 [EXPENSE SERVICE] Auto-filled employee name: " + expense.getEmployeeName());
+                }
+                if (expense.getDepartmentName() == null || expense.getDepartmentName().isEmpty()) {
+                    expense.setDepartmentName(deptName);
+                    System.out.println("🔥 [EXPENSE SERVICE] Auto-filled department: " + expense.getDepartmentName());
+                }
+            } else {
+                System.out.println("🔥 [EXPENSE SERVICE] Employee not found for ID: " + expense.getEmployeeId());
+            }
+        }
+        
+        Expense saved = expenseRepository.save(expense);
+        System.out.println("🔥 [EXPENSE SERVICE] Saved expense with ID: " + saved.getId());
+        return saved;
     }
 
     public List<Expense> findAll() {
-        return expenseRepository.findAll();
+        List<Expense> expenses = expenseRepository.findAllWithEmployee();
+        // Populate employee details for each expense
+        for (Expense expense : expenses) {
+            if (expense.getEmployee() != null) {
+                String fullName = expense.getEmployee().getFirstName() + " " + expense.getEmployee().getLastName();
+                expense.setEmployeeName(fullName);
+                
+                if (expense.getEmployee().getDepartment() != null) {
+                    expense.setDepartmentName(expense.getEmployee().getDepartment().getName());
+                }
+            }
+        }
+        return expenses;
     }
 
     public List<Expense> findFiltered(Long employeeId, String status, LocalDate startDate, LocalDate endDate) {

@@ -9,11 +9,11 @@ public class StaticResourceConfig implements WebMvcConfigurer {
     
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // Serve uploaded files
+        // Serve uploaded files from C:/uploads/
         registry.addResourceHandler("/uploads/**")
-                .addResourceLocations("file:uploads/");
+                .addResourceLocations("file:C:/uploads/");
         
-        // Expose uploads directory for external access
+        // Legacy support for old uploads folder
         registry.addResourceHandler("/api/uploads/**")
                 .addResourceLocations("file:uploads/");
     }

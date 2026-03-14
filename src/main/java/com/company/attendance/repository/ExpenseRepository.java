@@ -7,7 +7,8 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDate;
 import java.util.List;
 public interface ExpenseRepository extends JpaRepository<Expense, Long> {
-    @Query("SELECT e FROM Expense e WHERE (:employeeId IS NULL OR e.employeeId = :employeeId) " +
+    
+    @Query("SELECT e FROM Expense e LEFT JOIN FETCH e.employee WHERE (:employeeId IS NULL OR e.employeeId = :employeeId) " +
             "AND (:status IS NULL OR e.status = :status) " +
             "AND (:startDate IS NULL OR e.expenseDate >= :startDate) " +
             "AND (:endDate IS NULL OR e.expenseDate <= :endDate)")
@@ -17,6 +18,9 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );
+    
+    @Query("SELECT e FROM Expense e LEFT JOIN FETCH e.employee")
+    List<Expense> findAllWithEmployee();
 }
 
 
