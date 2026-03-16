@@ -8,7 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.Map;
 
 @RestController
@@ -20,91 +19,45 @@ public class TaskLocationController {
 
     private final LocationBasedAttendanceService locationBasedAttendanceService;
 
-    /**
-     * Task Update Validation - HARD BLOCK when >200m
-     * PUT /api/tasks/{taskId}/status
-     */
-    @PutMapping("/{taskId}/status")
-    public ResponseEntity<?> updateTaskStatus(
+    @PostMapping("/{taskId}/location/validate")
+    public ResponseEntity<?> validateTaskLocation(
             @PathVariable Long taskId,
             @RequestBody Map<String, Object> request,
             @RequestHeader(value = "X-Employee-Latitude", required = false) Double latitude,
             @RequestHeader(value = "X-Employee-Longitude", required = false) Double longitude) {
-        
+
         try {
-            // Step 1: Validate location headers
             if (latitude == null || longitude == null) {
                 return ResponseEntity.badRequest().body(Map.of(
-                    "error", "MISSING_LOCATION",
-                    "message", "Location headers (X-Employee-Latitude, X-Employee-Longitude) are required",
-                    "timestamp", LocalDateTime.now().toString()
+                        "error", "MISSING_LOCATION",
+                        "message", "Location headers (X-Employee-Latitude, X-Employee-Longitude) are required"
                 ));
             }
-            
-            // Step 2: Get task details for validation
-            String status = (String) request.get("status");
-            Integer employeeId = (Integer) request.get("employeeId");
-            
-            if (status == null || employeeId == null) {
-                return ResponseEntity.badRequest().body(Map.of(
-                    "error", "VALIDATION_ERROR",
-                    "message", "Status and employeeId are required",
-                    "timestamp", LocalDateTime.now().toString()
-                ));
-            }
-            
-            // Step 3: HARD LOCATION VALIDATION
-            if (!locationBasedAttendanceService.validateTaskLocation(taskId, latitude, longitude)) {
-                // Calculate actual distance for error response
-                double distance;
-                try {
-                    distance = calculateDistanceToCustomer(taskId, latitude, longitude);
-                } catch (Exception distanceError) {
-                    log.error("Distance calculation failed for task {}: {}", taskId, distanceError.getMessage());
-                    return ResponseEntity.status(403).body(Map.of(
-                        "error", "LOCATION_VALIDATION_FAILED",
-                        "message", "Unable to validate location for task update",
-                        "details", Map.of(
-                            "taskId", taskId,
-                            "reason", "Distance calculation failed"
-                        ),
-                        "timestamp", LocalDateTime.now().toString()
-                    ));
-                }
-                
+
+            boolean valid = locationBasedAttendanceService.validateTaskLocation(taskId, latitude, longitude);
+            if (!valid) {
+                double distance = calculateDistanceToCustomer(taskId, latitude, longitude);
                 return ResponseEntity.status(403).body(Map.of(
-                    "error", "LOCATION_RESTRICTION",
-                    "message", "Task update blocked - You are outside the 200m customer area",
-                    "details", Map.of(
-                        "taskId", taskId,
-                        "currentDistance", Math.round(distance),
-                        "maxAllowedDistance", 200.0,
-                        "employeeLocation", Map.of(
-                            "latitude", latitude,
-                            "longitude", longitude
+                        "error", "LOCATION_RESTRICTION",
+                        "message", "You are outside the 200m customer area",
+                        "details", Map.of(
+                                "taskId", taskId,
+                                "currentDistance", Math.round(distance),
+                                "maxAllowedDistance", 200.0
                         )
-                    ),
-                    "timestamp", LocalDateTime.now().toString()
                 ));
             }
-            
-            // Step 4: Process task status update (if location valid)
-            log.info("Task {} status updated to {} at location ({}, {})", taskId, status, latitude, longitude);
-            
+
             return ResponseEntity.ok(Map.of(
-                "success", true,
-                "message", "Task status updated successfully",
-                "taskId", taskId,
-                "status", status,
-                "timestamp", LocalDateTime.now().toString()
+                    "success", true,
+                    "message", "Location valid",
+                    "taskId", taskId
             ));
-            
         } catch (Exception e) {
-            log.error("Error updating task status: {}", e.getMessage(), e);
+            log.error("Error validating task location: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().body(Map.of(
-                "error", "INTERNAL_ERROR",
-                "message", "Failed to update task status",
-                "timestamp", LocalDateTime.now().toString()
+                    "error", "INTERNAL_ERROR",
+                    "message", "Failed to validate task location"
             ));
         }
     }

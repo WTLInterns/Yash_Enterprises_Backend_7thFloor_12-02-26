@@ -7,6 +7,7 @@ import com.company.attendance.entity.TaskCustomField;
 import com.company.attendance.entity.TaskCustomFieldValue;
 import com.company.attendance.mapper.TaskMapper;
 import com.company.attendance.service.TaskService;
+import com.company.attendance.service.LocationBasedAttendanceService;
 import com.company.attendance.repository.EmployeeRepository;
 import com.company.attendance.repository.ClientRepository;
 import com.company.attendance.repository.TaskCustomFieldRepository;
@@ -33,6 +34,7 @@ public class TaskController {
     private final ClientRepository clientRepository;
     private final TaskCustomFieldRepository taskCustomFieldRepository;
     private final NotificationService notificationService;
+    private final LocationBasedAttendanceService locationBasedAttendanceService;
 
     private TaskDto toEnrichedDto(Task task) {
         TaskDto dto = taskMapper.toDto(task);
@@ -431,17 +433,25 @@ public class TaskController {
             log.warn("Task update rejected (id={}): {}", id, e.getMessage());
             throw e;
         }
+
     }
 
     @PutMapping("/{id}/status")
     public ResponseEntity<?> updateTaskStatus(
             @PathVariable Long id,
-            @RequestBody Map<String, String> payload
+            @RequestBody Map<String, String> payload,
+            @RequestHeader(value = "X-User-Role", required = false) String userRole,
+            @RequestHeader(value = "X-Employee-Latitude", required = false) Double latitude,
+            @RequestHeader(value = "X-Employee-Longitude", required = false) Double longitude
     ) {
         try {
             String newStatus = payload.get("status");
             String employeeIdStr = payload.get("employeeId");
-            
+
+            String effectiveRole = (userRole == null || userRole.trim().isEmpty())
+                    ? "EMPLOYEE"
+                    : userRole.trim().toUpperCase();
+
             if (newStatus == null || newStatus.trim().isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Status is required"));
             }
@@ -455,6 +465,23 @@ public class TaskController {
                 updatedByEmployeeId = Long.valueOf(employeeIdStr);
             } catch (NumberFormatException e) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Invalid employee ID format"));
+            }
+
+            if ("EMPLOYEE".equals(effectiveRole)) {
+                if (latitude == null || longitude == null) {
+                    return ResponseEntity.badRequest().body(Map.of(
+                            "error", "MISSING_LOCATION",
+                            "message", "Location headers are required"
+                    ));
+                }
+
+                boolean validLocation = locationBasedAttendanceService.validateTaskLocation(id, latitude, longitude);
+                if (!validLocation) {
+                    return ResponseEntity.status(403).body(Map.of(
+                            "error", "LOCATION_RESTRICTION",
+                            "message", "You must be within 200 meters of the customer location"
+                    ));
+                }
             }
             
             taskService.updateTaskStatus(id, newStatus, updatedByEmployeeId);

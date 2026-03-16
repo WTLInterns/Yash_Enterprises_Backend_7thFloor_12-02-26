@@ -15,8 +15,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -65,8 +63,10 @@ public class CustomerAddressEditController {
                     .orElseThrow(() -> new RuntimeException("Employee not found for derivation"));
                 
                 derivedUserRole = employee.getRole() != null ? employee.getRole().getName() : null;
-                derivedUserDepartment = employee.getDepartment() != null ? employee.getDepartment().getName() : null;
-                
+derivedUserDepartment =
+    employee.getDepartment() != null
+        ? employee.getDepartment().getName()
+        : employee.getDepartmentName();                
                 log.info("Derived role: {} and department: {} from employeeId: {}", 
                     derivedUserRole, derivedUserDepartment, userId);
             }
@@ -189,6 +189,12 @@ public class CustomerAddressEditController {
             @RequestHeader(value = "X-User-Department", required = false) String userDepartment) {
         
         try {
+            log.info("===== ADDRESS EDIT REQUEST DEBUG =====");
+            log.info("employeeId param: {}", employeeId);
+            log.info("X-User-Id header: {}", userId);
+            log.info("X-User-Role header: {}", userRole);
+            log.info("X-User-Department header: {}", userDepartment);
+
             // 🔥 HEADER FALLBACK: Derive from employeeId if headers missing
             String derivedUserRole = userRole;
             String derivedUserDepartment = userDepartment;
@@ -202,11 +208,16 @@ public class CustomerAddressEditController {
                     .orElseThrow(() -> new RuntimeException("Employee not found for derivation"));
                 
                 derivedUserRole = employee.getRole() != null ? employee.getRole().getName() : null;
-                derivedUserDepartment = employee.getDepartment() != null ? employee.getDepartment().getName() : null;
-                
+derivedUserDepartment =
+    employee.getDepartment() != null
+        ? employee.getDepartment().getName()
+        : employee.getDepartmentName();                
                 log.info("Derived role: {} and department: {} from employeeId: {}", 
                     derivedUserRole, derivedUserDepartment, userId);
             }
+
+            log.info("Derived Role: {}", derivedUserRole);
+            log.info("Derived Department: {}", derivedUserDepartment);
             
             // 🔥 ROLE CHECK: Only EMPLOYEE, TL, MANAGER, ADMIN can create
             if (!Set.of("EMPLOYEE", "TL", "MANAGER", "ADMIN").contains(derivedUserRole.toUpperCase())) {
@@ -222,11 +233,29 @@ public class CustomerAddressEditController {
             // Check if employee exists
             Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new RuntimeException("Employee not found"));
+
+            log.info("Employee ID from DB: {}", employee.getId());
+            if (employee.getDepartment() != null) {
+                log.info("Employee Department Entity: {}", employee.getDepartment().getName());
+            } else {
+                log.info("Employee Department Entity: null");
+            }
+            log.info("Employee Department Name Column: {}", employee.getDepartmentName());
             
             // 🔥 DEPARTMENT VALIDATION: Employee must belong to same department (except ADMIN)
-            if (!"ADMIN".equals(derivedUserRole.toUpperCase()) && 
-                !derivedUserDepartment.equals(employee.getDepartment())) {
-                return ResponseEntity.status(403).body(Map.of("error", "Can only create requests for employees in your department"));
+            if (!"ADMIN".equalsIgnoreCase(derivedUserRole)) {
+               String employeeDepartment =
+    employee.getDepartment() != null
+        ? employee.getDepartment().getName()
+        : employee.getDepartmentName();
+
+                log.info("Employee Department from DB: {}", employeeDepartment);
+                log.info("Comparing employeeDepartment='{}' with derivedUserDepartment='{}'", employeeDepartment, derivedUserDepartment);
+                
+                if (employeeDepartment == null ||
+                    !employeeDepartment.equalsIgnoreCase(derivedUserDepartment)) {
+                    return ResponseEntity.status(403).body(Map.of("error", "Can only create requests for employees in your department"));
+                }
             }
             
             // 🔥 Restrict editable types (Enterprise Security)
@@ -329,9 +358,11 @@ public class CustomerAddressEditController {
      */
     @PutMapping("/{requestId}/approve")
     @Transactional
-    public ResponseEntity<?> approveRequest(@PathVariable Long requestId) {
-        
-        Long adminId = getLoggedInEmployeeId();
+    public ResponseEntity<?> approveRequest(
+            @PathVariable Long requestId,
+            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+
+        Long adminId = userId != null ? Long.valueOf(userId) : null;
         
         try {
             CustomerAddressEditRequest request =
@@ -413,10 +444,11 @@ public class CustomerAddressEditController {
     @Transactional
     public ResponseEntity<?> rejectRequest(
             @PathVariable Long requestId,
-            @RequestParam(required = false) String rejectionReason) {
+            @RequestParam(required = false) String rejectionReason,
+            @RequestHeader(value = "X-User-Id", required = false) String userId) {
         
         try {
-            Long adminId = getLoggedInEmployeeId();
+            Long adminId = userId != null ? Long.valueOf(userId) : null;
             
             CustomerAddressEditRequest request =
                 editRequestRepository.findById(requestId)
@@ -481,43 +513,6 @@ public class CustomerAddressEditController {
         }
     }
     
-    /**
-     * Helper method to get current user role from security context
-     */
-    private String getCurrentUserRole() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.getAuthorities() != null) {
-            return authentication.getAuthorities().stream()
-                    .filter(authority -> authority.getAuthority().startsWith("ROLE_"))
-                    .map(authority -> authority.getAuthority().substring(5)) // Remove "ROLE_" prefix
-                    .findFirst()
-                    .orElse("USER");
-        }
-        return "USER";
-    }
-
-    /**
-     * Helper method to get logged-in employee ID from security context
-     */
-    private Long getLoggedInEmployeeId() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.getPrincipal() instanceof Employee emp) {
-            return emp.getId();
-        }
-        throw new RuntimeException("Admin not authenticated");
-    }
-
-    /**
-     * Helper method to get current user's department
-     */
-    private String getCurrentUserDepartment() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.getPrincipal() instanceof Employee emp) {
-            return emp.getDepartment() != null ? emp.getDepartment().getName() : null;
-        }
-        return null;
-    }
-
     /**
      * Update address type for a request
      */

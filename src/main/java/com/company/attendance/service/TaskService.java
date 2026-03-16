@@ -12,6 +12,7 @@ import com.company.attendance.repository.ClientRepository;
 import com.company.attendance.repository.CustomerAddressRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -31,6 +32,7 @@ public class TaskService {
     private final ClientRepository clientRepository;
     private final CustomerAddressRepository customerAddressRepository;
     private final NotificationService notificationService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     private void validateCustomerAddressLink(Task task) {
         if (task.getCustomerAddressId() == null) {
@@ -380,6 +382,30 @@ public class TaskService {
                 
                 log.info("Task status updated successfully: {} -> {} by employee {}", 
                     taskId, taskStatus, employeeId);
+                    
+                // 🔔 REAL-TIME: Broadcast WebSocket event for instant UI updates
+                try {
+                    Map<String, Object> taskStatusEvent = Map.of(
+                        "taskId", task.getId(),
+                        "status", taskStatus.toString(),
+                        "updatedByEmployeeId", employeeId,
+                        "updatedByEmployeeName", employeeName,
+                        "timestamp", LocalDateTime.now().toString(),
+                        "type", "TASK_STATUS_CHANGED",
+                        "taskName", task.getTaskName(),
+                        "clientName", clientName,
+                        "assignedToEmployeeId", task.getAssignedToEmployeeId()
+                    );
+                    
+                    // Broadcast to all connected clients
+                    messagingTemplate.convertAndSend("/topic/task-status-updates", taskStatusEvent);
+                    log.info("WebSocket event broadcasted for task status change: taskId={}, status={}", 
+                        task.getId(), taskStatus);
+                        
+                } catch (Exception wsEx) {
+                    log.warn("Failed to broadcast WebSocket event: {}", wsEx.getMessage());
+                    // Continue even if WebSocket fails
+                }
                     
             } catch (Exception notificationEx) {
                 log.error("Notification failed but task was updated: {}", notificationEx.getMessage());

@@ -94,9 +94,22 @@ public class EmployeeService {
         
         // ✅ NEW: Handle TL assignment for EMPLOYEE role
         if (dto.getTlId() != null) {
-            Employee tl = employeeRepository.findById(dto.getTlId()).orElse(null);
-            System.out.println("Setting TL: " + tl);
+
+            Employee tl = employeeRepository.findById(dto.getTlId())
+                .orElseThrow(() -> new RuntimeException("TL not found"));
+
             employee.setTl(tl);
+
+            // 🔥 inherit TL department
+            Department resolvedDepartment = tl.getDepartment();
+            if (resolvedDepartment == null && tl.getDepartmentName() != null && !tl.getDepartmentName().trim().isEmpty()) {
+                resolvedDepartment = departmentRepository.findByCode(tl.getDepartmentName().trim()).orElse(null);
+            }
+
+            employee.setDepartment(resolvedDepartment);
+            employee.setDepartmentName(tl.getDepartmentName());
+
+            System.out.println("Employee inherited department from TL: " + tl.getDepartmentName());
         }
         
         if (dto.getOrganizationId() != null) {
@@ -298,11 +311,21 @@ public class EmployeeService {
         
         // ✅ NEW: Handle TL assignment for EMPLOYEE role during update
         if (dto.getTlId() != null) {
-            Employee tl = employeeRepository.findById(dto.getTlId()).orElse(null);
-            if (tl != null && !tl.equals(existing.getTl())) {
-                System.out.println("Updating TL from '" + existing.getTl() + "' to '" + tl + "'");
-                existing.setTl(tl);
+
+            Employee tl = employeeRepository.findById(dto.getTlId())
+                .orElseThrow(() -> new RuntimeException("TL not found"));
+
+            System.out.println("Updating TL from '" + existing.getTl() + "' to '" + tl + "'");
+            existing.setTl(tl);
+
+            // 🔥 update department as well
+            Department resolvedDepartment = tl.getDepartment();
+            if (resolvedDepartment == null && tl.getDepartmentName() != null && !tl.getDepartmentName().trim().isEmpty()) {
+                resolvedDepartment = departmentRepository.findByCode(tl.getDepartmentName().trim()).orElse(null);
             }
+
+            existing.setDepartment(resolvedDepartment);
+            existing.setDepartmentName(tl.getDepartmentName());
         }
         
         if (dto.getOrganizationId() != null) {
