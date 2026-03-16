@@ -13,6 +13,7 @@ import com.company.attendance.repository.EmployeeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.usermodel.DateUtil;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -97,80 +98,143 @@ public class DealExcelImportService {
         for (Cell cell : headerRow) {
             String header = getCellValueAsString(cell).trim();
             if (!header.isEmpty()) {
-                headerMap.put(header.toLowerCase(), cell.getColumnIndex());
+                headerMap.put(normalizeHeader(header), cell.getColumnIndex());
             }
         }
         
-        // Check required headers
+        // Check required headers with variations
         for (String required : REQUIRED_HEADERS) {
-            if (!headerMap.containsKey(required.toLowerCase())) {
-                throw new RuntimeException("Missing required header: " + required);
+            if (!hasRequiredHeader(headerMap, required)) {
+                throw new RuntimeException("Missing required header: " + required + 
+                    " (found: " + String.join(", ", headerMap.keySet()) + ")");
             }
         }
         
         return headerMap;
+    }
+    
+    /**
+     * Normalize header name for flexible matching
+     */
+    private String normalizeHeader(String header) {
+        return header.trim().toLowerCase().replaceAll("\\s+", "");
+    }
+    
+    /**
+     * Check if required header exists (allows variations)
+     */
+    private boolean hasRequiredHeader(Map<String, Integer> headerMap, String requiredHeader) {
+        String normalizedRequired = normalizeHeader(requiredHeader);
+        
+        // Direct match
+        if (headerMap.containsKey(normalizedRequired)) {
+            return true;
+        }
+        
+        // Check common variations
+        return switch (normalizedRequired) {
+            case "district" -> headerMap.containsKey("district") || headerMap.containsKey("dist");
+            case "customernumber" -> headerMap.containsKey("customernumber") || headerMap.containsKey("customerno");
+            default -> headerMap.containsKey(normalizedRequired);
+        };
     }
 
     @Transactional
     private void importSingleRow(Row row, Map<String, Integer> headerMap, 
                                 String userDepartment, boolean allowDepartmentOverride) throws Exception {
         
-        // Extract values
-        String customerName = getCellValue(row, headerMap, "Customer Name");
-        String village = getCellValue(row, headerMap, "Village");
-        String taluka = getCellValue(row, headerMap, "Taluka");
-        String district = getCellValue(row, headerMap, "District");
-        String productName = getCellValue(row, headerMap, "Product");
-        String department = getCellValue(row, headerMap, "Department");
-        String stage = getCellValue(row, headerMap, "Stage");
+        // Get header indices
+        Integer customerNameIndex = findHeaderIndex(headerMap, "Customer Name");
+        Integer villageIndex = findHeaderIndex(headerMap, "Village");
+        Integer talukaIndex = findHeaderIndex(headerMap, "Taluka");
+        Integer districtIndex = findHeaderIndex(headerMap, "District");
+        Integer productNameIndex = findHeaderIndex(headerMap, "Product");
+        Integer departmentIndex = findHeaderIndex(headerMap, "Department");
+        Integer stageIndex = findHeaderIndex(headerMap, "Stage");
+        Integer appNoIndex = findHeaderIndex(headerMap, "App No");
+        Integer bankNameIndex = findHeaderIndex(headerMap, "Bank Name");
+        Integer branchNameIndex = findHeaderIndex(headerMap, "Branch Name");
+        Integer contactNameIndex = findHeaderIndex(headerMap, "Contact Name");
+        Integer allotmentLetterIndex = findHeaderIndex(headerMap, "Allotment Letter");
+        Integer closingDateIndex = findHeaderIndex(headerMap, "Closing Date");
+        Integer amountIndex = findHeaderIndex(headerMap, "Amount");
+        Integer addressTypeIndex = findHeaderIndex(headerMap, "Address Type");
+        
+        // Extract values safely (never null, returns "-" for empty)
+        String customerName = customerNameIndex != null ? getCellValueSafely(row, customerNameIndex) : "-";
+        String village = villageIndex != null ? getCellValueSafely(row, villageIndex) : "-";
+        String taluka = talukaIndex != null ? getCellValueSafely(row, talukaIndex) : "-";
+        String district = districtIndex != null ? getCellValueSafely(row, districtIndex) : "-";
+        String productName = productNameIndex != null ? getCellValueSafely(row, productNameIndex) : "-";
+        String department = departmentIndex != null ? getCellValueSafely(row, departmentIndex) : "-";
+        String stage = stageIndex != null ? getCellValueSafely(row, stageIndex) : "-";
         
         // Optional fields
-        String appNo = getCellValue(row, headerMap, "App No");
-        String bankName = getCellValue(row, headerMap, "Bank Name");
-        String branchName = getCellValue(row, headerMap, "Branch Name");
-        String contactName = getCellValue(row, headerMap, "Contact Name");
-        String allotmentLetter = getCellValue(row, headerMap, "Allotment Letter");
-        String closingDateStr = getCellValue(row, headerMap, "Closing Date");
-        String amountStr = getCellValue(row, headerMap, "Amount");
-        String addressType = getCellValue(row, headerMap, "Address Type");
+        String appNo = appNoIndex != null ? getCellValueSafely(row, appNoIndex) : "-";
+        String bankName = bankNameIndex != null ? getCellValueSafely(row, bankNameIndex) : "-";
+        String branchName = branchNameIndex != null ? getCellValueSafely(row, branchNameIndex) : "-";
+        String contactName = contactNameIndex != null ? getCellValueSafely(row, contactNameIndex) : "-";
+        String allotmentLetter = allotmentLetterIndex != null ? getCellValueSafely(row, allotmentLetterIndex) : "-";
+        LocalDate closingDate = closingDateIndex != null ? parseExcelDate(row, closingDateIndex) : null;
+        String amountStr = amountIndex != null ? getCellValueSafely(row, amountIndex) : "-";
+        String addressType = addressTypeIndex != null ? getCellValueSafely(row, addressTypeIndex) : "-";
+        
+        // Validate only truly required fields
+        if (customerName.equals("-")) {
+            throw new RuntimeException("Customer Name is required");
+        }
+        
+        if (productName.equals("-")) {
+            throw new RuntimeException("Product is required");
+        }
+        
+        if (stage.equals("-")) {
+            throw new RuntimeException("Stage is required");
+        }
+        
+        // Log row data for debugging
+        log.debug("Importing row: Customer={}, Village={}, District={}, Product={}, Stage={}", 
+                 customerName, village, district, productName, stage);
         
         // Department logic
-        if (!allowDepartmentOverride || department.isEmpty()) {
+        if (!allowDepartmentOverride || department.equals("-")) {
             department = userDepartment;
         }
         
         // Find or create client
         Client client = findOrCreateClient(customerName, department);
         
-        // Create or update address
+        // Create or update address (village can be "-")
         CustomerAddress.AddressType addressTypeEnum = parseAddressType(addressType);
         createOrUpdateAddress(client.getId(), village, taluka, district, addressTypeEnum);
         
-        // Create deal
+        // Create deal with safe defaults
         DealDto dealDto = new DealDto();
         dealDto.setName(productName);
         dealDto.setClientId(client.getId());
         dealDto.setDepartment(department);
         dealDto.setStage(stage);
-        dealDto.setRelatedBankName(bankName);
-        dealDto.setBranchName(branchName);
-        dealDto.setDescription(allotmentLetter);
+        dealDto.setRelatedBankName(bankName.equals("-") ? null : bankName);
+        dealDto.setBranchName(branchName.equals("-") ? null : branchName);
+        dealDto.setDescription(allotmentLetter.equals("-") ? null : allotmentLetter);
         
-        if (!amountStr.isEmpty()) {
+        // Handle amount safely
+        if (!amountStr.equals("-") && !amountStr.isEmpty()) {
             try {
-                dealDto.setValueAmount(new BigDecimal(amountStr));
+                // Remove any non-numeric characters except decimal point
+                String cleanAmount = amountStr.replaceAll("[^0-9.]", "");
+                if (!cleanAmount.isEmpty()) {
+                    dealDto.setValueAmount(new BigDecimal(cleanAmount));
+                }
             } catch (NumberFormatException e) {
-                throw new RuntimeException("Invalid amount format: " + amountStr);
+                log.warn("Invalid amount format '{}' for customer {}, using 0", amountStr, customerName);
+                dealDto.setValueAmount(BigDecimal.ZERO);
             }
         }
         
-        if (!closingDateStr.isEmpty()) {
-            try {
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-                dealDto.setClosingDate(LocalDate.parse(closingDateStr, formatter));
-            } catch (Exception e) {
-                throw new RuntimeException("Invalid closing date format: " + closingDateStr);
-            }
+        // Handle closing date (already parsed safely)
+        if (closingDate != null) {
+            dealDto.setClosingDate(closingDate);
         }
         
         // Use existing DealService to create the deal
@@ -233,11 +297,122 @@ public class DealExcelImportService {
     }
 
     private String getCellValue(Row row, Map<String, Integer> headerMap, String headerName) {
-        Integer index = headerMap.get(headerName.toLowerCase());
+        String normalizedHeaderName = normalizeHeader(headerName);
+        Integer index = headerMap.get(normalizedHeaderName);
+        
+        // If direct match not found, try variations
+        if (index == null) {
+            index = findHeaderIndex(headerMap, headerName);
+        }
+        
         if (index == null) return "";
         
         Cell cell = row.getCell(index);
         return getCellValueAsString(cell);
+    }
+    
+    /**
+     * Safe cell value reader - never returns null, returns "-" for empty cells
+     */
+    private String getCellValueSafely(Row row, int index) {
+        Cell cell = row.getCell(index);
+        
+        if (cell == null) {
+            return "-";
+        }
+        
+        return switch (cell.getCellType()) {
+            case STRING -> {
+                String value = cell.getStringCellValue().trim();
+                yield value.isEmpty() ? "-" : value;
+            }
+            case NUMERIC -> String.valueOf((long) cell.getNumericCellValue());
+            case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
+            case FORMULA -> {
+                try {
+                    yield String.valueOf(cell.getNumericCellValue());
+                } catch (Exception e) {
+                    yield cell.getStringCellValue().trim();
+                }
+            }
+            default -> "-";
+        };
+    }
+    
+    /**
+     * Parse Excel date properly - handles both numeric Excel dates and string dates
+     */
+    private LocalDate parseExcelDate(Row row, int index) {
+        Cell cell = row.getCell(index);
+        
+        if (cell == null) {
+            return null;
+        }
+        
+        if (cell.getCellType() == CellType.NUMERIC) {
+            if (DateUtil.isCellDateFormatted(cell)) {
+                return cell.getLocalDateTimeCellValue().toLocalDate();
+            } else {
+                // It's a regular number, not a date
+                return null;
+            }
+        }
+        
+        if (cell.getCellType() == CellType.STRING) {
+            String dateStr = cell.getStringCellValue().trim();
+            if (dateStr.isEmpty()) {
+                return null;
+            }
+            try {
+                // Try different date formats
+                DateTimeFormatter[] formatters = {
+                    DateTimeFormatter.ofPattern("yyyy-MM-dd"),
+                    DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+                    DateTimeFormatter.ofPattern("dd-MM-yyyy"),
+                    DateTimeFormatter.ofPattern("MM/dd/yyyy"),
+                    DateTimeFormatter.ofPattern("MM-dd-yyyy")
+                };
+                
+                for (DateTimeFormatter formatter : formatters) {
+                    try {
+                        return LocalDate.parse(dateStr, formatter);
+                    } catch (Exception ignored) {
+                        // Try next format
+                    }
+                }
+                
+                log.warn("Could not parse date string: {}", dateStr);
+                return null;
+            } catch (Exception e) {
+                log.warn("Error parsing date string: {}", dateStr, e);
+                return null;
+            }
+        }
+        
+        return null;
+    }
+    private Integer findHeaderIndex(Map<String, Integer> headerMap, String headerName) {
+        String normalizedRequired = normalizeHeader(headerName);
+        
+        // Direct match
+        if (headerMap.containsKey(normalizedRequired)) {
+            return headerMap.get(normalizedRequired);
+        }
+        
+        // Check common variations
+        return switch (normalizedRequired) {
+            case "district" -> {
+                if (headerMap.containsKey("district")) yield headerMap.get("district");
+                if (headerMap.containsKey("dist")) yield headerMap.get("dist");
+                yield null;
+            }
+            case "customernumber" -> {
+                if (headerMap.containsKey("customernumber")) yield headerMap.get("customernumber");
+                if (headerMap.containsKey("customerno")) yield headerMap.get("customerno");
+                yield null;
+            }
+            default -> headerMap.get(normalizedRequired);
+        };
     }
 
     private String getCellValueAsString(Cell cell) {
