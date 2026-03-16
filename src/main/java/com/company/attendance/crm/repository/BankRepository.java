@@ -11,6 +11,8 @@ import java.util.Optional;
 public interface BankRepository extends JpaRepository<Bank, Long>, JpaSpecificationExecutor<Bank> {
     boolean existsByNameIgnoreCase(String name);
     
+    Optional<Bank> findByNameIgnoreCase(String name);
+    
     default Bank findByIdSafe(Long id) {
         return findById(id).orElseThrow(() ->
             new RuntimeException("Bank not found: " + id)

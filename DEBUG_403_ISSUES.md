@@ -3,7 +3,7 @@
 ## 1️⃣ TEST DEBUG ENDPOINT
 ```bash
 # Test if authentication is working
-curl -X GET "http://localhost:8080/api/debug/role" \
+curl -X GET "https://api.yashrajent.com/api/debug/role" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
@@ -30,14 +30,14 @@ If role is working correctly, you should see:
 ## 4️⃣ TEST TASKS ENDPOINT
 ```bash
 # Should now work with EXECUTIVE role
-curl -X GET "http://localhost:8080/api/tasks" \
+curl -X GET "https://api.yashrajent.com/api/tasks" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
 ## 5️⃣ TEST LOCATION ENDPOINT  
 ```bash
 # Should now work with EXECUTIVE role
-curl -X POST "http://localhost:8080/api/employee-locations/2/location" \
+curl -X POST "https://api.yashrajent.com/api/employee-locations/2/location" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"latitude": 19.0760, "longitude": 72.8777}'

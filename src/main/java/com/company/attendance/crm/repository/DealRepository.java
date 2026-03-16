@@ -19,6 +19,8 @@ public interface DealRepository extends JpaRepository<Deal, Long> {
     
     Optional<Deal> findFirstByClientIdOrderByCreatedAtDesc(Long clientId);
     
+    Optional<Deal> findByNameAndClientId(String name, Long clientId);
+    
     @Query("SELECT d FROM Deal d WHERE d.client.id = :clientId")
     List<Deal> findByClientEntityId(@Param("clientId") Long clientId);
     

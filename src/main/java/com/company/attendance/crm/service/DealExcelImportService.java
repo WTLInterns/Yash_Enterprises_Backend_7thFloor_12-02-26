@@ -3,6 +3,9 @@ package com.company.attendance.crm.service;
 import com.company.attendance.crm.mapper.CrmMapper;
 import com.company.attendance.crm.dto.DealDto;
 import com.company.attendance.crm.entity.Deal;
+import com.company.attendance.crm.entity.Bank;
+import com.company.attendance.crm.repository.BankRepository;
+import com.company.attendance.crm.repository.DealRepository;
 import com.company.attendance.entity.Client;
 import com.company.attendance.entity.CustomerAddress;
 import com.company.attendance.entity.Employee;
@@ -31,7 +34,10 @@ import java.util.*;
 public class DealExcelImportService {
 
     private final DealService dealService;
+    private final BankService bankService;
     private final ClientService clientService;
+    private final BankRepository bankRepository;
+    private final DealRepository dealRepository;
     private final ClientRepository clientRepository;
     private final CustomerAddressRepository customerAddressRepository;
     private final EmployeeRepository employeeRepository;
@@ -204,18 +210,32 @@ public class DealExcelImportService {
         // Find or create client
         Client client = findOrCreateClient(customerName, department);
         
+        // Find or create bank from Excel data
+        Bank bank = findOrCreateBank(bankName, branchName);
+        
         // Create or update address (village can be "-")
         CustomerAddress.AddressType addressTypeEnum = parseAddressType(addressType);
         createOrUpdateAddress(client.getId(), village, taluka, district, addressTypeEnum);
         
-        // Create deal with safe defaults
+        // Check for existing deal to prevent duplicates
+        Optional<Deal> existingDeal = dealRepository.findByNameAndClientId(productName, client.getId());
+        
+        // Create deal DTO for both new and update scenarios
         DealDto dealDto = new DealDto();
         dealDto.setName(productName);
         dealDto.setClientId(client.getId());
         dealDto.setDepartment(department);
         dealDto.setStage(stage);
-        dealDto.setRelatedBankName(bankName.equals("-") ? null : bankName);
-        dealDto.setBranchName(branchName.equals("-") ? null : branchName);
+        
+        // Set bank information if available
+        if (bank != null) {
+            dealDto.setRelatedBankName(bank.getName());
+            dealDto.setBranchName(bank.getBranchName());
+        } else {
+            dealDto.setRelatedBankName(!bankName.equals("-") ? bankName : null);
+            dealDto.setBranchName(!branchName.equals("-") ? branchName : null);
+        }
+        
         dealDto.setDescription(allotmentLetter.equals("-") ? null : allotmentLetter);
         
         // Handle amount safely
@@ -237,11 +257,49 @@ public class DealExcelImportService {
             dealDto.setClosingDate(closingDate);
         }
         
-        // Use existing DealService to create the deal
-        Deal deal = crmMapper.toDealEntity(dealDto);
-        dealService.create(deal);
-        
-        log.info("Imported deal: {} for client: {}", productName, customerName);
+        if (existingDeal.isPresent()) {
+            // Update existing deal with missing information
+            Deal existing = existingDeal.get();
+            boolean updated = false;
+            
+            if (existing.getBranchName() == null && dealDto.getBranchName() != null) {
+                existing.setBranchName(dealDto.getBranchName());
+                updated = true;
+            }
+            
+            if (existing.getRelatedBankName() == null && dealDto.getRelatedBankName() != null) {
+                existing.setRelatedBankName(dealDto.getRelatedBankName());
+                updated = true;
+            }
+            
+            if (existing.getValueAmount() == null && dealDto.getValueAmount() != null) {
+                existing.setValueAmount(dealDto.getValueAmount());
+                updated = true;
+            }
+            
+            if (existing.getClosingDate() == null && dealDto.getClosingDate() != null) {
+                existing.setClosingDate(dealDto.getClosingDate());
+                updated = true;
+            }
+            
+            if (existing.getDescription() == null && dealDto.getDescription() != null) {
+                existing.setDescription(dealDto.getDescription());
+                updated = true;
+            }
+            
+            if (updated) {
+                dealRepository.save(existing);
+                log.info("Updated existing deal {} for client: {}", existing.getId(), customerName);
+            } else {
+                log.debug("No updates needed for existing deal {} for client: {}", existing.getId(), customerName);
+            }
+        } else {
+            // Create new deal
+            Deal deal = crmMapper.toDealEntity(dealDto);
+            dealService.create(deal);
+            
+            log.info("Created new deal: {} for client: {}", productName, customerName);
+        }
     }
 
     private Client findOrCreateClient(String name, String department) {
@@ -258,6 +316,31 @@ public class DealExcelImportService {
         client.setIsActive(true);
         
         return clientService.createClientEntity(client);
+    }
+
+    /**
+     * Find existing bank or create new one from Excel data
+     */
+    private Bank findOrCreateBank(String bankName, String branchName) {
+        if (bankName == null || bankName.equals("-")) {
+            return null;
+        }
+
+        // Check if bank already exists (case-insensitive)
+        Optional<Bank> existing = bankRepository.findByNameIgnoreCase(bankName.trim());
+        if (existing.isPresent()) {
+            log.debug("Found existing bank: {}", bankName);
+            return existing.get();
+        }
+
+        // Create new bank
+        Bank bank = new Bank();
+        bank.setName(bankName.trim());
+        bank.setBranchName(branchName != null && !branchName.equals("-") ? branchName.trim() : null);
+        bank.setActive(true);
+        
+        log.info("Creating new bank: {} - {}", bankName, branchName);
+        return bankService.create(bank);
     }
 
     private void createOrUpdateAddress(Long clientId, String village, String taluka, 
