@@ -8,7 +8,7 @@ import java.time.LocalDate;
 import java.util.List;
 public interface ExpenseRepository extends JpaRepository<Expense, Long> {
     
-    @Query("SELECT e FROM Expense e LEFT JOIN FETCH e.employee WHERE (:employeeId IS NULL OR e.employeeId = :employeeId) " +
+    @Query("SELECT e FROM Expense e LEFT JOIN FETCH e.employee LEFT JOIN FETCH e.employee.tl WHERE (:employeeId IS NULL OR e.employeeId = :employeeId) " +
             "AND (:status IS NULL OR e.status = :status) " +
             "AND (:startDate IS NULL OR e.expenseDate >= :startDate) " +
             "AND (:endDate IS NULL OR e.expenseDate <= :endDate)")
@@ -19,8 +19,14 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
             @Param("endDate") LocalDate endDate
     );
     
-    @Query("SELECT e FROM Expense e LEFT JOIN FETCH e.employee")
+    @Query("SELECT e FROM Expense e LEFT JOIN FETCH e.employee LEFT JOIN FETCH e.employee.tl")
     List<Expense> findAllWithEmployee();
+    
+    @Query("SELECT e FROM Expense e LEFT JOIN FETCH e.employee LEFT JOIN FETCH e.employee.tl WHERE e.employee.departmentName = :department")
+    List<Expense> findByDepartment(@Param("department") String department);
+    
+    @Query("SELECT e FROM Expense e LEFT JOIN FETCH e.employee LEFT JOIN FETCH e.employee.tl WHERE e.employeeId = :employeeId")
+    List<Expense> findByEmployeeId(@Param("employeeId") Long employeeId);
 }
 
 
