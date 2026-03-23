@@ -5,6 +5,7 @@ import com.company.attendance.mapper.ExpenseMapper;
 import com.company.attendance.service.ExpenseService;
 import com.company.attendance.util.FileUploadUtil;
 import com.company.attendance.util.UploadUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,6 +29,7 @@ public class ExpenseController {
     private final ExpenseService expenseService;
     private final ExpenseMapper expenseMapper;
     private final UploadUtil uploadUtil;
+    private final ObjectMapper objectMapper;
 
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
@@ -37,7 +39,10 @@ public class ExpenseController {
             @RequestParam(required = false) Long employeeId,
             @RequestParam(required = false) Integer month,
             @RequestParam(required = false) Integer year,
-            @RequestParam(required = false) String status
+            @RequestParam(required = false) String status,
+            @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
+            @RequestHeader(value = "X-User-Role", required = false) String userRoleHeader,
+            @RequestHeader(value = "X-User-Department", required = false) String userDepartmentHeader
     ) {
         LocalDate startDate = null;
         LocalDate endDate = null;
@@ -46,9 +51,38 @@ public class ExpenseController {
             endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
         }
 
-        var expenses = (employeeId != null || status != null || startDate != null || endDate != null)
-                ? expenseService.findFiltered(employeeId, status, startDate, endDate)
-                : expenseService.findAll();
+        List<Expense> expenses;
+        
+        // Role-based filtering
+        if (userRoleHeader != null) {
+            String role = userRoleHeader;
+            String department = userDepartmentHeader;
+            
+            if (role.equals("ADMIN") || role.equals("MANAGER") || "ACCOUNT".equals(department)) {
+                // Admin / Manager / Account see all
+                expenses = (employeeId != null || status != null || startDate != null || endDate != null)
+                        ? expenseService.findFiltered(employeeId, status, startDate, endDate)
+                        : expenseService.findAll();
+            } else if (role.equals("TL") && department != null) {
+                // TL sees only their department
+                expenses = expenseService.findByDepartment(department);
+            } else if (userIdHeader != null) {
+                // Employee sees only their own expenses
+                Long currentUserId = Long.valueOf(userIdHeader);
+                expenses = expenseService.findByEmployeeId(currentUserId);
+            } else {
+                // Fallback - no filtering
+                expenses = (employeeId != null || status != null || startDate != null || endDate != null)
+                        ? expenseService.findFiltered(employeeId, status, startDate, endDate)
+                        : expenseService.findAll();
+            }
+        } else {
+            // No role header - fallback to original logic
+            expenses = (employeeId != null || status != null || startDate != null || endDate != null)
+                    ? expenseService.findFiltered(employeeId, status, startDate, endDate)
+                    : expenseService.findAll();
+        }
+        
         var dtos = expenses.stream().map(expenseMapper::toDto).collect(Collectors.toList());
         return ResponseEntity.ok(dtos);
     }
@@ -59,15 +93,53 @@ public class ExpenseController {
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
-    @PostMapping
-    public ResponseEntity<ExpenseDto> createExpense(@Valid @RequestBody ExpenseDto dto) {
+    @PostMapping(consumes = "multipart/form-data")
+    public ResponseEntity<ExpenseDto> createExpense(
+            @RequestPart("expense") String expenseJson,
+            @RequestPart(value = "file", required = false) MultipartFile file,
+            @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
+            @RequestHeader(value = "X-User-Role", required = false) String userRoleHeader,
+            @RequestHeader(value = "X-User-Department", required = false) String userDepartmentHeader
+    ) throws IOException {
+        
+        ExpenseDto dto = objectMapper.readValue(expenseJson, ExpenseDto.class);
+        
+        // Security fix: Force employeeId to current user for non-admin roles
+        if (userIdHeader != null && userRoleHeader != null) {
+            String role = userRoleHeader;
+            if (!role.equals("ADMIN") && !role.equals("MANAGER") && !"ACCOUNT".equals(userDepartmentHeader)) {
+                // For TL and EMPLOYEE roles, force employeeId to current user
+                dto.setEmployeeId(Long.valueOf(userIdHeader));
+            }
+        }
+        
         Expense expense = expenseService.save(expenseMapper.toEntity(dto));
+        
+        if(file != null && !file.isEmpty()){
+            String receiptUrl = uploadUtil.saveFile(file, "expenses");
+            expense.setReceiptUrl(receiptUrl);
+            expense = expenseService.save(expense);
+        }
+        
         return ResponseEntity.ok(expenseMapper.toDto(expense));
     }
-    @PutMapping("/{id}")
-    public ResponseEntity<ExpenseDto> updateExpense(@PathVariable Long id, @Valid @RequestBody ExpenseDto dto) {
+    @PutMapping(path = "/{id}", consumes = "multipart/form-data")
+    public ResponseEntity<ExpenseDto> updateExpense(
+            @PathVariable Long id,
+            @RequestPart("expense") String expenseJson,
+            @RequestPart(value = "file", required = false) MultipartFile file
+    ) throws IOException {
+        
+        ExpenseDto dto = objectMapper.readValue(expenseJson, ExpenseDto.class);
         Expense expense = expenseMapper.toEntity(dto);
         Expense updated = expenseService.update(id, expense);
+        
+        if(file != null && !file.isEmpty()){
+            String receiptUrl = uploadUtil.saveFile(file, "expenses");
+            updated.setReceiptUrl(receiptUrl);
+            updated = expenseService.save(updated);
+        }
+        
         return ResponseEntity.ok(expenseMapper.toDto(updated));
     }
 

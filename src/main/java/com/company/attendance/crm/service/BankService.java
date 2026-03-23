@@ -27,8 +27,17 @@ public class BankService {
         if (bank.getName() == null || bank.getName().isBlank()){
             throw new IllegalArgumentException("name is required");
         }
-        if (bankRepository.existsByNameIgnoreCase(bank.getName())){
-            throw new IllegalArgumentException("Bank name already exists");
+        
+        // 🔥 FIX: Check bank uniqueness by name + branch + taluka (real-world logic)
+        Optional<Bank> existing = bankRepository
+            .findByNameIgnoreCaseAndBranchNameIgnoreCaseAndTalukaIgnoreCase(
+                bank.getName(),
+                bank.getBranchName(),
+                bank.getTaluka()
+            );
+        
+        if (existing.isPresent()) {
+            return existing.get(); // 🔥 FIX: Return existing bank instead of throwing exception
         }
         
         // Set owner from logged-in user

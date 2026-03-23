@@ -76,9 +76,16 @@ public class ExpenseService {
                 String fullName = expense.getEmployee().getFirstName() + " " + expense.getEmployee().getLastName();
                 expense.setEmployeeName(fullName);
                 
+                // Try to get department from multiple sources
+                String deptName = null;
                 if (expense.getEmployee().getDepartment() != null) {
-                    expense.setDepartmentName(expense.getEmployee().getDepartment().getName());
+                    deptName = expense.getEmployee().getDepartment().getName();
+                } else if (expense.getEmployee().getDepartmentName() != null && !expense.getEmployee().getDepartmentName().isEmpty()) {
+                    deptName = expense.getEmployee().getDepartmentName();
+                } else if (expense.getEmployee().getTl() != null && expense.getEmployee().getTl().getDepartmentName() != null) {
+                    deptName = expense.getEmployee().getTl().getDepartmentName();
                 }
+                expense.setDepartmentName(deptName);
             }
         }
         return expenses;
@@ -86,6 +93,14 @@ public class ExpenseService {
 
     public List<Expense> findFiltered(Long employeeId, String status, LocalDate startDate, LocalDate endDate) {
         return expenseRepository.findFiltered(employeeId, status, startDate, endDate);
+    }
+
+    public List<Expense> findByDepartment(String department) {
+        return expenseRepository.findByDepartment(department);
+    }
+
+    public List<Expense> findByEmployeeId(Long employeeId) {
+        return expenseRepository.findByEmployeeId(employeeId);
     }
 
     public Optional<Expense> findById(Long id) {
