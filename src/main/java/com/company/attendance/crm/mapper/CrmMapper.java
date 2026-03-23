@@ -217,7 +217,7 @@ public Client toClientEntity(ClientDto dto) {
     dto.setDescription(deal.getDescription());
     dto.setRequiredAmount(deal.getRequiredAmount());
     dto.setOutstandingAmount(deal.getOutstandingAmount());
-    dto.setStage(deal.getStageCode());
+    dto.setStageCode(deal.getStageCode()); // 🔥 FIX: Use stageCode field for frontend 
     dto.setDepartment(deal.getDepartment());
     dto.setActive(deal.getActive());
 
@@ -271,7 +271,7 @@ public Client toClientEntity(ClientDto dto) {
     deal.setDescription(dto.getDescription());
     deal.setRequiredAmount(dto.getRequiredAmount());
     deal.setOutstandingAmount(dto.getOutstandingAmount());
-    deal.setStageCode(dto.getStage());
+    deal.setStageCode(dto.getStageCode()); // 🔥 FIX: Use stageCode from DTO
     deal.setDepartment(dto.getDepartment());
     deal.setActive(dto.getActive());
     return deal;

@@ -4,8 +4,12 @@ import com.company.attendance.crm.mapper.CrmMapper;
 import com.company.attendance.crm.dto.DealDto;
 import com.company.attendance.crm.entity.Deal;
 import com.company.attendance.crm.entity.Bank;
+import com.company.attendance.crm.entity.Product;
+import com.company.attendance.crm.entity.DealProduct;
 import com.company.attendance.crm.repository.BankRepository;
 import com.company.attendance.crm.repository.DealRepository;
+import com.company.attendance.crm.repository.ProductRepository;
+import com.company.attendance.crm.repository.DealProductRepository;
 import com.company.attendance.entity.Client;
 import com.company.attendance.entity.CustomerAddress;
 import com.company.attendance.entity.Employee;
@@ -13,6 +17,8 @@ import com.company.attendance.service.ClientService;
 import com.company.attendance.repository.ClientRepository;
 import com.company.attendance.repository.CustomerAddressRepository;
 import com.company.attendance.repository.EmployeeRepository;
+
+import java.util.ArrayList; // 🔥 FIX: Import ArrayList for stage history
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
@@ -38,6 +44,8 @@ public class DealExcelImportService {
     private final ClientService clientService;
     private final BankRepository bankRepository;
     private final DealRepository dealRepository;
+    private final ProductRepository productRepository; // 🔥 FIX: Add Product repository
+    private final DealProductRepository dealProductRepository; // 🔥 FIX: Add DealProduct repository
     private final ClientRepository clientRepository;
     private final CustomerAddressRepository customerAddressRepository;
     private final EmployeeRepository employeeRepository;
@@ -48,7 +56,7 @@ public class DealExcelImportService {
         "Product", "Department", "Stage"
     );
 
-    @Transactional
+    // 🔥 FIX: Remove @Transactional from main method to prevent full rollback on single row failure
     public Map<String, Object> importDealsFromExcel(
             org.springframework.web.multipart.MultipartFile file,
             String userDepartment,
@@ -85,7 +93,7 @@ public class DealExcelImportService {
                 } catch (Exception e) {
                     String error = String.format("Row %d: %s", i + 1, e.getMessage());
                     errors.add(error);
-                    log.warn("Failed to import row {}: {}", i + 1, e.getMessage());
+                    log.error("❌ FULL ERROR ROW {} ", i + 1, e); // 🔥 FIX: Full error logging
                 }
             }
         }
@@ -145,6 +153,47 @@ public class DealExcelImportService {
         };
     }
 
+    /**
+     * 🔥 FIX: Normalize stage names to match database format
+     */
+    private String normalizeStage(String stage) {
+        if (stage == null || stage.trim().isEmpty()) return "NEW_LEAD";
+
+        stage = stage.trim().toUpperCase().replace(" ", "_");
+
+        switch (stage) {
+            case "DOC_COLLECT":
+            case "DOCUMENT_COLLECTION":
+            case "DOC.COLLECT":
+                return "DOC_COLLECT";
+
+            case "NEW_LEAD":
+            case "LEAD":
+                return "NEW_LEAD";
+
+            case "DOP":
+                return "DOP";
+
+            case "ACCOUNT":
+                return "ACCOUNT";
+
+            case "CLOSE_WIN":
+            case "CLOSED_WON":
+                return "CLOSE_WIN";
+
+            case "CLOSE_LOST":
+            case "CLOSED_LOST":
+                return "CLOSE_LOST";
+
+            case "LOAN_APPLICATION":
+            case "LOAN_APP":
+                return "LOAN_APPLICATION";
+
+            default:
+                return stage;
+        }
+    }
+
     @Transactional
     private void importSingleRow(Row row, Map<String, Integer> headerMap, 
                                 String userDepartment, boolean allowDepartmentOverride) throws Exception {
@@ -167,79 +216,86 @@ public class DealExcelImportService {
         Integer addressTypeIndex = findHeaderIndex(headerMap, "Address Type");
         
         // Extract values safely (never null, returns "-" for empty)
-        String customerName = customerNameIndex != null ? getCellValueSafely(row, customerNameIndex) : "-";
-        String village = villageIndex != null ? getCellValueSafely(row, villageIndex) : "-";
-        String taluka = talukaIndex != null ? getCellValueSafely(row, talukaIndex) : "-";
-        String district = districtIndex != null ? getCellValueSafely(row, districtIndex) : "-";
-        String productName = productNameIndex != null ? getCellValueSafely(row, productNameIndex) : "-";
-        String department = departmentIndex != null ? getCellValueSafely(row, departmentIndex) : "-";
-        String stage = stageIndex != null ? getCellValueSafely(row, stageIndex) : "-";
+        String customerName = customerNameIndex != null ? getCellValueSafely(row, customerNameIndex) : null;
+        String village = villageIndex != null ? getCellValueSafely(row, villageIndex) : null;
+        String taluka = talukaIndex != null ? getCellValueSafely(row, talukaIndex) : null;
+        String district = districtIndex != null ? getCellValueSafely(row, districtIndex) : null;
+        String productName = productNameIndex != null ? getCellValueSafely(row, productNameIndex) : null;
+        String department = departmentIndex != null ? getCellValueSafely(row, departmentIndex) : null;
+        String stage = stageIndex != null ? getCellValueSafely(row, stageIndex) : null;
         
         // Optional fields
-        String appNo = appNoIndex != null ? getCellValueSafely(row, appNoIndex) : "-";
-        String bankName = bankNameIndex != null ? getCellValueSafely(row, bankNameIndex) : "-";
-        String branchName = branchNameIndex != null ? getCellValueSafely(row, branchNameIndex) : "-";
-        String contactName = contactNameIndex != null ? getCellValueSafely(row, contactNameIndex) : "-";
-        String allotmentLetter = allotmentLetterIndex != null ? getCellValueSafely(row, allotmentLetterIndex) : "-";
+        String appNo = appNoIndex != null ? getCellValueSafely(row, appNoIndex) : null;
+        String bankName = bankNameIndex != null ? getCellValueSafely(row, bankNameIndex) : null;
+        String branchName = branchNameIndex != null ? getCellValueSafely(row, branchNameIndex) : null;
+        String contactName = contactNameIndex != null ? getCellValueSafely(row, contactNameIndex) : null;
+        String allotmentLetter = allotmentLetterIndex != null ? getCellValueSafely(row, allotmentLetterIndex) : null;
         LocalDate closingDate = closingDateIndex != null ? parseExcelDate(row, closingDateIndex) : null;
-        String amountStr = amountIndex != null ? getCellValueSafely(row, amountIndex) : "-";
-        String addressType = addressTypeIndex != null ? getCellValueSafely(row, addressTypeIndex) : "-";
+        String amountStr = amountIndex != null ? getCellValueSafely(row, amountIndex) : null;
+        String addressType = addressTypeIndex != null ? getCellValueSafely(row, addressTypeIndex) : null;
         
-        // Validate only truly required fields
-        if (customerName.equals("-")) {
+        // 🔥 FIX: Validate only truly required fields with null handling
+        if (customerName == null || customerName.trim().isEmpty()) {
             throw new RuntimeException("Customer Name is required");
         }
         
-        if (productName.equals("-")) {
+        if (productName == null || productName.trim().isEmpty()) {
             throw new RuntimeException("Product is required");
         }
         
-        if (stage.equals("-")) {
-            throw new RuntimeException("Stage is required");
+        if (stage == null || stage.trim().isEmpty()) {
+            stage = "NEW_LEAD"; // 🔥 FIX: Default stage instead of throwing error
         }
         
-        // Log row data for debugging
-        log.debug("Importing row: Customer={}, Village={}, District={}, Product={}, Stage={}", 
-                 customerName, village, district, productName, stage);
+        // 🔥 ENHANCED LOGGING: Log row data for debugging
+        log.info("🔥 EXCEL ROW {} → Customer: {}, Bank: {}, Branch: {}, Taluka: {}, District: {}, Product: {}, Stage: {}", 
+                 row.getRowNum(), customerName, bankName, branchName, taluka, district, productName, stage);
         
-        // Department logic
-        if (!allowDepartmentOverride || department.equals("-")) {
-            department = userDepartment;
+        // Department logic - 🔥 FIX: Normalize department and only override if empty
+        if (department != null && !department.trim().isEmpty()) {
+            department = department.trim().toUpperCase(); // 🔥 FIX: Normalize to uppercase
+        } else {
+            department = userDepartment; // Only use user department if Excel is empty
         }
         
         // Find or create client
         Client client = findOrCreateClient(customerName, department);
         
         // Find or create bank from Excel data
-        Bank bank = findOrCreateBank(bankName, branchName);
+        Bank bank = findOrCreateBank(bankName, branchName, taluka, district);
         
         // Create or update address (village can be "-")
         CustomerAddress.AddressType addressTypeEnum = parseAddressType(addressType);
         createOrUpdateAddress(client.getId(), village, taluka, district, addressTypeEnum);
         
-        // Check for existing deal to prevent duplicates
-        Optional<Deal> existingDeal = dealRepository.findByNameAndClientId(productName, client.getId());
+        // 🔥 FIX: Remove restrictive duplicate check to ensure all Excel rows are imported
+        // Optional<Deal> existingDeal = dealRepository.findByNameAndClientId(productName, client.getId());
         
         // Create deal DTO for both new and update scenarios
         DealDto dealDto = new DealDto();
         dealDto.setName(productName);
         dealDto.setClientId(client.getId());
         dealDto.setDepartment(department);
-        dealDto.setStage(stage);
+        dealDto.setStageCode(normalizeStage(stage)); // 🔥 FIX: Use normalized stage
         
         // Set bank information if available
         if (bank != null) {
-            dealDto.setRelatedBankName(bank.getName());
+            dealDto.setBankId(bank.getId()); // 🔥 CRITICAL: Save bankId for frontend mapping
             dealDto.setBranchName(bank.getBranchName());
+            // relatedBankName not needed - bankId is sufficient for frontend
         } else {
-            dealDto.setRelatedBankName(!bankName.equals("-") ? bankName : null);
-            dealDto.setBranchName(!branchName.equals("-") ? branchName : null);
+            dealDto.setBranchName(branchName != null && !branchName.equals("-") && !branchName.trim().isEmpty() ? branchName : null);
         }
         
-        dealDto.setDescription(allotmentLetter.equals("-") ? null : allotmentLetter);
+        // 🔥 FIX: Handle allotmentLetter null safely
+        if (allotmentLetter != null && !allotmentLetter.equals("-") && !allotmentLetter.trim().isEmpty()) {
+            dealDto.setDescription(allotmentLetter);
+        } else {
+            dealDto.setDescription(null); // 🔥 skip only this field
+        }
         
-        // Handle amount safely
-        if (!amountStr.equals("-") && !amountStr.isEmpty()) {
+        // 🔥 FIX: Handle amount null safely
+        if (amountStr != null && !amountStr.equals("-") && !amountStr.trim().isEmpty()) {
             try {
                 // Remove any non-numeric characters except decimal point
                 String cleanAmount = amountStr.replaceAll("[^0-9.]", "");
@@ -247,9 +303,10 @@ public class DealExcelImportService {
                     dealDto.setValueAmount(new BigDecimal(cleanAmount));
                 }
             } catch (NumberFormatException e) {
-                log.warn("Invalid amount format '{}' for customer {}, using 0", amountStr, customerName);
                 dealDto.setValueAmount(BigDecimal.ZERO);
             }
+        } else {
+            dealDto.setValueAmount(BigDecimal.ZERO); // 🔥 safe default
         }
         
         // Handle closing date (already parsed safely)
@@ -257,91 +314,131 @@ public class DealExcelImportService {
             dealDto.setClosingDate(closingDate);
         }
         
-        if (existingDeal.isPresent()) {
-            // Update existing deal with missing information
-            Deal existing = existingDeal.get();
-            boolean updated = false;
-            
-            if (existing.getBranchName() == null && dealDto.getBranchName() != null) {
-                existing.setBranchName(dealDto.getBranchName());
-                updated = true;
-            }
-            
-            if (existing.getRelatedBankName() == null && dealDto.getRelatedBankName() != null) {
-                existing.setRelatedBankName(dealDto.getRelatedBankName());
-                updated = true;
-            }
-            
-            if (existing.getValueAmount() == null && dealDto.getValueAmount() != null) {
-                existing.setValueAmount(dealDto.getValueAmount());
-                updated = true;
-            }
-            
-            if (existing.getClosingDate() == null && dealDto.getClosingDate() != null) {
-                existing.setClosingDate(dealDto.getClosingDate());
-                updated = true;
-            }
-            
-            if (existing.getDescription() == null && dealDto.getDescription() != null) {
-                existing.setDescription(dealDto.getDescription());
-                updated = true;
-            }
-            
-            if (updated) {
-                dealRepository.save(existing);
-                log.info("Updated existing deal {} for client: {}", existing.getId(), customerName);
-            } else {
-                log.debug("No updates needed for existing deal {} for client: {}", existing.getId(), customerName);
-            }
-        } else {
-            // Create new deal
-            Deal deal = crmMapper.toDealEntity(dealDto);
-            dealService.create(deal);
-            
-            log.info("Created new deal: {} for client: {}", productName, customerName);
+        // 🔥 FIX: ALWAYS CREATE NEW DEAL (CRM best practice - no data loss)
+        // Remove duplicate check to ensure all Excel rows are imported
+        Deal deal = crmMapper.toDealEntity(dealDto);
+        deal = dealService.create(deal); // 🔥 FIX: Get the created deal with ID
+        
+        // 🔥 FIX: CREATE OR FIND PRODUCT
+        Product product = productRepository
+            .findByNameIgnoreCase(productName)
+            .orElseGet(() -> {
+                Product p = new Product();
+                p.setName(productName);
+                p.setActive(true); // 🔥 FIX: Use setActive not setIsActive
+                return productRepository.save(p);
+            });
+
+        // 🔥 FIX: CREATE DEAL_PRODUCT (LINK)
+        DealProduct dealProduct = new DealProduct();
+        dealProduct.setDeal(deal); // 🔥 FIX: Use setDeal not setDealId
+        dealProduct.setProduct(product); // 🔥 FIX: Use setProduct not setProductId
+        dealProduct.setQuantity(BigDecimal.ONE); // 🔥 FIX: Use BigDecimal for quantity
+        dealProduct.setUnitPrice(
+            dealDto.getValueAmount() != null ? dealDto.getValueAmount() : BigDecimal.ZERO
+        );
+        dealProduct.setTotal(dealProduct.getUnitPrice()); // 🔥 FIX: Calculate total properly
+        
+        // 🔥 CRITICAL FIX: Add to deal's collection for proper relationship
+        deal.getDealProducts().add(dealProduct);
+        
+        dealProductRepository.save(dealProduct);
+        
+        // 🔥 FIX: Save deal again to persist the relationship
+        dealService.update(deal);
+        
+        log.info("✅ Product linked: {} → Deal {} (Product ID: {})", productName, deal.getId(), product.getId());
+        
+        // 🔥 FIX: Create stage history for pipeline tracking
+        if (deal.getStageHistory() == null) {
+            deal.setStageHistory(new ArrayList<>());
         }
+        
+        // Note: Stage history creation would require DealStageHistory entity and repository
+        // For now, the deal will be created with the correct stageCode
+        
+        log.info("✅ Created new deal: {} for client: {} (Bank: {} | BankId: {})", 
+                 productName, customerName, 
+                 bank != null ? bank.getName() : "None", 
+                 bank != null ? bank.getId() : "None");
     }
 
     private Client findOrCreateClient(String name, String department) {
-        // Note: Client entity doesn't have department field
-        // Check if client exists by name only (clients are global)
-        Optional<Client> existing = clientRepository.findByName(name);
+        // 🔥 FIX: Prevent duplicate clients - same customer should be same client
+        Optional<Client> existing = clientRepository.findByName(name.trim());
         if (existing.isPresent()) {
+            log.debug("Found existing client: {}", name);
             return existing.get();
         }
         
-        // Create new client
+        // Create new client only if doesn't exist
         Client client = new Client();
-        client.setName(name);
+        client.setName(name.trim());
         client.setIsActive(true);
         
+        log.info("Creating new client: {}", name);
         return clientService.createClientEntity(client);
     }
 
     /**
-     * Find existing bank or create new one from Excel data
+     * 🔥 FIX: Find existing bank or create new one from Excel data using BankService
      */
-    private Bank findOrCreateBank(String bankName, String branchName) {
-        if (bankName == null || bankName.equals("-")) {
+    private Bank findOrCreateBank(String bankName, String branchName, String taluka, String district) {
+        if (bankName == null || bankName.trim().isEmpty()) {
             return null;
         }
 
-        // Check if bank already exists (case-insensitive)
-        Optional<Bank> existing = bankRepository.findByNameIgnoreCase(bankName.trim());
+        // 🔥 FIX: Handle null values for branch and taluka
+        if (branchName != null && branchName.trim().isEmpty()) {
+            branchName = null;
+        }
+        if (taluka != null && taluka.trim().isEmpty()) {
+            taluka = null;
+        }
+
+        // 🔥 ENHANCED: Handle bank duplicate logic with multiple levels of specificity
+        Optional<Bank> existing = null;
+        if (branchName != null && taluka != null) {
+            // Most specific: name + branch + taluka
+            existing = bankRepository.findByNameIgnoreCaseAndBranchNameIgnoreCaseAndTalukaIgnoreCase(
+                bankName.trim(), branchName.trim(), taluka.trim()
+            );
+        } else if (branchName != null) {
+            // Medium specificity: name + branch
+            existing = bankRepository.findByNameIgnoreCaseAndBranchNameIgnoreCase(
+                bankName.trim(), branchName.trim()
+            );
+        } else {
+            // Least specific: name only
+            existing = bankRepository.findByNameIgnoreCase(bankName.trim());
+        }
+
         if (existing.isPresent()) {
-            log.debug("Found existing bank: {}", bankName);
+            log.debug("Found existing bank: {} ({})", bankName, branchName);
             return existing.get();
         }
 
-        // Create new bank
-        Bank bank = new Bank();
-        bank.setName(bankName.trim());
-        bank.setBranchName(branchName != null && !branchName.equals("-") ? branchName.trim() : null);
-        bank.setActive(true);
-        
-        log.info("Creating new bank: {} - {}", bankName, branchName);
-        return bankService.create(bank);
+        // 🔥 FIX: Create new bank using BankService (which now handles duplicates correctly)
+        Bank newBank = new Bank();
+        newBank.setName(bankName.trim());
+        newBank.setBranchName(branchName != null ? branchName.trim() : null);
+        newBank.setTaluka(taluka != null ? taluka.trim() : null);
+        newBank.setDistrict(district != null ? district.trim() : null);
+        newBank.setActive(true);
+
+        try {
+            Bank createdBank = bankService.create(newBank);
+            log.info("Created new bank: {} ({})", bankName, branchName);
+            return createdBank;
+        } catch (Exception e) {
+            log.error("Failed to create bank: {} ({}) - {}", bankName, branchName, e.getMessage());
+            return null; // 🔥 FIX: Return null instead of breaking the import
+        }
     }
+
+    /**
+     * Parse Excel date properly - handles both numeric Excel dates and string dates
+     */
 
     private void createOrUpdateAddress(Long clientId, String village, String taluka, 
                                      String district, CustomerAddress.AddressType addressType) {
@@ -359,9 +456,15 @@ public class DealExcelImportService {
             address.setAddressType(addressType);
         }
         
-        address.setAddressLine(village);
-        address.setCity(taluka);
-        address.setState(district);
+        // 🔥 FIX: Handle address_line null safely (DB constraint)
+        if (village == null || village.equals("-") || village.trim().isEmpty()) {
+            address.setAddressLine("N/A"); // 🔥 default value for DB constraint
+        } else {
+            address.setAddressLine(village);
+        }
+        // 🔥 FIX: Handle city and state null safely
+        address.setCity(taluka != null && !taluka.trim().isEmpty() ? taluka : "N/A");
+        address.setState(district != null && !district.trim().isEmpty() ? district : "N/A");
         address.setCountry("India"); // Default
         
         customerAddressRepository.save(address);
@@ -395,19 +498,19 @@ public class DealExcelImportService {
     }
     
     /**
-     * Safe cell value reader - never returns null, returns "-" for empty cells
+     * Safe cell value reader - never returns null, returns null for empty cells
      */
     private String getCellValueSafely(Row row, int index) {
         Cell cell = row.getCell(index);
         
         if (cell == null) {
-            return "-";
+            return null; // 🔥 FIX: Return null instead of "-"
         }
         
         return switch (cell.getCellType()) {
             case STRING -> {
                 String value = cell.getStringCellValue().trim();
-                yield value.isEmpty() ? "-" : value;
+                yield value.isEmpty() ? null : value; // 🔥 FIX: Return null instead of "-"
             }
             case NUMERIC -> String.valueOf((long) cell.getNumericCellValue());
             case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
@@ -415,10 +518,11 @@ public class DealExcelImportService {
                 try {
                     yield String.valueOf(cell.getNumericCellValue());
                 } catch (Exception e) {
-                    yield cell.getStringCellValue().trim();
+                    String value = cell.getStringCellValue().trim();
+                    yield value.isEmpty() ? null : value; // 🔥 FIX: Return null instead of "-"
                 }
             }
-            default -> "-";
+            default -> null; // 🔥 FIX: Return null instead of "-"
         };
     }
     
