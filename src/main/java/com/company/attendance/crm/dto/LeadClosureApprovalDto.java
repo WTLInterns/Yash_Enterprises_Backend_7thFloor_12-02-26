@@ -1,12 +1,14 @@
 package com.company.attendance.crm.dto;
 
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class LeadClosureApprovalDto {
@@ -14,19 +16,24 @@ public class LeadClosureApprovalDto {
     private Long id;
     private Long dealId;
     private String dealName;
+    private Long clientId;
     private String clientName;
-    private String dealValue;
-    private Long requestedBy;
-    private String requestedByName;
     private String requestedStage;
+    private String currentStage;
+    private String currentDepartment;
+    private String fromDepartment;
+    private Long requestedByUserId;
+    private String requestedByName;
+    private OffsetDateTime requestedAt;
     private String status;
-    private Long approvedBy;
-    private String approvedByName;
-    private LocalDateTime approvedAt;
+    private Long reviewedByUserId;
+    private String reviewedByName;
+    private OffsetDateTime reviewedAt;
     private String rejectionReason;
-    private LocalDateTime createdAt;
+    private java.math.BigDecimal valueAmount;
 
-    @Data
+    @Getter
+    @Setter
     @NoArgsConstructor
     @AllArgsConstructor
     public static class RequestApprovalRequest {
@@ -34,7 +41,8 @@ public class LeadClosureApprovalDto {
         private String reason;
     }
 
-    @Data
+    @Getter
+    @Setter
     @NoArgsConstructor
     @AllArgsConstructor
     public static class ApprovalAction {

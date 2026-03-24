@@ -1,16 +1,17 @@
 package com.company.attendance.crm.entity;
 
-import com.company.attendance.crm.enums.ApprovalStatus;
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 @Entity
-@Table(name = "lead_closure_approval")
-@Data
+@Table(name = "lead_closure_approvals")
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class LeadClosureApproval {
@@ -22,33 +23,51 @@ public class LeadClosureApproval {
     @Column(name = "deal_id", nullable = false)
     private Long dealId;
 
-    @Column(name = "requested_by", nullable = false)
-    private Long requestedBy;
+    @Column(name = "deal_name")
+    private String dealName;
+
+    @Column(name = "client_id")
+    private Long clientId;
+
+    @Column(name = "client_name")
+    private String clientName;
 
     @Column(name = "requested_stage", nullable = false)
     private String requestedStage;
 
-    @Enumerated(EnumType.STRING)
+    @Column(name = "current_stage")
+    private String currentStage;
+
+    @Column(name = "current_department")
+    private String currentDepartment;
+
+    @Column(name = "from_department")
+    private String fromDepartment;
+
+    @Column(name = "requested_by_user_id", nullable = false)
+    private Long requestedByUserId;
+
+    @Column(name = "requested_by_name")
+    private String requestedByName;
+
+    @Column(name = "requested_at", nullable = false)
+    private OffsetDateTime requestedAt;
+
     @Column(name = "status", nullable = false)
-    private ApprovalStatus status;
+    private String status;
 
-    @Column(name = "approved_by")
-    private Long approvedBy;
+    @Column(name = "reviewed_by_user_id")
+    private Long reviewedByUserId;
 
-    @Column(name = "approved_at")
-    private LocalDateTime approvedAt;
+    @Column(name = "reviewed_by_name")
+    private String reviewedByName;
 
-    @Column(name = "rejection_reason", length = 500)
+    @Column(name = "reviewed_at")
+    private OffsetDateTime reviewedAt;
+
+    @Column(name = "rejection_reason")
     private String rejectionReason;
 
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
-
-    @PrePersist
-    protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-        if (this.status == null) {
-            this.status = ApprovalStatus.PENDING;
-        }
-    }
+    @Column(name = "value_amount")
+    private java.math.BigDecimal valueAmount;
 }

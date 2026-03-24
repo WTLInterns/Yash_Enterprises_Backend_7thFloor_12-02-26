@@ -220,47 +220,27 @@ public class DealController {
     String prevDepartment = deal.getDepartment();
     String prevStageCode = deal.getStageCode();
 
-    // Set the new stage
+    // ✅ FIXED: Directly set new stage — NO auto ACCOUNT transfer
+    // Account transfer is now handled via LeadClosureApprovalService (approval flow)
     deal.setStageCode(stageRaw);
 
-    // AUTO MOVE TO ACCOUNT if final stage reached OR if stage is "ACCOUNT"
-    if ("ACCOUNT".equalsIgnoreCase(stageRaw) || stageService.shouldTransitionToAccount(prevDepartment, stageRaw)) {
-      // 🔥 FIXED: Prevent duplicate notifications if already in ACCOUNT
-      if ("ACCOUNT".equalsIgnoreCase(prevDepartment)) {
-        System.out.println("Deal is already in ACCOUNT department, skipping transfer notifications");
-        deal.setStageCode(stageRaw);
-      } else {
-        deal.setDepartment("ACCOUNT");
-        deal.setStageCode(stageService.getFirstAccountStage());
-        System.out.println("AUTO TRANSITION: Deal " + dealId + 
-          " moved from " + prevDepartment + "/" + prevStageCode + 
-          " to ACCOUNT/" + deal.getStageCode());
-      }
-    } else if (body.get("department") != null) {
-      // Manual department change (only if not auto-transitioned)
-      // 🔥 FIXED: Prevent duplicate notifications if already in target department
-      if (body.get("department").equalsIgnoreCase(prevDepartment)) {
-        System.out.println("Deal is already in target department " + body.get("department") + ", skipping transfer notifications");
-      } else {
-        deal.setDepartment(body.get("department"));
-      }
+    // Only update department if explicitly provided in request body
+    if (body.get("department") != null && !body.get("department").isBlank()) {
+      deal.setDepartment(body.get("department"));
     }
 
     Deal saved = dealRepository.save(deal);
 
-    // FIX: Try body userId first, then header, then audit service
+    // Resolve userId from body → header → audit service
     Long userId = null;
     if (body.get("userId") != null) {
-      try {
-        userId = Long.valueOf(body.get("userId"));
-      } catch (NumberFormatException e) {
-        // ignore
-      }
+      try { userId = Long.valueOf(body.get("userId")); } catch (NumberFormatException e) { /* ignore */ }
     }
     if (userId == null) {
       userId = headerUserId != null ? headerUserId : auditService.getCurrentUserId();
     }
     
+    // Save stage history
     DealStageHistory h = new DealStageHistory();
     h.setDeal(saved);
     h.setPreviousStage(prevStageCode);
@@ -268,92 +248,6 @@ public class DealController {
     h.setChangedBy(userId != null ? String.valueOf(userId) : null);
     h.setChangedAt(OffsetDateTime.now());
     dealStageHistoryRepository.save(h);
-
-    // SEND NOTIFICATIONS when deal is transferred to ACCOUNT
-    if ("ACCOUNT".equalsIgnoreCase(saved.getDepartment()) && !"ACCOUNT".equalsIgnoreCase(prevDepartment)) {
-      try {
-        System.out.println("===== SENDING NOTIFICATIONS FOR DEAL TRANSFER =====");
-        System.out.println("Deal ID: " + saved.getId());
-        System.out.println("Client ID: " + saved.getClientId());
-        System.out.println("Previous Department: " + prevDepartment);
-        System.out.println("New Department: ACCOUNT");
-        
-        // 🔥 FIXED: Calculate deal value from products with proper fallback
-        BigDecimal dealValue = saved.getValueAmount();
-        try {
-            // Try to get calculated grand total from products
-            BigDecimal calculatedTotal = productLineService.grandTotal(saved.getId());
-            if (calculatedTotal != null && calculatedTotal.compareTo(BigDecimal.ZERO) > 0) {
-                dealValue = calculatedTotal;
-                System.out.println("Deal Value (calculated from products): " + dealValue);
-            } else {
-                System.out.println("Deal Value (using fallback - no product totals): " + dealValue);
-            }
-        } catch (Exception e) {
-            System.out.println("Deal Value (fallback to valueAmount due to error): " + dealValue);
-            System.out.println("Could not calculate from products: " + e.getMessage());
-        }
-        
-        System.out.println("Customer Name: " + saved.getName());
-        
-        String title = "Deal Sent to Accounts";
-        String message = "Deal for customer '" + saved.getName() +
-                      "' (Rs." + (dealValue != null ? dealValue : "0") +
-                      ") moved from " + prevDepartment +
-                      " to ACCOUNT by " + employeeName(userId);
-
-        Map<String, String> data = Map.of(
-            "dealId", String.valueOf(saved.getId()),
-            "clientId", String.valueOf(saved.getClientId()),
-            "fromDepartment", prevDepartment,
-            "toDepartment", "ACCOUNT",
-            "dealValue", String.valueOf(dealValue),
-            "customerName", saved.getName()
-        );
-
-        // Notify ADMIN (role-based)
-        System.out.println("Sending ADMIN notification...");
-        notificationService.sendRoleBasedNotification(
-            "ADMIN",
-            title,
-            message,
-            "DEAL_TRANSFER",
-            saved.getId()
-        );
-        System.out.println("✅ ADMIN notification sent");
-
-        // Notify MANAGER (role-based)
-        System.out.println("Sending MANAGER notification...");
-        notificationService.sendRoleBasedNotification(
-            "MANAGER",
-            title,
-            message,
-            "DEAL_TRANSFER",
-            saved.getId()
-        );
-        System.out.println("✅ MANAGER notification sent");
-
-        // Notify ACCOUNT department (department-based)
-        System.out.println("Sending ACCOUNT department notification...");
-        notificationService.sendDepartmentNotification(
-            "ACCOUNT",
-            title,
-            message,
-            "DEAL_TRANSFER",
-            saved.getId()
-        );
-        System.out.println("✅ ACCOUNT department notification sent");
-
-        System.out.println("===== ALL NOTIFICATIONS SENT SUCCESSFULLY =====");
-        System.out.println("NOTIFICATIONS SENT: Deal " + saved.getId() + 
-          " transfer to ACCOUNT notified to ADMIN, MANAGER, ACCOUNT department");
-      } catch (Exception e) {
-        System.err.println("===== NOTIFICATION SENDING FAILED =====");
-        System.err.println("FAILED TO SEND NOTIFICATIONS: " + e.getMessage());
-        e.printStackTrace();
-        // Continue even if notifications fail
-      }
-    }
 
     return ResponseEntity.ok(mapper.toDealDto(saved));
   }

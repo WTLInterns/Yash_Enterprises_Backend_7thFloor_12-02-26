@@ -147,62 +147,55 @@ public class NotificationService {
     /**
      * Send role-based notification with WebSocket support
      */
+    /**
+     * ✅ FIXED: Send role-based notification — supports BOTH "MANAGER" and "ADMIN"
+     * Replace existing sendRoleBasedNotification method with this one
+     */
     @Transactional
     public void sendRoleBasedNotification(String role, String title, String message, String type, Long refId) {
         try {
-            log.info("🔥 [FIREBASE] sendRoleBasedNotification called:");
-            log.info("🔥 [FIREBASE] - Role: {}", role);
-            log.info("🔥 [FIREBASE] - Title: {}", title);
-            log.info("🔥 [FIREBASE] - Message: {}", message);
-            log.info("🔥 [FIREBASE] - Type: {}", type);
-            log.info("🔥 [FIREBASE] - RefId: {}", refId);
-            log.info("🔥 [FIREBASE] - Firebase Enabled: {}", firebaseEnabled);
+            log.info("� sendRoleBasedNotification: role={}, title={}, type={}", role, title, type);
 
-            if ("MANAGER".equals(role)) {
-                // Find all manager employees
-                List<Employee> managerEmployees = employeeRepository.findByRole_Name("MANAGER");
-                log.info("🔥 [FIREBASE] Found {} manager employees", managerEmployees.size());
-                
-                for (Employee manager : managerEmployees) {
-                    log.info("🔥 [FIREBASE] Sending to manager: {} (ID: {})", manager.getFullName(), manager.getId());
-                    
-                    // Create notification for each manager
-                    AppNotification notification = new AppNotification();
-                    notification.setRecipientEmployeeId(manager.getId());
-                    notification.setRecipientRole(role);
-                    notification.setTitle(title);
-                    notification.setBody(message);
-                    notification.setType(type);
-                    notification.setRefType(type);
-                    notification.setRefId(refId);
-                    notification.setChannel("WEB");
-                    notification.setCreatedAt(LocalDateTime.now());
-                    
-                    notificationRepository.save(notification);
-                    
-                    // Send Firebase notification
-                    notifyEmployeeWeb(manager.getId(), title, message, type, type, refId, null);
-                    notifyEmployeeMobile(manager.getId(), title, message, type, type, refId, null);
-                }
-                
-                // Send WebSocket notification
-                messagingTemplate.convertAndSend("/topic/notifications/role/MANAGER", Map.of(
-                    "title", title,
-                    "body", message,
-                    "type", type,
-                    "refId", refId,
-                    "role", role,
-                    "timestamp", LocalDateTime.now().toString()
-                ));
-                
-                log.info("✅ [FIREBASE] Manager notification sent: {} - {} managers notified", title, managerEmployees.size());
-                
-            } else {
-                log.warn("🔥 [FIREBASE] Unsupported role for notification: {}", role);
+            // Find all employees with this role
+            List<Employee> employees = employeeRepository.findByRole_Name(role);
+            log.info("� Found {} employees with role={}", employees.size(), role);
+
+            for (Employee emp : employees) {
+                // Save DB notification per employee (with role set)
+                AppNotification notification = AppNotification.builder()
+                        .recipientEmployeeId(emp.getId())
+                        .recipientRole(role)
+                        .title(title)
+                        .body(message)
+                        .type(type)
+                        .refType(type)
+                        .refId(refId)
+                        .channel("WEB")
+                        .createdAt(LocalDateTime.now())
+                        .build();
+                notificationRepository.save(notification);
+
+                // Firebase push
+                notifyEmployeeWeb(emp.getId(), title, message, type, type, refId, null);
+                notifyEmployeeMobile(emp.getId(), title, message, type, type, refId, null);
+
+                log.info("✅ Notified {} employee: {} (ID: {})", role, emp.getFullName(), emp.getId());
             }
-            
+
+            // WebSocket broadcast to role topic
+            messagingTemplate.convertAndSend("/topic/notifications/role/" + role, Map.of(
+                "title", title,
+                "body", message,
+                "type", type,
+                "refId", refId != null ? refId : 0L,
+                "role", role,
+                "timestamp", LocalDateTime.now().toString()
+            ));
+
+            log.info("✅ sendRoleBasedNotification complete: role={}, {} employees notified", role, employees.size());
+
         } catch (Exception e) {
-            log.error("❌ [FIREBASE] Error in sendRoleBasedNotification", e);
+            log.error("❌ sendRoleBasedNotification failed for role={}: {}", role, e.getMessage(), e);
         }
     }
 
@@ -259,6 +252,52 @@ public class NotificationService {
             
         } catch (Exception e) {
             log.error("❌ [DEPARTMENT NOTIFICATION] Error in sendDepartmentNotification", e);
+        }
+    }
+
+    /**
+     * ✅ NEW: Send notification to a specific user (by userId)
+     * Used by LeadClosureApprovalService to notify requester on approve/reject
+     */
+    @Transactional
+    public void sendUserNotification(Long userId, String title, String message, String type, Long refId) {
+        if (userId == null) {
+            log.warn("🔔 sendUserNotification: userId is null, skipping");
+            return;
+        }
+        try {
+            log.info("🔔 sendUserNotification: userId={}, title={}, type={}", userId, title, type);
+
+            // Save DB notification
+            AppNotification notification = AppNotification.builder()
+                    .recipientEmployeeId(userId)
+                    .title(title)
+                    .body(message)
+                    .type(type)
+                    .refType(type)
+                    .refId(refId)
+                    .channel("WEB")
+                    .createdAt(LocalDateTime.now())
+                    .build();
+            notificationRepository.save(notification);
+
+            // Firebase push (web + mobile)
+            notifyEmployeeWeb(userId, title, message, type, type, refId, null);
+            notifyEmployeeMobile(userId, title, message, type, type, refId, null);
+
+            // WebSocket direct message
+            messagingTemplate.convertAndSend("/topic/notifications/user/" + userId, Map.of(
+                "title", title,
+                "body", message,
+                "type", type,
+                "refId", refId != null ? refId : 0L,
+                "timestamp", LocalDateTime.now().toString()
+            ));
+
+            log.info("✅ sendUserNotification sent to userId={}", userId);
+
+        } catch (Exception e) {
+            log.error("❌ sendUserNotification failed for userId={}: {}", userId, e.getMessage(), e);
         }
     }
 }

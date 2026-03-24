@@ -3,276 +3,308 @@ package com.company.attendance.crm.service;
 import com.company.attendance.crm.dto.LeadClosureApprovalDto;
 import com.company.attendance.crm.entity.Deal;
 import com.company.attendance.crm.entity.LeadClosureApproval;
-import com.company.attendance.crm.enums.ApprovalStatus;
+import com.company.attendance.crm.entity.DealStageHistory;
+import com.company.attendance.crm.mapper.CrmMapper;
 import com.company.attendance.crm.repository.DealRepository;
 import com.company.attendance.crm.repository.LeadClosureApprovalRepository;
-import com.company.attendance.entity.Employee;
-import com.company.attendance.repository.EmployeeRepository;
+import com.company.attendance.crm.repository.DealStageHistoryRepository;
 import com.company.attendance.notification.NotificationService;
+import com.company.attendance.entity.Employee;
+import com.company.attendance.entity.Client;
+import com.company.attendance.repository.EmployeeRepository;
+import com.company.attendance.repository.ClientRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional
 public class LeadClosureApprovalService {
 
     private final LeadClosureApprovalRepository approvalRepository;
     private final DealRepository dealRepository;
+    private final DealStageHistoryRepository stageHistoryRepository;
     private final EmployeeRepository employeeRepository;
+    private final ClientRepository clientRepository;
     private final NotificationService notificationService;
+    private final CrmMapper mapper;
 
-    /**
-     * Request closure approval from ACCOUNT department user
-     */
-    public LeadClosureApprovalDto requestClosure(Long dealId, String stage, Long employeeId) {
-        log.info("Requesting closure approval for deal {} by employee {}", dealId, employeeId);
+    // ── Helpers ─────────────────────────────────────────────────────────────
 
-        // Check if pending approval already exists
-        if (approvalRepository.existsByDealIdAndStatus(dealId, ApprovalStatus.PENDING)) {
+    private String getEmployeeName(Long employeeId) {
+        if (employeeId == null) return "Unknown User";
+        return employeeRepository.findById(employeeId)
+            .map(e -> {
+                String first = e.getFirstName() != null ? e.getFirstName().trim() : "";
+                String last  = e.getLastName()  != null ? e.getLastName().trim()  : "";
+                String full  = (first + " " + last).trim();
+                return full.isEmpty() ? "User #" + employeeId : full;
+            })
+            .orElse("User #" + employeeId);
+    }
+
+    private String getEmployeeDept(Long employeeId) {
+        if (employeeId == null) return null;
+        return employeeRepository.findById(employeeId)
+            .map(Employee::getDepartmentName)
+            .orElse(null);
+    }
+
+    // ✅ NEW: Get client name by clientId
+    private String getClientName(Long clientId) {
+        if (clientId == null) return null;
+        return clientRepository.findById(clientId)
+            .map(Client::getName)
+            .orElse(null);
+    }
+
+    // ── Request Closure ──────────────────────────────────────────────────────
+
+    @Transactional
+    public LeadClosureApprovalDto requestClosure(Long dealId, String stage, Long requestedByUserId) {
+        Deal deal = dealRepository.findByIdSafe(dealId);
+
+        boolean alreadyPending = approvalRepository.existsByDealIdAndStatus(dealId, "PENDING");
+        if (alreadyPending) {
             throw new IllegalStateException("Approval request already pending for this deal");
         }
 
-        // Validate stage - accept both variations
-        boolean isValidStage = "CLOSE_WON".equals(stage) || "CLOSE_LOST".equals(stage) 
-                           || "CLOSE_WIN".equals(stage) || "CLOSE_LOST".equals(stage);
-        
-        if (!isValidStage) {
-            throw new IllegalArgumentException("Invalid stage. Only CLOSE_WON, CLOSE_WIN, or CLOSE_LOST are allowed");
-        }
-        
-        // Keep original stage format - don't normalize
-        // This ensures consistency between frontend and backend
+        String requesterName = getEmployeeName(requestedByUserId);
+        String requesterDept = getEmployeeDept(requestedByUserId);
+        // ✅ Fetch client name
+        String clientName = getClientName(deal.getClientId());
 
-        // Get deal information
-        Deal deal = dealRepository.findById(dealId)
-                .orElseThrow(() -> new IllegalArgumentException("Deal not found with id: " + dealId));
-
-        // Create approval request
         LeadClosureApproval approval = new LeadClosureApproval();
         approval.setDealId(dealId);
-        approval.setRequestedBy(employeeId);
-        approval.setRequestedStage(stage);
-        approval.setStatus(ApprovalStatus.PENDING);
+        approval.setDealName(deal.getName());
+        approval.setClientId(deal.getClientId());
+        approval.setClientName(clientName);  // ✅ Set client name
+        approval.setRequestedStage(stage != null ? stage : "ACCOUNT");
+        approval.setCurrentStage(deal.getStageCode());
+        approval.setCurrentDepartment(deal.getDepartment());
+        approval.setFromDepartment(deal.getDepartment());
+        approval.setRequestedByUserId(requestedByUserId);
+        approval.setRequestedByName(requesterName);
+        approval.setRequestedAt(OffsetDateTime.now());
+        approval.setStatus("PENDING");
+        approval.setValueAmount(deal.getValueAmount());
 
-        approval = approvalRepository.save(approval);
-        log.info("Created closure approval request: {}", approval.getId());
+        LeadClosureApproval saved = approvalRepository.save(approval);
 
-        // Send notification to MANAGER role
-        sendClosureRequestNotification(approval, deal);
+        String notifTitle = "Deal Transfer Request";
+        String notifMessage = requesterName
+            + " (" + (requesterDept != null ? requesterDept : "Unknown") + ")"
+            + " requests to transfer deal '" + deal.getName() + "'"
+            + (clientName != null ? " (Client: " + clientName + ")" : "")
+            + (deal.getValueAmount() != null ? " (₹" + deal.getValueAmount() + ")" : "")
+            + " to Accounts. Approval required.";
 
-        return convertToDto(approval, deal);
-    }
-
-    /**
-     * Approve closure request by MANAGER
-     */
-    public LeadClosureApprovalDto approveClosure(Long approvalId, Long managerId) {
-        log.info("🔥 [APPROVAL] approveClosure called:");
-        log.info("🔥 [APPROVAL] - ApprovalId: {}", approvalId);
-        log.info("🔥 [APPROVAL] - ManagerId: {}", managerId);
-        
-        log.info("Approving closure request {} by manager {}", approvalId, managerId);
-
-        LeadClosureApproval approval = approvalRepository.findById(approvalId)
-                .orElseThrow(() -> new IllegalArgumentException("Approval request not found"));
-
-        if (approval.getStatus() != ApprovalStatus.PENDING) {
-            throw new IllegalStateException("Approval request is not pending");
+        try {
+            notificationService.sendRoleBasedNotification(
+                "MANAGER", notifTitle, notifMessage, "DEAL_TRANSFER_REQUEST", dealId);
+            log.info("✅ MANAGER notified for deal {} transfer request", dealId);
+        } catch (Exception e) {
+            log.error("Failed to notify MANAGER: {}", e.getMessage());
         }
 
-        // Update approval
-        approval.setStatus(ApprovalStatus.APPROVED);
-        approval.setApprovedBy(managerId);
-        approval.setApprovedAt(LocalDateTime.now());
-
-        approval = approvalRepository.save(approval);
-
-        // Update deal stage
-        Deal deal = dealRepository.findById(approval.getDealId())
-                .orElseThrow(() -> new IllegalArgumentException("Deal not found"));
-
-        deal.setStageCode(approval.getRequestedStage());
-        dealRepository.save(deal);
-        log.info("Updated deal {} stage to {}", deal.getId(), approval.getRequestedStage());
-
-        // Send notification to ACCOUNT user
-        sendApprovalNotification(approval, deal, true);
-
-        return convertToDto(approval, deal);
-    }
-
-    /**
-     * Reject closure request by MANAGER
-     */
-    public LeadClosureApprovalDto rejectClosure(Long approvalId, Long managerId, String reason) {
-        log.info("Rejecting closure request {} by manager {}", approvalId, managerId);
-
-        LeadClosureApproval approval = approvalRepository.findById(approvalId)
-                .orElseThrow(() -> new IllegalArgumentException("Approval request not found"));
-
-        if (approval.getStatus() != ApprovalStatus.PENDING) {
-            throw new IllegalStateException("Approval request is not pending");
+        try {
+            notificationService.sendRoleBasedNotification(
+                "ADMIN", notifTitle, notifMessage, "DEAL_TRANSFER_REQUEST", dealId);
+            log.info("✅ ADMIN notified for deal {} transfer request", dealId);
+        } catch (Exception e) {
+            log.error("Failed to notify ADMIN: {}", e.getMessage());
         }
 
-        // Update approval
-        approval.setStatus(ApprovalStatus.REJECTED);
-        approval.setApprovedBy(managerId);
-        approval.setApprovedAt(LocalDateTime.now());
+        return toDto(saved, deal);
+    }
+
+    // ── Approve ──────────────────────────────────────────────────────────────
+
+    @Transactional
+    public LeadClosureApprovalDto approveClosure(Long approvalId, Long approvedByUserId) {
+        LeadClosureApproval approval = approvalRepository.findById(approvalId)
+            .orElseThrow(() -> new IllegalArgumentException("Approval not found: " + approvalId));
+
+        if (!"PENDING".equals(approval.getStatus())) {
+            throw new IllegalStateException("Approval is not in PENDING state");
+        }
+
+        // ✅ approvedByUserId is the ACTUAL logged-in manager/admin who clicked approve
+        String approverName = getEmployeeName(approvedByUserId);
+        log.info("✅ approveClosure: approvalId={}, approvedByUserId={}, approverName={}",
+            approvalId, approvedByUserId, approverName);
+
+        approval.setStatus("APPROVED");
+        approval.setReviewedByUserId(approvedByUserId);
+        approval.setReviewedByName(approverName);  // ✅ Dynamic — whoever approved
+        approval.setReviewedAt(OffsetDateTime.now());
+        approvalRepository.save(approval);
+
+        Deal deal = dealRepository.findByIdSafe(approval.getDealId());
+        String prevDept  = deal.getDepartment();
+        String prevStage = deal.getStageCode();
+
+        deal.setDepartment("ACCOUNT");
+        deal.setStageCode("INVENTORY");
+        Deal savedDeal = dealRepository.save(deal);
+
+        DealStageHistory h = new DealStageHistory();
+        h.setDeal(savedDeal);
+        h.setPreviousStage(prevStage);
+        h.setNewStage("INVENTORY");
+        h.setChangedBy(String.valueOf(approvedByUserId));
+        h.setChangedAt(OffsetDateTime.now());
+        stageHistoryRepository.save(h);
+
+        // ✅ Notify requester with DYNAMIC approver name
+        try {
+            String title = "Deal Transfer Approved ✅";
+            String message = "Your request to transfer deal '" + deal.getName() + "'"
+                + " from " + prevDept + " to Accounts has been approved by " + approverName + ".";
+            notificationService.sendUserNotification(
+                approval.getRequestedByUserId(), title, message, "DEAL_APPROVED", deal.getId());
+            log.info("✅ Requester {} notified of approval by {}", approval.getRequestedByUserId(), approverName);
+        } catch (Exception e) {
+            log.error("Failed to notify requester of approval: {}", e.getMessage());
+        }
+
+        // ✅ Notify ACCOUNT department with DYNAMIC approver name
+        try {
+            String clientName = getClientName(deal.getClientId());
+            String title = "New Deal Received 🎉";
+            String message = "Deal '" + deal.getName() + "'"
+                + (clientName != null ? " (Client: " + clientName + ")" : "")
+                + (deal.getValueAmount() != null ? " (₹" + deal.getValueAmount() + ")" : "")
+                + " from " + prevDept + " has been transferred to Accounts."
+                + " Approved by " + approverName + ".";
+            notificationService.sendDepartmentNotification(
+                "ACCOUNT", title, message, "DEAL_TRANSFER", deal.getId());
+            log.info("✅ ACCOUNT dept notified of new deal");
+        } catch (Exception e) {
+            log.error("Failed to notify ACCOUNT dept: {}", e.getMessage());
+        }
+
+        // Notify original department
+        try {
+            if (prevDept != null && !prevDept.equals("ACCOUNT")) {
+                String title = "Deal Transferred to Accounts ✅";
+                String message = "Deal '" + deal.getName()
+                    + "' has been successfully transferred to the Accounts department."
+                    + " Approved by " + approverName + ".";
+                notificationService.sendDepartmentNotification(
+                    prevDept, title, message, "DEAL_TRANSFER", deal.getId());
+            }
+        } catch (Exception e) {
+            log.error("Failed to notify original dept: {}", e.getMessage());
+        }
+
+        return toDto(approval, deal);
+    }
+
+    // ── Reject ───────────────────────────────────────────────────────────────
+
+    @Transactional
+    public LeadClosureApprovalDto rejectClosure(Long approvalId, Long rejectedByUserId, String reason) {
+        LeadClosureApproval approval = approvalRepository.findById(approvalId)
+            .orElseThrow(() -> new IllegalArgumentException("Approval not found: " + approvalId));
+
+        if (!"PENDING".equals(approval.getStatus())) {
+            throw new IllegalStateException("Approval is not in PENDING state");
+        }
+
+        String rejectorName = getEmployeeName(rejectedByUserId);
+        log.info("✅ rejectClosure: approvalId={}, rejectedByUserId={}, rejectorName={}",
+            approvalId, rejectedByUserId, rejectorName);
+
+        approval.setStatus("REJECTED");
+        approval.setReviewedByUserId(rejectedByUserId);
+        approval.setReviewedByName(rejectorName);  // ✅ Dynamic
+        approval.setReviewedAt(OffsetDateTime.now());
         approval.setRejectionReason(reason);
+        approvalRepository.save(approval);
 
-        approval = approvalRepository.save(approval);
+        try {
+            Deal deal = dealRepository.findByIdSafe(approval.getDealId());
+            String title = "Deal Transfer Rejected ❌";
+            String message = "Your request to transfer deal '" + deal.getName() + "'"
+                + " to Accounts has been rejected by " + rejectorName + "."
+                + (reason != null && !reason.isBlank() ? " Reason: " + reason : "");
+            notificationService.sendUserNotification(
+                approval.getRequestedByUserId(), title, message, "DEAL_REJECTED", deal.getId());
+            log.info("✅ Requester {} notified of rejection by {}", approval.getRequestedByUserId(), rejectorName);
+        } catch (Exception e) {
+            log.error("Failed to notify requester of rejection: {}", e.getMessage());
+        }
 
-        // Get deal for notification
-        Deal deal = dealRepository.findById(approval.getDealId())
-                .orElseThrow(() -> new IllegalArgumentException("Deal not found"));
-
-        // Send notification to ACCOUNT user
-        sendApprovalNotification(approval, deal, false);
-
-        return convertToDto(approval, deal);
+        Deal deal = dealRepository.findByIdSafe(approval.getDealId());
+        return toDto(approval, deal);
     }
 
-    /**
-     * Get all pending approvals for MANAGER
-     */
-    @Transactional(readOnly = true)
+    // ── Queries ──────────────────────────────────────────────────────────────
+
     public List<LeadClosureApprovalDto> getPendingApprovals() {
-        List<LeadClosureApproval> approvals = approvalRepository.findByStatusOrderByCreatedAtDesc(ApprovalStatus.PENDING);
-        
-        return approvals.stream()
-                .map(approval -> {
-                    Deal deal = dealRepository.findById(approval.getDealId()).orElse(null);
-                    return convertToDto(approval, deal);
-                })
-                .collect(Collectors.toList());
+        return approvalRepository.findByStatusOrderByRequestedAtDesc("PENDING")
+            .stream()
+            .map(a -> toDto(a, dealRepository.findByIdSafe(a.getDealId())))
+            .collect(Collectors.toList());
     }
 
-    /**
-     * Get approvals requested by a specific user
-     */
-    @Transactional(readOnly = true)
+    public List<LeadClosureApprovalDto> getAllApprovals() {
+        return approvalRepository.findAllByOrderByRequestedAtDesc()
+            .stream()
+            .map(a -> toDto(a, dealRepository.findByIdSafe(a.getDealId())))
+            .collect(Collectors.toList());
+    }
+
     public List<LeadClosureApprovalDto> getRequestsByUser(Long userId) {
-        List<LeadClosureApproval> approvals = approvalRepository.findByRequestedByOrderByCreatedAtDesc(userId);
-        
-        return approvals.stream()
-                .map(approval -> {
-                    Deal deal = dealRepository.findById(approval.getDealId()).orElse(null);
-                    return convertToDto(approval, deal);
-                })
-                .collect(Collectors.toList());
+        return approvalRepository.findByRequestedByUserIdOrderByRequestedAtDesc(userId)
+            .stream()
+            .map(a -> toDto(a, dealRepository.findByIdSafe(a.getDealId())))
+            .collect(Collectors.toList());
     }
 
-    /**
-     * Convert entity to DTO
-     */
-    private LeadClosureApprovalDto convertToDto(LeadClosureApproval approval, Deal deal) {
+    public long getPendingCount() {
+        return approvalRepository.countByStatus("PENDING");
+    }
+
+    // ── DTO Mapper ───────────────────────────────────────────────────────────
+
+    private LeadClosureApprovalDto toDto(LeadClosureApproval a, Deal deal) {
         LeadClosureApprovalDto dto = new LeadClosureApprovalDto();
-        dto.setId(approval.getId());
-        dto.setDealId(approval.getDealId());
-        dto.setRequestedBy(approval.getRequestedBy());
-        dto.setRequestedStage(approval.getRequestedStage());
-        dto.setStatus(approval.getStatus().name());
-        dto.setApprovedBy(approval.getApprovedBy());
-        dto.setApprovedAt(approval.getApprovedAt());
-        dto.setRejectionReason(approval.getRejectionReason());
-        dto.setCreatedAt(approval.getCreatedAt());
+        dto.setId(a.getId());
+        dto.setDealId(a.getDealId());
+        dto.setDealName(a.getDealName() != null ? a.getDealName()
+            : (deal != null ? deal.getName() : ""));
+        dto.setClientId(a.getClientId() != null ? a.getClientId()
+            : (deal != null ? deal.getClientId() : null));
 
-        // Set deal information
-        if (deal != null) {
-            dto.setDealName(deal.getName());
-            dto.setClientName("Client #" + deal.getClientId());
-            dto.setDealValue(deal.getValueAmount() != null ? deal.getValueAmount().toString() : "0");
+        // ✅ clientName: use stored value or fetch fresh
+        if (a.getClientName() != null) {
+            dto.setClientName(a.getClientName());
+        } else if (deal != null && deal.getClientId() != null) {
+            dto.setClientName(getClientName(deal.getClientId()));
         }
 
-        // Set employee names
-        Employee requestedByEmployee = employeeRepository.findById(approval.getRequestedBy()).orElse(null);
-        if (requestedByEmployee != null) {
-            dto.setRequestedByName(requestedByEmployee.getFullName());
-        }
-
-        if (approval.getApprovedBy() != null) {
-            Employee approvedByEmployee = employeeRepository.findById(approval.getApprovedBy()).orElse(null);
-            if (approvedByEmployee != null) {
-                dto.setApprovedByName(approvedByEmployee.getFullName());
-            }
-        }
-
+        dto.setRequestedStage(a.getRequestedStage());
+        dto.setCurrentStage(a.getCurrentStage());
+        dto.setCurrentDepartment(a.getCurrentDepartment());
+        dto.setFromDepartment(a.getFromDepartment());
+        dto.setRequestedByUserId(a.getRequestedByUserId());
+        dto.setRequestedByName(a.getRequestedByName());
+        dto.setRequestedAt(a.getRequestedAt());
+        dto.setStatus(a.getStatus());
+        dto.setReviewedByUserId(a.getReviewedByUserId());
+        dto.setReviewedByName(a.getReviewedByName());
+        dto.setReviewedAt(a.getReviewedAt());
+        dto.setRejectionReason(a.getRejectionReason());
+        dto.setValueAmount(a.getValueAmount() != null ? a.getValueAmount()
+            : (deal != null ? deal.getValueAmount() : null));
         return dto;
-    }
-
-    /**
-     * Send notification to MANAGER role about closure request
-     */
-    private void sendClosureRequestNotification(LeadClosureApproval approval, Deal deal) {
-        try {
-            String title = "Deal Closure Request";
-            String body = String.format("Account department requested %s approval for deal: %s", 
-                    approval.getRequestedStage().replace("_", " "), deal.getName());
-
-            log.info("🔥 [NOTIFICATION] Sending closure request notification:");
-            log.info("🔥 [NOTIFICATION] - Title: {}", title);
-            log.info("🔥 [NOTIFICATION] - Body: {}", body);
-            log.info("🔥 [NOTIFICATION] - Stage: {}", approval.getRequestedStage());
-            log.info("🔥 [NOTIFICATION] - Deal: {}", deal.getName());
-            log.info("🔥 [NOTIFICATION] - Approval ID: {}", approval.getId());
-
-            notificationService.sendRoleBasedNotification("MANAGER", title, body, 
-                    "DEAL_CLOSURE_REQUEST", approval.getId());
-
-            log.info("✅ [NOTIFICATION] Closure request notification sent to MANAGER role");
-        } catch (Exception e) {
-            log.error("❌ [NOTIFICATION] Failed to send closure request notification", e);
-        }
-    }
-
-    /**
-     * Send notification to ACCOUNT user about approval decision
-     */
-    private void sendApprovalNotification(LeadClosureApproval approval, Deal deal, boolean approved) {
-        try {
-            String title = approved ? "Deal Closure Approved" : "Deal Closure Rejected";
-            String body = approved
-                    ? String.format("Your %s request for deal '%s' has been approved", 
-                            approval.getRequestedStage().replace("_", " "), deal.getName())
-                    : String.format("Your %s request for deal '%s' has been rejected. Reason: %s", 
-                            approval.getRequestedStage().replace("_", " "), deal.getName(), 
-                            approval.getRejectionReason() != null ? approval.getRejectionReason() : "No reason provided");
-
-            log.info("🔥 [APPROVAL NOTIFICATION] Sending approval decision notification:");
-            log.info("🔥 [APPROVAL NOTIFICATION] - Approved: {}", approved);
-            log.info("🔥 [APPROVAL NOTIFICATION] - Title: {}", title);
-            log.info("🔥 [APPROVAL NOTIFICATION] - Body: {}", body);
-            log.info("🔥 [APPROVAL NOTIFICATION] - Deal: {}", deal.getName());
-            log.info("🔥 [APPROVAL NOTIFICATION] - Stage: {}", approval.getRequestedStage());
-            log.info("🔥 [APPROVAL NOTIFICATION] - Approval ID: {}", approval.getId());
-            log.info("🔥 [APPROVAL NOTIFICATION] - Requested By: {}", approval.getRequestedBy());
-
-            // 🎯 SOLUTION: Send notification directly to the employee who requested the approval
-            // AND also try department notification for ACCOUNT department
-            Long requestedByEmployeeId = approval.getRequestedBy();
-            if (requestedByEmployeeId != null) {
-                log.info("🔥 [APPROVAL NOTIFICATION] Sending direct notification to employee: {}", requestedByEmployeeId);
-                notificationService.notifyEmployeeWeb(requestedByEmployeeId, title, body, 
-                    "DEAL_CLOSURE_DECISION", "DEAL_CLOSURE_DECISION", approval.getId(), null);
-                notificationService.notifyEmployeeMobile(requestedByEmployeeId, title, body, 
-                    "DEAL_CLOSURE_DECISION", "DEAL_CLOSURE_DECISION", approval.getId(), null);
-            }
-
-            // Also try department notification (in case ACCOUNT department exists in future)
-            notificationService.sendDepartmentNotification("ACCOUNT", title, body,
-                    "DEAL_CLOSURE_DECISION", approval.getId());
-
-            log.info("✅ [APPROVAL NOTIFICATION] Closure decision notification sent to employee {} and ACCOUNT department", requestedByEmployeeId);
-        } catch (Exception e) {
-            log.error("❌ [APPROVAL NOTIFICATION] Failed to send closure decision notification", e);
-        }
     }
 }

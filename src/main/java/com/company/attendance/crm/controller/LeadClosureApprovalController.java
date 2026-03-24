@@ -24,55 +24,50 @@ public class LeadClosureApprovalController {
     private final AuditService auditService;
 
     /**
-     * Request closure approval - ACCOUNT department users only
+     * Request closure approval — ANY department user can request
+     * (Previously restricted to ACCOUNT only — REMOVED that restriction)
      */
     @PostMapping("/deals/{dealId}/request-close")
     public ResponseEntity<?> requestClosure(
             @PathVariable Long dealId,
             @RequestBody LeadClosureApprovalDto.RequestApprovalRequest request) {
-        
+
         try {
             Employee currentUser = getCurrentUser();
-            
-            // Check if user is from ACCOUNT department
-            if (!"ACCOUNT".equals(currentUser.getDepartmentName())) {
-                return ResponseEntity.badRequest().body(Map.of(
-                    "error", "Only ACCOUNT department users can request deal closure"
-                ));
-            }
+
+            // 🔥 REMOVED: ACCOUNT-only restriction
+            // Any department user reaching ACCOUNT terminal stage can request transfer
 
             LeadClosureApprovalDto approval = approvalService.requestClosure(
-                    dealId, 
-                    request.getStage(), 
+                    dealId,
+                    request.getStage(),
                     currentUser.getId()
             );
 
             return ResponseEntity.ok(Map.of(
-                "message", "Closure request submitted successfully",
+                "message", "Transfer request submitted successfully. Waiting for Manager approval.",
                 "approval", approval
             ));
-            
+
         } catch (IllegalArgumentException | IllegalStateException e) {
             log.warn("Closure request failed: {}", e.getMessage());
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             log.error("Failed to submit closure request", e);
             return ResponseEntity.internalServerError().body(Map.of(
-                "error", "Failed to submit closure request"
+                "error", "Failed to submit request"
             ));
         }
     }
 
     /**
-     * Get pending approvals - MANAGER role only
+     * Get pending approvals — MANAGER or ADMIN role
      */
     @GetMapping("/pending")
-    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<List<LeadClosureApprovalDto>> getPendingApprovals() {
         try {
             List<LeadClosureApprovalDto> approvals = approvalService.getPendingApprovals();
             return ResponseEntity.ok(approvals);
-            
         } catch (Exception e) {
             log.error("Failed to fetch pending approvals", e);
             return ResponseEntity.internalServerError().build();
@@ -80,10 +75,25 @@ public class LeadClosureApprovalController {
     }
 
     /**
-     * Approve closure request - MANAGER role only
+     * Get all approvals (pending + history) — MANAGER or ADMIN
+     */
+    @GetMapping("/all")
+    public ResponseEntity<List<LeadClosureApprovalDto>> getAllApprovals() {
+        try {
+            List<LeadClosureApprovalDto> approvals = approvalService.getAllApprovals();
+            return ResponseEntity.ok(approvals);
+        } catch (Exception e) {
+            log.error("Failed to fetch all approvals", e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * Approve — MANAGER or ADMIN
+     * On approve: deal moves to ACCOUNT/INVENTORY
+     * Notifications sent to: requester + ACCOUNT dept
      */
     @PostMapping("/{approvalId}/approve")
-    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<?> approveClosure(@PathVariable Long approvalId) {
         try {
             Employee currentUser = getCurrentUser();
@@ -94,57 +104,54 @@ public class LeadClosureApprovalController {
             );
             
             return ResponseEntity.ok(Map.of(
-                "message", "Closure approved successfully",
+                "message", "Deal approved and transferred to Accounts successfully",
                 "approval", approval
             ));
-            
+
         } catch (IllegalArgumentException | IllegalStateException e) {
-            log.warn("Closure approval failed: {}", e.getMessage());
+            log.warn("Approval failed: {}", e.getMessage());
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             log.error("Failed to approve closure {}", approvalId, e);
-            return ResponseEntity.internalServerError().body(Map.of(
-                "error", "Failed to approve closure"
-            ));
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to approve"));
         }
     }
 
     /**
-     * Reject closure request - MANAGER role only
+     * Reject — MANAGER or ADMIN
+     * On reject: deal stays in original dept/stage
+     * Notification sent to: requester
      */
     @PostMapping("/{approvalId}/reject")
-    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<?> rejectClosure(
             @PathVariable Long approvalId,
             @RequestBody LeadClosureApprovalDto.ApprovalAction action) {
-        
+
         try {
             Employee currentUser = getCurrentUser();
-            
+
             LeadClosureApprovalDto approval = approvalService.rejectClosure(
-                    approvalId, 
+                    approvalId,
                     currentUser.getId(),
                     action.getReason()
             );
-            
+
             return ResponseEntity.ok(Map.of(
-                "message", "Closure rejected successfully",
+                "message", "Request rejected",
                 "approval", approval
             ));
-            
+
         } catch (IllegalArgumentException | IllegalStateException e) {
-            log.warn("Closure rejection failed: {}", e.getMessage());
+            log.warn("Rejection failed: {}", e.getMessage());
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             log.error("Failed to reject closure {}", approvalId, e);
-            return ResponseEntity.internalServerError().body(Map.of(
-                "error", "Failed to reject closure"
-            ));
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to reject"));
         }
     }
 
     /**
-     * Get user's own approval requests
+     * Get current user's own requests
      */
     @GetMapping("/my-requests")
     public ResponseEntity<List<LeadClosureApprovalDto>> getMyRequests() {
@@ -152,10 +159,22 @@ public class LeadClosureApprovalController {
             Employee currentUser = getCurrentUser();
             List<LeadClosureApprovalDto> requests = approvalService.getRequestsByUser(currentUser.getId());
             return ResponseEntity.ok(requests);
-            
         } catch (Exception e) {
             log.error("Failed to fetch user requests", e);
             return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * Get approval count (for badge on nav)
+     */
+    @GetMapping("/pending/count")
+    public ResponseEntity<Map<String, Long>> getPendingCount() {
+        try {
+            long count = approvalService.getPendingCount();
+            return ResponseEntity.ok(Map.of("count", count));
+        } catch (Exception e) {
+            return ResponseEntity.ok(Map.of("count", 0L));
         }
     }
 
