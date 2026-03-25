@@ -114,6 +114,23 @@ public class AttendanceService {
         return attendances.stream().map(this::toDtoEnriched).collect(Collectors.toList());
     }
 
+    public List<AttendanceDto> findAllDtosEnriched() {
+        List<Attendance> all = attendanceRepository.findAll();
+        if (all == null || all.isEmpty()) return List.of();
+
+        List<AttendanceDto> out = new java.util.ArrayList<>();
+        for (Attendance a : all) {
+            if (a == null || a.getEmployee() == null || a.getEmployee().getId() == null) {
+                continue;
+            }
+            try {
+                out.add(toDtoEnriched(a));
+            } catch (Exception ignored) {
+            }
+        }
+        return out;
+    }
+
     private void enrichPunchAddresses(AttendanceDto dto) {
         if (dto == null || dto.getEmployeeId() == null || dto.getDate() == null) return;
 
