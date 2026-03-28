@@ -225,6 +225,7 @@ public Client toClientEntity(ClientDto dto) {
     dto.setUpdatedByName(employeeName(deal.getUpdatedBy()));
     
     dto.setDealCode(deal.getDealCode());
+    dto.setMovedToApproval(deal.getMovedToApproval());
 
     // Owner: only use already-loaded client relation — no extra DB call
     Client client = deal.getClient();

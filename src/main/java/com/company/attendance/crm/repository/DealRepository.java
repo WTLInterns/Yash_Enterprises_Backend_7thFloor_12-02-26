@@ -27,22 +27,22 @@ public interface DealRepository extends JpaRepository<Deal, Long> {
     @Query("SELECT d FROM Deal d WHERE d.department = :department AND d.stageCode = :stage")
     List<Deal> findByDepartmentAndStage(@Param("department") String department, @Param("stage") String stage);
     
-    @Query("SELECT d FROM Deal d WHERE d.department = :department")
+    @Query("SELECT d FROM Deal d LEFT JOIN FETCH d.client LEFT JOIN FETCH d.bank WHERE d.department = :department")
     List<Deal> findByDepartment(@Param("department") String department);
     
     /**
      * 🔥 DEPARTMENT-AWARE: Find deals by department with pagination
      */
-    @Query("SELECT d FROM Deal d WHERE d.department = :department")
+    @Query("SELECT d FROM Deal d LEFT JOIN FETCH d.client LEFT JOIN FETCH d.bank WHERE d.department = :department")
     Page<Deal> findByDepartment(@Param("department") String department, Pageable pageable);
     
     @Query("SELECT d FROM Deal d WHERE d.stageCode = :stage")
     List<Deal> findByStage(@Param("stage") String stage);
 
-    @Query("SELECT d FROM Deal d WHERE d.department = :dept AND (d.movedToApproval = false OR d.movedToApproval IS NULL)")
+    @Query("SELECT d FROM Deal d LEFT JOIN FETCH d.client LEFT JOIN FETCH d.bank WHERE d.department = :dept AND (d.movedToApproval = false OR d.movedToApproval IS NULL)")
     List<Deal> findByDepartmentNotMovedToApproval(@Param("dept") String dept);
 
-    @Query("SELECT d FROM Deal d WHERE d.movedToApproval = true")
+    @Query("SELECT d FROM Deal d LEFT JOIN FETCH d.client LEFT JOIN FETCH d.bank WHERE d.movedToApproval = true")
     List<Deal> findMovedToApproval();
 
     @Query("SELECT COUNT(d) FROM Deal d WHERE d.department = :dept")

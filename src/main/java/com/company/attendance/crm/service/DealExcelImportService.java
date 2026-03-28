@@ -287,7 +287,7 @@ public class DealExcelImportService {
         }
         
         // Find or create client
-        Client client = findOrCreateClient(customerName, contactName, department, ownerUserId);
+        Client client = findOrCreateClient(customerName, contactName, department, appNo, ownerUserId);
         
         // Find or create bank from Excel data
         Bank bank = findOrCreateBank(bankName, branchName, taluka, district);
@@ -301,10 +301,11 @@ public class DealExcelImportService {
         
         // Create deal DTO for both new and update scenarios
         DealDto dealDto = new DealDto();
-        dealDto.setName(productName);
+        dealDto.setName(customerName);
         dealDto.setClientId(client.getId());
         dealDto.setDepartment(department);
-        dealDto.setStageCode(resolveStageCode(stage, department)); // resolve against stage_master
+        String resolvedStage = resolveStageCode(stage, department);
+        dealDto.setStageCode(resolvedStage);
         
         // Set bank information if available
         if (bank != null) {
@@ -343,6 +344,10 @@ public class DealExcelImportService {
         
         // Generate dealCode using cache to avoid per-row DB call
         Deal deal = crmMapper.toDealEntity(dealDto);
+        deal.setClientId(client.getId()); // ensure clientId is always set explicitly
+        if ("CLOSE_WIN".equalsIgnoreCase(resolvedStage) || "CLOSE_LOST".equalsIgnoreCase(resolvedStage)) {
+            deal.setMovedToApproval(true);
+        }
         String dept = department;
         long count = deptCountCache.computeIfAbsent(dept,
             d -> dealRepository.countByDepartment(d));
@@ -376,12 +381,8 @@ public class DealExcelImportService {
         
         dealProductRepository.save(dealProduct);
         
-        // 🔥 FIX: Save deal again to persist the relationship
-        dealService.update(deal);
-        
         log.info("✅ Product linked: {} → Deal {} (Product ID: {})", productName, deal.getId(), product.getId());
         
-        // 🔥 FIX: Create stage history for pipeline tracking
         if (deal.getStageHistory() == null) {
             deal.setStageHistory(new ArrayList<>());
         }
@@ -395,30 +396,67 @@ public class DealExcelImportService {
                  bank != null ? bank.getId() : "None");
     }
 
-    private Client findOrCreateClient(String name, String contactName, String department, Long ownerUserId) {
-        // Prevent duplicate clients - same customer should be same client
-        Optional<Client> existing = clientRepository.findByName(name.trim());
-        if (existing.isPresent()) {
-            Client c = existing.get();
-            // Update contactName if it was missing and now provided
-            if (contactName != null && !contactName.trim().isEmpty() && c.getContactName() == null) {
-                c.setContactName(contactName.trim());
-                clientRepository.save(c);
+    private Client findOrCreateClient(String name, String contactName, String department, String appNo, Long ownerUserId) {
+        // 1. Agr No match (most reliable)
+        if (appNo != null && !appNo.trim().isEmpty()) {
+            Optional<Client> byAppNo = clientRepository.findByCustomerNumber(appNo.trim());
+            if (byAppNo.isPresent()) {
+                Client c = byAppNo.get();
+                if (!Boolean.TRUE.equals(c.getIsActive())) {
+                    c.setIsActive(true);
+                    clientRepository.save(c);
+                }
+                log.debug("Found client by Agr No: {}", appNo);
+                return c;
             }
-            log.debug("Found existing client: {}", name);
-            return c;
         }
-        
-        // Create new client only if doesn't exist
+
+        // 2. Name + Contact fallback
+        if (name != null && contactName != null && !contactName.trim().isEmpty()) {
+            Optional<Client> byNameContact = clientRepository.findByNameAndContactName(name.trim(), contactName.trim());
+            if (byNameContact.isPresent()) {
+                Client c = byNameContact.get();
+                if (!Boolean.TRUE.equals(c.getIsActive())) {
+                    c.setIsActive(true);
+                    clientRepository.save(c);
+                }
+                log.debug("Found client by name+contact: {}", name);
+                return c;
+            }
+        }
+
+        // 3. Name-only fallback (handles re-upload after delete)
+        if (name != null) {
+            Optional<Client> byName = clientRepository.findByName(name.trim());
+            if (byName.isPresent()) {
+                Client c = byName.get();
+                // Only reuse if this client has no deal yet (avoid wrong reuse)
+                boolean hasDeal = !dealRepository.findByClientId(c.getId()).isEmpty();
+                if (!hasDeal) {
+                    if (!Boolean.TRUE.equals(c.getIsActive())) {
+                        c.setIsActive(true);
+                        clientRepository.save(c);
+                    }
+                    log.debug("Found dealless client by name: {}", name);
+                    return c;
+                }
+            }
+        }
+
+        // 4. Create new client
         Client client = new Client();
         client.setName(name.trim());
         client.setIsActive(true);
-        if (ownerUserId != null) { client.setOwnerId(ownerUserId); }
+        if (appNo != null && !appNo.trim().isEmpty()) {
+            client.setCustomerNumber(appNo.trim());
+        }
         if (contactName != null && !contactName.trim().isEmpty()) {
             client.setContactName(contactName.trim());
         }
-        
-        log.info("Creating new client: {}", name);
+        if (ownerUserId != null) {
+            client.setOwnerId(ownerUserId);
+        }
+        log.info("Creating new client: {} (Agr No: {})", name, appNo);
         return clientService.createClientEntity(client);
     }
 

@@ -120,15 +120,14 @@ public class DealController {
       @RequestHeader(value = "X-User-Department", required = false) String department
   ) {
     List<Deal> deals;
-    if ("ACCOUNT".equalsIgnoreCase(department)) {
-      // ACCOUNT sees only their deals NOT yet moved to approval
-      deals = dealRepository.findByDepartmentNotMovedToApproval("ACCOUNT");
-    } else if ("ADMIN".equalsIgnoreCase(role) || "MANAGER".equalsIgnoreCase(role)) {
-      // ADMIN/MANAGER see deals moved to approval
-      deals = dealRepository.findMovedToApproval();
+    if ("ADMIN".equalsIgnoreCase(role) || "MANAGER".equalsIgnoreCase(role) || "HR".equalsIgnoreCase(role)) {
+      // ADMIN / MANAGER / HR → full access, all deals
+      deals = dealRepository.findAllWithClient();
+    } else if (department != null && !department.isBlank()) {
+      // Department-based users → only their department's deals
+      deals = dealRepository.findByDepartment(department.trim().toUpperCase());
     } else {
-      // Other departments see their own deals
-      deals = dealRepository.findByDepartment(department != null ? department : "");
+      deals = List.of();
     }
     List<DealDto> dtos = deals.stream().map(mapper::toDealDto).collect(Collectors.toList());
     return ResponseEntity.ok(dtos);

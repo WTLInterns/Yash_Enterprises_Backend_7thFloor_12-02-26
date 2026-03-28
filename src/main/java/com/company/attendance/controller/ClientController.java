@@ -200,11 +200,11 @@ public class ClientController {
         if (ids == null || ids.isEmpty()) {
             return ResponseEntity.badRequest().body(java.util.Map.of("error", "No IDs provided"));
         }
-        log.info("DELETE /api/clients/bulk - Deleting {} clients", ids.size());
+        log.info("DELETE /api/clients/bulk - Hard deleting {} clients", ids.size());
         int deleted = 0;
         for (Long id : ids) {
             try {
-                clientService.deleteClientEntity(id);
+                clientService.hardDeleteClientEntity(id);
                 deleted++;
             } catch (Exception e) {
                 log.warn("Could not delete client {}: {}", id, e.getMessage());

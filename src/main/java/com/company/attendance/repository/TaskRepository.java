@@ -13,6 +13,8 @@ import java.util.Optional;
 public interface TaskRepository extends JpaRepository<Task, Long> {
     
     List<Task> findByAssignedToEmployeeId(Long employeeId);
+
+    List<Task> findByClientId(Long clientId);
     
     @Query("""
         SELECT t FROM Task t
