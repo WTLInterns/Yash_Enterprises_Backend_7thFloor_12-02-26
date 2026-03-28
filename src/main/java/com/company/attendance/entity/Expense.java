@@ -38,6 +38,12 @@ public class Expense {
 
     private String status;
 
+    private String rejectionReason;
+
+    // 🔥 NEW: Client mapping for CRM integration
+    private Long clientId;
+    private String clientName;
+
     // Add employee relationship for mapping
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employeeId", insertable = false, updatable = false)

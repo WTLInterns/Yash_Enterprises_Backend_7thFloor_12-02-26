@@ -11,7 +11,6 @@ import com.company.attendance.crm.entity.ProductCategory;
 import com.company.attendance.entity.Client;
 import com.company.attendance.entity.Employee;
 import com.company.attendance.repository.EmployeeRepository;
-import com.company.attendance.repository.ClientRepository;
 import org.springframework.stereotype.Component;
 
 import java.time.ZoneOffset;
@@ -21,21 +20,17 @@ import java.util.Optional;
 public class CrmMapper {
 
   private final EmployeeRepository employeeRepository;
-  private final ClientRepository clientRepository;
 
-  public CrmMapper(EmployeeRepository employeeRepository, ClientRepository clientRepository) {
+  public CrmMapper(EmployeeRepository employeeRepository) {
     this.employeeRepository = employeeRepository;
-    this.clientRepository = clientRepository;
   }
 
   private String employeeName(Long employeeId) {
     if (employeeId == null) return null;
     Optional<Employee> emp = employeeRepository.findById(employeeId);
     if (emp.isEmpty()) return null;
-    String first = emp.get().getFirstName() != null ? emp.get().getFirstName().trim() : "";
-    String last = emp.get().getLastName() != null ? emp.get().getLastName().trim() : "";
-    String full = (first + " " + last).trim();
-    return full.isEmpty() ? null : full;
+    String full = emp.get().getFullName();
+    return (full == null || full.isBlank()) ? null : full;
   }
 
   // ---- Bank ----
@@ -160,9 +155,6 @@ public class CrmMapper {
     dto.setCreatedBy(client.getCreatedBy());
     dto.setUpdatedBy(client.getUpdatedBy());
     dto.setOwnerId(client.getOwnerId());
-
-    dto.setCreatedByName(employeeName(client.getCreatedBy()));
-    dto.setUpdatedByName(employeeName(client.getUpdatedBy()));
     dto.setOwnerName(employeeName(client.getOwnerId()));
 
     return dto;
@@ -232,24 +224,20 @@ public Client toClientEntity(ClientDto dto) {
     dto.setCreatedByName(employeeName(deal.getCreatedBy()));
     dto.setUpdatedByName(employeeName(deal.getUpdatedBy()));
     
-    // Owner should come from the Client, not the Deal
+    dto.setDealCode(deal.getDealCode());
+
+    // Owner: only use already-loaded client relation — no extra DB call
     Client client = deal.getClient();
-    if (client == null && deal.getClientId() != null) {
-      client = clientRepository.findById(deal.getClientId()).orElse(null);
-    }
-    
-    if (client != null && client.getOwnerId() != null) {
+    if (client != null) {
       dto.setOwnerName(employeeName(client.getOwnerId()));
       dto.setClientName(client.getName());
-    } else {
-      dto.setOwnerName(null);
-      dto.setClientName(null);
     }
 
     // Optional display fields if relations loaded
     dto.setBankName(deal.getBank() != null ? deal.getBank().getName() : null);
+    dto.setTaluka(deal.getBank() != null ? deal.getBank().getTaluka() : null);
+    dto.setDistrict(deal.getBank() != null ? deal.getBank().getDistrict() : null);
 
-    // Keep customFields default if absent
     if (dto.getCustomFields() == null) {
       dto.setCustomFields("{}");
     }

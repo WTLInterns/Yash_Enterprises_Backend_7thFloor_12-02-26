@@ -362,11 +362,32 @@ public ResponseEntity<List<EmployeeDto>> listEmployees() {
     
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> deleteEmployee(@PathVariable Long id) {
-        employeeService.delete(id);
-        return ResponseEntity.ok(Map.of(
-            "success", true,
-            "message", "Employee deleted successfully"
-        ));
+        try {
+            employeeService.deleteWithCleanup(id);
+            return ResponseEntity.ok(Map.of("success", true, "message", "Employee deleted successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{id}/deactivate")
+    public ResponseEntity<Map<String, Object>> deactivateEmployee(@PathVariable Long id) {
+        try {
+            employeeService.deactivate(id);
+            return ResponseEntity.ok(Map.of("success", true, "message", "Employee deactivated"));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/bulk")
+    public ResponseEntity<Map<String, Object>> bulkDelete(@RequestBody List<Long> ids) {
+        try {
+            ids.forEach(employeeService::deleteWithCleanup);
+            return ResponseEntity.ok(Map.of("success", true, "message", ids.size() + " employees deleted"));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("success", false, "message", e.getMessage()));
+        }
     }
 
     @PostMapping("/{id}/upload-image")

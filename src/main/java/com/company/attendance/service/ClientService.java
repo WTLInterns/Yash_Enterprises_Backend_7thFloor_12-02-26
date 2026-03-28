@@ -59,7 +59,9 @@ public class ClientService {
 
     public List<Client> getActiveClientEntities() {
         log.info("Fetching active client entities");
-        return clientRepository.findByIsActive(true);
+        List<Client> clients = clientRepository.findAllActive();
+        log.info("Found {} active clients", clients.size());
+        return clients;
     }
 
     public Client getClientEntityById(Long id) {

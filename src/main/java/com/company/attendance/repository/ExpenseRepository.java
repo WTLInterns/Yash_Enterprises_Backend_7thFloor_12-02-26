@@ -27,6 +27,12 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
     
     @Query("SELECT e FROM Expense e LEFT JOIN FETCH e.employee LEFT JOIN FETCH e.employee.tl WHERE e.employeeId = :employeeId")
     List<Expense> findByEmployeeId(@Param("employeeId") Long employeeId);
+    
+    // 🔥 NEW: Find expenses by clientId for CRM integration
+    @Query("SELECT e FROM Expense e LEFT JOIN FETCH e.employee LEFT JOIN FETCH e.employee.tl WHERE e.clientId = :clientId")
+    List<Expense> findByClientId(@Param("clientId") Long clientId);
+
+    void deleteByEmployeeId(Long employeeId);
 }
 
 

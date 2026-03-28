@@ -109,7 +109,7 @@ public class TaskService {
     }
 
     public List<Task> findAll() {
-        return taskRepository.findAll();
+        return taskRepository.findAllWithRelations();
     }
     
     /**

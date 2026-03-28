@@ -7,6 +7,8 @@ import com.company.attendance.entity.Designation;
 import com.company.attendance.entity.Organization;
 import com.company.attendance.entity.Department;
 import com.company.attendance.entity.Shift;
+import com.company.attendance.repository.AttendanceRepository;
+import com.company.attendance.repository.ExpenseRepository;
 import com.company.attendance.repository.EmployeeRepository;
 import com.company.attendance.repository.RoleRepository;
 import com.company.attendance.repository.TeamRepository;
@@ -23,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +39,8 @@ public class EmployeeService {
     private final OrganizationRepository organizationRepository;
     private final DepartmentRepository departmentRepository;
     private final ShiftRepository shiftRepository;
+    private final AttendanceRepository attendanceRepository;
+    private final ExpenseRepository expenseRepository;
 
     public Employee save(Employee employee) {
         if (employee.getId() == null) {
@@ -429,6 +434,37 @@ public class EmployeeService {
     }
 
     public void delete(Long id) {
+        employeeRepository.deleteById(id);
+    }
+
+    /** Soft delete — marks INACTIVE, no FK violation */
+    @Transactional
+    public void deactivate(Long id) {
+        Employee emp = employeeRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Employee not found: " + id));
+        emp.setStatus(Employee.Status.INACTIVE);
+        emp.setUpdatedAt(LocalDateTime.now());
+        employeeRepository.save(emp);
+    }
+
+    /** Hard delete — removes all FK dependencies then deletes employee */
+    @Transactional
+    public void deleteWithCleanup(Long id) {
+        // 1. Null out self-referencing FKs: other employees who have this as TL or reporting manager
+        List<Employee> subordinates = employeeRepository.findAll().stream()
+                .filter(e -> (e.getTl() != null && e.getTl().getId().equals(id))
+                          || (e.getReportingManager() != null && e.getReportingManager().getId().equals(id)))
+                .collect(java.util.stream.Collectors.toList());
+        for (Employee sub : subordinates) {
+            if (sub.getTl() != null && sub.getTl().getId().equals(id)) sub.setTl(null);
+            if (sub.getReportingManager() != null && sub.getReportingManager().getId().equals(id)) sub.setReportingManager(null);
+            employeeRepository.save(sub);
+        }
+        // 2. Delete attendance records
+        attendanceRepository.deleteByEmployeeId(id);
+        // 3. Delete expense records
+        expenseRepository.deleteByEmployeeId(id);
+        // 4. Delete the employee
         employeeRepository.deleteById(id);
     }
 

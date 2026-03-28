@@ -6,10 +6,12 @@ import com.company.attendance.crm.entity.Deal;
 import com.company.attendance.crm.entity.Bank;
 import com.company.attendance.crm.entity.Product;
 import com.company.attendance.crm.entity.DealProduct;
+import com.company.attendance.crm.entity.StageMaster;
 import com.company.attendance.crm.repository.BankRepository;
 import com.company.attendance.crm.repository.DealRepository;
 import com.company.attendance.crm.repository.ProductRepository;
 import com.company.attendance.crm.repository.DealProductRepository;
+import com.company.attendance.crm.repository.StageMasterRepository;
 import com.company.attendance.entity.Client;
 import com.company.attendance.entity.CustomerAddress;
 import com.company.attendance.entity.Employee;
@@ -44,23 +46,24 @@ public class DealExcelImportService {
     private final ClientService clientService;
     private final BankRepository bankRepository;
     private final DealRepository dealRepository;
-    private final ProductRepository productRepository; // 🔥 FIX: Add Product repository
-    private final DealProductRepository dealProductRepository; // 🔥 FIX: Add DealProduct repository
+    private final ProductRepository productRepository;
+    private final DealProductRepository dealProductRepository;
     private final ClientRepository clientRepository;
     private final CustomerAddressRepository customerAddressRepository;
     private final EmployeeRepository employeeRepository;
     private final CrmMapper crmMapper;
+    private final StageMasterRepository stageMasterRepository;
 
     private static final Set<String> REQUIRED_HEADERS = Set.of(
-        "Customer Name", "Village", "Taluka", "District", 
-        "Product", "Department", "Stage"
+        "Customer Name", "Product", "Stage"
     );
 
     // 🔥 FIX: Remove @Transactional from main method to prevent full rollback on single row failure
     public Map<String, Object> importDealsFromExcel(
             org.springframework.web.multipart.MultipartFile file,
             String userDepartment,
-            boolean allowDepartmentOverride) throws Exception {
+            boolean allowDepartmentOverride,
+            Long ownerUserId) throws Exception {
         
         Map<String, Object> result = new HashMap<>();
         List<String> errors = new ArrayList<>();
@@ -80,6 +83,9 @@ public class DealExcelImportService {
             
             Map<String, Integer> headerMap = validateHeaders(headerRow);
             
+            // Per-department count cache — avoids one DB call per row
+            Map<String, Long> deptCountCache = new HashMap<>();
+            
             // Process data rows
             for (int i = 1; i <= sheet.getLastRowNum(); i++) {
                 Row row = sheet.getRow(i);
@@ -88,7 +94,7 @@ public class DealExcelImportService {
                 totalRows++;
                 
                 try {
-                    importSingleRow(row, headerMap, userDepartment, allowDepartmentOverride);
+                    importSingleRow(row, headerMap, userDepartment, allowDepartmentOverride, deptCountCache, ownerUserId);
                     successCount++;
                 } catch (Exception e) {
                     String error = String.format("Row %d: %s", i + 1, e.getMessage());
@@ -149,54 +155,73 @@ public class DealExcelImportService {
         return switch (normalizedRequired) {
             case "district" -> headerMap.containsKey("district") || headerMap.containsKey("dist");
             case "customernumber" -> headerMap.containsKey("customernumber") || headerMap.containsKey("customerno");
+            case "village" -> headerMap.containsKey("village") || headerMap.containsKey("address");
+            case "taluka" -> headerMap.containsKey("taluka") || headerMap.containsKey("tehsil");
             default -> headerMap.containsKey(normalizedRequired);
         };
     }
 
     /**
-     * 🔥 FIX: Normalize stage names to match database format
+     * Resolve Excel stage value to a valid stageCode from stage_master.
+     * Tries: exact stageCode match → stageName match → normalizeStage fallback.
+     */
+    private String resolveStageCode(String excelStage, String department) {
+        if (excelStage == null || excelStage.trim().isEmpty()) return "NEW_LEAD";
+
+        List<StageMaster> stages = stageMasterRepository.findByDepartmentOrderByStageOrder(department);
+
+        // 1. Exact stageCode match (case-insensitive)
+        String upper = excelStage.trim().toUpperCase();
+        for (StageMaster s : stages) {
+            if (s.getStageCode().equalsIgnoreCase(upper)) return s.getStageCode();
+        }
+
+        // 2. stageName match (case-insensitive, ignore spaces/underscores)
+        String normalized = upper.replace(" ", "").replace("_", "");
+        for (StageMaster s : stages) {
+            String nameNorm = s.getStageName().toUpperCase().replace(" ", "").replace("_", "");
+            String codeNorm = s.getStageCode().toUpperCase().replace("_", "");
+            if (nameNorm.equals(normalized) || codeNorm.equals(normalized)) return s.getStageCode();
+        }
+
+        // 3. Fallback: use normalizeStage (may not be in stage_master but saves the deal)
+        String fallback = normalizeStage(excelStage);
+        log.warn("Stage '{}' not found in stage_master for dept '{}', using fallback: {}", excelStage, department, fallback);
+        return fallback;
+    }
+
+    /**
+     * Normalize stage names to match database format
      */
     private String normalizeStage(String stage) {
         if (stage == null || stage.trim().isEmpty()) return "NEW_LEAD";
 
-        stage = stage.trim().toUpperCase().replace(" ", "_");
+        String s = stage.trim().toUpperCase().replace(" ", "_");
 
-        switch (stage) {
-            case "DOC_COLLECT":
-            case "DOCUMENT_COLLECTION":
-            case "DOC.COLLECT":
-                return "DOC_COLLECT";
-
-            case "NEW_LEAD":
-            case "LEAD":
-                return "NEW_LEAD";
-
-            case "DOP":
-                return "DOP";
-
-            case "ACCOUNT":
-                return "ACCOUNT";
-
-            case "CLOSE_WIN":
-            case "CLOSED_WON":
-                return "CLOSE_WIN";
-
-            case "CLOSE_LOST":
-            case "CLOSED_LOST":
-                return "CLOSE_LOST";
-
-            case "LOAN_APPLICATION":
-            case "LOAN_APP":
-                return "LOAN_APPLICATION";
-
-            default:
-                return stage;
-        }
+        return switch (s) {
+            case "DOC_COLLECT", "DOCUMENT_COLLECTION", "DOC.COLLECT" -> "DOC_COLLECT";
+            case "NEW_LEAD", "LEAD", "NEW_LEADS" -> "NEW_LEAD";
+            case "DOP" -> "DOP";
+            case "ACCOUNT" -> "ACCOUNT";
+            case "CLOSE_WIN", "CLOSED_WON", "CLOSE_WIN_", "CLOSEWIN" -> "CLOSE_WIN";
+            case "CLOSE_LOST", "CLOSED_LOST", "CLOSE_LOST_", "CLOSELOST" -> "CLOSE_LOST";
+            case "LOAN_APPLICATION", "LOAN_APP" -> "LOAN_APPLICATION";
+            case "BILLING" -> "BILLING";
+            case "PENDING" -> "PENDING";
+            case "IN_PROCESS", "INPROCESS" -> "IN_PROCESS";
+            case "HOLD" -> "HOLD";
+            case "PHYSICAL_POSSESSION" -> "PHYSICAL_POSSESSION";
+            case "DMO", "DM_ORDER", "DM_ORDER_" -> "DMO";
+            case "CJMO" -> "CJMO";
+            case "RECOVERY" -> "RECOVERY";
+            default -> s; // keep as-is (already uppercased+underscored)
+        };
     }
 
-    @Transactional
-    private void importSingleRow(Row row, Map<String, Integer> headerMap, 
-                                String userDepartment, boolean allowDepartmentOverride) throws Exception {
+    // @Transactional removed — private methods are not proxied by Spring AOP
+    private void importSingleRow(Row row, Map<String, Integer> headerMap,
+                                String userDepartment, boolean allowDepartmentOverride,
+                                Map<String, Long> deptCountCache, Long ownerUserId) throws Exception {
         
         // Get header indices
         Integer customerNameIndex = findHeaderIndex(headerMap, "Customer Name");
@@ -212,8 +237,10 @@ public class DealExcelImportService {
         Integer contactNameIndex = findHeaderIndex(headerMap, "Contact Name");
         Integer allotmentLetterIndex = findHeaderIndex(headerMap, "Allotment Letter");
         Integer closingDateIndex = findHeaderIndex(headerMap, "Closing Date");
+        Integer allocationDateIndex = findHeaderIndex(headerMap, "Allocation Date");
         Integer amountIndex = findHeaderIndex(headerMap, "Amount");
         Integer addressTypeIndex = findHeaderIndex(headerMap, "Address Type");
+        Integer accountStatusIndex = findHeaderIndex(headerMap, "Account Status");
         
         // Extract values safely (never null, returns "-" for empty)
         String customerName = customerNameIndex != null ? getCellValueSafely(row, customerNameIndex) : null;
@@ -230,7 +257,8 @@ public class DealExcelImportService {
         String branchName = branchNameIndex != null ? getCellValueSafely(row, branchNameIndex) : null;
         String contactName = contactNameIndex != null ? getCellValueSafely(row, contactNameIndex) : null;
         String allotmentLetter = allotmentLetterIndex != null ? getCellValueSafely(row, allotmentLetterIndex) : null;
-        LocalDate closingDate = closingDateIndex != null ? parseExcelDate(row, closingDateIndex) : null;
+        LocalDate closingDate = closingDateIndex != null ? parseExcelDate(row, closingDateIndex) 
+            : (allocationDateIndex != null ? parseExcelDate(row, allocationDateIndex) : null);
         String amountStr = amountIndex != null ? getCellValueSafely(row, amountIndex) : null;
         String addressType = addressTypeIndex != null ? getCellValueSafely(row, addressTypeIndex) : null;
         
@@ -251,15 +279,15 @@ public class DealExcelImportService {
         log.info("🔥 EXCEL ROW {} → Customer: {}, Bank: {}, Branch: {}, Taluka: {}, District: {}, Product: {}, Stage: {}", 
                  row.getRowNum(), customerName, bankName, branchName, taluka, district, productName, stage);
         
-        // Department logic - 🔥 FIX: Normalize department and only override if empty
+        // Department logic — normalize to UPPERCASE, fallback to userDepartment if blank
         if (department != null && !department.trim().isEmpty()) {
-            department = department.trim().toUpperCase(); // 🔥 FIX: Normalize to uppercase
+            department = department.trim().toUpperCase();
         } else {
-            department = userDepartment; // Only use user department if Excel is empty
+            department = userDepartment != null ? userDepartment.trim().toUpperCase() : "GEN";
         }
         
         // Find or create client
-        Client client = findOrCreateClient(customerName, department);
+        Client client = findOrCreateClient(customerName, contactName, department, ownerUserId);
         
         // Find or create bank from Excel data
         Bank bank = findOrCreateBank(bankName, branchName, taluka, district);
@@ -276,7 +304,7 @@ public class DealExcelImportService {
         dealDto.setName(productName);
         dealDto.setClientId(client.getId());
         dealDto.setDepartment(department);
-        dealDto.setStageCode(normalizeStage(stage)); // 🔥 FIX: Use normalized stage
+        dealDto.setStageCode(resolveStageCode(stage, department)); // resolve against stage_master
         
         // Set bank information if available
         if (bank != null) {
@@ -309,15 +337,19 @@ public class DealExcelImportService {
             dealDto.setValueAmount(BigDecimal.ZERO); // 🔥 safe default
         }
         
-        // Handle closing date (already parsed safely)
         if (closingDate != null) {
             dealDto.setClosingDate(closingDate);
         }
         
-        // 🔥 FIX: ALWAYS CREATE NEW DEAL (CRM best practice - no data loss)
-        // Remove duplicate check to ensure all Excel rows are imported
+        // Generate dealCode using cache to avoid per-row DB call
         Deal deal = crmMapper.toDealEntity(dealDto);
-        deal = dealService.create(deal); // 🔥 FIX: Get the created deal with ID
+        String dept = department;
+        long count = deptCountCache.computeIfAbsent(dept,
+            d -> dealRepository.countByDepartment(d));
+        count++;
+        deptCountCache.put(dept, count);
+        deal.setDealCode(dept + count);
+        deal = dealService.create(deal);
         
         // 🔥 FIX: CREATE OR FIND PRODUCT
         Product product = productRepository
@@ -363,18 +395,28 @@ public class DealExcelImportService {
                  bank != null ? bank.getId() : "None");
     }
 
-    private Client findOrCreateClient(String name, String department) {
-        // 🔥 FIX: Prevent duplicate clients - same customer should be same client
+    private Client findOrCreateClient(String name, String contactName, String department, Long ownerUserId) {
+        // Prevent duplicate clients - same customer should be same client
         Optional<Client> existing = clientRepository.findByName(name.trim());
         if (existing.isPresent()) {
+            Client c = existing.get();
+            // Update contactName if it was missing and now provided
+            if (contactName != null && !contactName.trim().isEmpty() && c.getContactName() == null) {
+                c.setContactName(contactName.trim());
+                clientRepository.save(c);
+            }
             log.debug("Found existing client: {}", name);
-            return existing.get();
+            return c;
         }
         
         // Create new client only if doesn't exist
         Client client = new Client();
         client.setName(name.trim());
         client.setIsActive(true);
+        if (ownerUserId != null) { client.setOwnerId(ownerUserId); }
+        if (contactName != null && !contactName.trim().isEmpty()) {
+            client.setContactName(contactName.trim());
+        }
         
         log.info("Creating new client: {}", name);
         return clientService.createClientEntity(client);
@@ -396,26 +438,23 @@ public class DealExcelImportService {
             taluka = null;
         }
 
-        // 🔥 ENHANCED: Handle bank duplicate logic with multiple levels of specificity
-        Optional<Bank> existing = null;
+        // Find existing bank — use List to avoid NonUniqueResultException
+        List<Bank> matches;
         if (branchName != null && taluka != null) {
-            // Most specific: name + branch + taluka
-            existing = bankRepository.findByNameIgnoreCaseAndBranchNameIgnoreCaseAndTalukaIgnoreCase(
-                bankName.trim(), branchName.trim(), taluka.trim()
-            );
+            matches = bankRepository.findByNameIgnoreCaseAndBranchNameIgnoreCaseAndTalukaIgnoreCase(
+                bankName.trim(), branchName.trim(), taluka.trim());
         } else if (branchName != null) {
-            // Medium specificity: name + branch
-            existing = bankRepository.findByNameIgnoreCaseAndBranchNameIgnoreCase(
-                bankName.trim(), branchName.trim()
-            );
+            matches = bankRepository.findByNameIgnoreCaseAndBranchNameIgnoreCase(
+                bankName.trim(), branchName.trim());
         } else {
-            // Least specific: name only
-            existing = bankRepository.findByNameIgnoreCase(bankName.trim());
+            matches = bankRepository.findByNameIgnoreCase(bankName.trim())
+                .map(java.util.Collections::singletonList)
+                .orElse(java.util.Collections.emptyList());
         }
 
-        if (existing.isPresent()) {
+        if (!matches.isEmpty()) {
             log.debug("Found existing bank: {} ({})", bankName, branchName);
-            return existing.get();
+            return matches.get(0);
         }
 
         // 🔥 FIX: Create new bank using BankService (which now handles duplicates correctly)
@@ -596,6 +635,48 @@ public class DealExcelImportService {
             case "customernumber" -> {
                 if (headerMap.containsKey("customernumber")) yield headerMap.get("customernumber");
                 if (headerMap.containsKey("customerno")) yield headerMap.get("customerno");
+                yield null;
+            }
+            case "contactname" -> {
+                if (headerMap.containsKey("contactname")) yield headerMap.get("contactname");
+                if (headerMap.containsKey("contactperson")) yield headerMap.get("contactperson");
+                yield null;
+            }
+            case "bankname" -> {
+                if (headerMap.containsKey("bankname")) yield headerMap.get("bankname");
+                if (headerMap.containsKey("bank")) yield headerMap.get("bank");
+                yield null;
+            }
+            case "branchname" -> {
+                if (headerMap.containsKey("branchname")) yield headerMap.get("branchname");
+                if (headerMap.containsKey("branch")) yield headerMap.get("branch");
+                yield null;
+            }
+            case "appno" -> {
+                if (headerMap.containsKey("appno")) yield headerMap.get("appno");
+                if (headerMap.containsKey("agrno")) yield headerMap.get("agrno");
+                if (headerMap.containsKey("agr_no")) yield headerMap.get("agr_no");
+                if (headerMap.containsKey("applicationno")) yield headerMap.get("applicationno");
+                yield null;
+            }
+            case "allotmentletter" -> {
+                if (headerMap.containsKey("allotmentletter")) yield headerMap.get("allotmentletter");
+                if (headerMap.containsKey("allotment")) yield headerMap.get("allotment");
+                yield null;
+            }
+            case "closingdate" -> {
+                if (headerMap.containsKey("closingdate")) yield headerMap.get("closingdate");
+                yield null;
+            }
+            case "allocationdate" -> {
+                if (headerMap.containsKey("allocationdate")) yield headerMap.get("allocationdate");
+                if (headerMap.containsKey("allocation")) yield headerMap.get("allocation");
+                if (headerMap.containsKey("allocationdate")) yield headerMap.get("allocationdate");
+                yield null;
+            }
+            case "accountstatus" -> {
+                if (headerMap.containsKey("accountstatus")) yield headerMap.get("accountstatus");
+                if (headerMap.containsKey("account_status")) yield headerMap.get("account_status");
                 yield null;
             }
             default -> headerMap.get(normalizedRequired);

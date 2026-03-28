@@ -117,6 +117,10 @@ public class Employee {
     private String updatedBy;
     private LocalDateTime updatedAt;
 
+    // PAN + Bank
+    private String panNumber;
+    private String bankAccountNumber;
+
     // ✅ NEW: Helper method for full name
     public String getFullName() {
         if (lastName != null && !lastName.trim().isEmpty()) {

@@ -51,7 +51,7 @@ public class DealExcelUploadController {
                     return ResponseEntity.badRequest().body(Map.of("error", "User ID required for role/department derivation"));
                 }
                 
-                Employee employee = employeeRepository.findById(Long.valueOf(userId))
+                Employee employee = employeeRepository.findByIdWithRelationships(Long.valueOf(userId))
                     .orElseThrow(() -> new RuntimeException("Employee not found for derivation"));
                 
                 derivedUserRole = employee.getRole() != null ? employee.getRole().getName() : null;
@@ -69,7 +69,8 @@ public class DealExcelUploadController {
             var result = dealExcelImportService.importDealsFromExcel(
                 file, 
                 derivedUserDepartment, 
-                allowDepartmentOverride
+                allowDepartmentOverride,
+                userId != null ? Long.valueOf(userId) : null
             );
             
             return ResponseEntity.ok(result);

@@ -11,7 +11,6 @@ import com.company.attendance.crm.repository.NoteRepository;
 import com.company.attendance.crm.service.DealService;
 import com.company.attendance.crm.service.AuditService;
 import com.company.attendance.crm.service.StageService;
-import com.company.attendance.crm.service.ProductLineService;
 import com.company.attendance.notification.NotificationService;
 import com.company.attendance.entity.Employee;
 import com.company.attendance.repository.EmployeeRepository;
@@ -23,7 +22,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.net.URI;
 import java.time.OffsetDateTime;
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
@@ -44,7 +42,6 @@ public class DealController {
   private final CrmMapper mapper;
   private final StageService stageService;
   private final NotificationService notificationService;
-  private final ProductLineService productLineService;
 
   public DealController(
     DealService dealService,
@@ -56,8 +53,7 @@ public class DealController {
     AuditService auditService,
     CrmMapper mapper,
     StageService stageService,
-    NotificationService notificationService,
-    ProductLineService productLineService
+    NotificationService notificationService
   ) {
     this.dealService = dealService;
     this.dealRepository = dealRepository;
@@ -69,7 +65,6 @@ public class DealController {
     this.mapper = mapper;
     this.stageService = stageService;
     this.notificationService = notificationService;
-    this.productLineService = productLineService;
   }
 
   private String employeeName(Long employeeId) {
@@ -94,27 +89,19 @@ public class DealController {
   @GetMapping
   public Page<DealDto> list(Pageable pageable) {
     Page<Deal> page = dealService.list(pageable);
-    List<DealDto> content = page.getContent().stream().map(deal -> {
-      DealDto dto = mapper.toDealDto(deal);
-      // 🔥 NEW: Calculate and set calculatedValue from products
-      try {
-        BigDecimal calculatedTotal = productLineService.grandTotal(deal.getId());
-        if (calculatedTotal != null && calculatedTotal.compareTo(BigDecimal.ZERO) > 0) {
-          dto.setCalculatedValue(calculatedTotal);
-        } else {
-          dto.setCalculatedValue(deal.getValueAmount());
-        }
-      } catch (Exception e) {
+    List<DealDto> content = page.getContent().stream()
+      .map(deal -> {
+        DealDto dto = mapper.toDealDto(deal);
         dto.setCalculatedValue(deal.getValueAmount());
-      }
-      return dto;
-    }).collect(Collectors.toList());
+        return dto;
+      })
+      .collect(Collectors.toList());
     return new PageImpl<>(content, pageable, page.getTotalElements());
   }
 
   @GetMapping(params = "clientId")
   public ResponseEntity<List<DealDto>> listByClientId(@RequestParam Long clientId) {
-    List<DealDto> deals = dealRepository.findByClientId(clientId)
+    List<DealDto> deals = dealRepository.findByClientIdWithRelations(clientId)
       .stream()
       .map(mapper::toDealDto)
       .collect(Collectors.toList());
@@ -127,15 +114,35 @@ public class DealController {
     return ResponseEntity.ok(dtos);
   }
 
+  @GetMapping("/filtered")
+  public ResponseEntity<List<DealDto>> getFilteredDeals(
+      @RequestHeader(value = "X-User-Role", required = false) String role,
+      @RequestHeader(value = "X-User-Department", required = false) String department
+  ) {
+    List<Deal> deals;
+    if ("ACCOUNT".equalsIgnoreCase(department)) {
+      // ACCOUNT sees only their deals NOT yet moved to approval
+      deals = dealRepository.findByDepartmentNotMovedToApproval("ACCOUNT");
+    } else if ("ADMIN".equalsIgnoreCase(role) || "MANAGER".equalsIgnoreCase(role)) {
+      // ADMIN/MANAGER see deals moved to approval
+      deals = dealRepository.findMovedToApproval();
+    } else {
+      // Other departments see their own deals
+      deals = dealRepository.findByDepartment(department != null ? department : "");
+    }
+    List<DealDto> dtos = deals.stream().map(mapper::toDealDto).collect(Collectors.toList());
+    return ResponseEntity.ok(dtos);
+  }
+
   @GetMapping("/{id}")
   public ResponseEntity<DealDto> getById(@PathVariable Long id) {
-    Optional<Deal> deal = dealRepository.findById(id);
+    Optional<Deal> deal = dealRepository.findByIdWithRelations(id);
     return deal.map(d -> ResponseEntity.ok(mapper.toDealDto(d))).orElse(ResponseEntity.notFound().build());
   }
 
   @GetMapping("/client/{clientId}")
   public ResponseEntity<List<DealDto>> getByClientId(@PathVariable Long clientId) {
-    List<DealDto> deals = dealRepository.findByClientId(clientId).stream().map(mapper::toDealDto).collect(Collectors.toList());
+    List<DealDto> deals = dealRepository.findByClientIdWithRelations(clientId).stream().map(mapper::toDealDto).collect(Collectors.toList());
     return ResponseEntity.ok(deals);
   }
 
@@ -184,6 +191,19 @@ public class DealController {
     return ResponseEntity.noContent().build();
   }
 
+  @DeleteMapping("/bulk")
+  public ResponseEntity<Map<String, Object>> bulkDelete(@RequestBody Map<String, List<Long>> body) {
+    List<Long> ids = body.get("ids");
+    if (ids == null || ids.isEmpty()) {
+      return ResponseEntity.badRequest().body(Map.of("error", "No IDs provided"));
+    }
+    dealService.deleteAll(ids);
+    Map<String, Object> result = new HashMap<>();
+    result.put("deleted", ids.size());
+    result.put("message", ids.size() + " deal(s) deleted successfully");
+    return ResponseEntity.ok(result);
+  }
+
   @GetMapping("/{dealId}/stages")
   public ResponseEntity<List<Map<String, Object>>> getStages(@PathVariable Long dealId) {
     Deal deal = dealRepository.findByIdSafe(dealId);
@@ -229,7 +249,7 @@ public class DealController {
       deal.setDepartment(body.get("department"));
     }
 
-    Deal saved = dealRepository.save(deal);
+    Deal saved = dealService.update(deal);
 
     // Resolve userId from body → header → audit service
     Long userId = null;

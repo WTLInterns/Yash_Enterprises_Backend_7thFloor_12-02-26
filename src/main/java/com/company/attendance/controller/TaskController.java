@@ -104,16 +104,17 @@ public class TaskController {
             String derivedUserDepartment = userDepartment;
             
             if (userRole == null || userDepartment == null) {
-                if (userId == null) {
-                    return ResponseEntity.badRequest().body(List.of());
+                if (userId != null) {
+                    var employee = employeeRepository.findByIdWithRelationships(Long.valueOf(userId))
+                        .orElse(null);
+                    if (employee != null) {
+                        derivedUserRole = employee.getRole() != null ? employee.getRole().getName() : null;
+                        derivedUserDepartment = employee.getDepartment() != null ? employee.getDepartment().getName() : null;
+                    }
                 }
-                
-                var employee = employeeRepository.findById(Long.valueOf(userId))
-                    .orElse(null);
-                
-                if (employee != null) {
-                    derivedUserRole = employee.getRole() != null ? employee.getRole().getName() : null;
-                    derivedUserDepartment = employee.getDepartment() != null ? employee.getDepartment().getName() : null;
+                // If still no role, default to ADMIN behavior (no userId required for dashboard calls)
+                if (derivedUserRole == null) {
+                    derivedUserRole = "ADMIN";
                 }
             }
             
@@ -123,7 +124,7 @@ public class TaskController {
             switch (derivedUserRole != null ? derivedUserRole.toUpperCase() : "UNKNOWN") {
                 case "ADMIN":
                 case "MANAGER":
-                    // ADMIN/MANAGER: Can filter by department or see all
+                    // ADMIN/MANAGER: Can filter by department or see all — no userId required
                     if (departmentParam != null && !departmentParam.isEmpty()) {
                         tasks = taskService.findByDepartment(departmentParam);
                     } else {
@@ -360,7 +361,7 @@ public class TaskController {
                     return ResponseEntity.status(403).body(null);
                 }
                 
-                var employee = employeeRepository.findById(Long.valueOf(userId))
+                var employee = employeeRepository.findByIdWithRelationships(Long.valueOf(userId))
                     .orElse(null);
                 
                 if (employee != null) {

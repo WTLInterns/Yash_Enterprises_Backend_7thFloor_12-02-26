@@ -156,6 +156,10 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> handleAllExceptions(Exception ex, WebRequest request) {
+        // Static resource not found — return 404, not 500
+        if (ex instanceof org.springframework.web.servlet.resource.NoResourceFoundException) {
+            return ResponseEntity.notFound().build();
+        }
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("timestamp", LocalDateTime.now());
         body.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());

@@ -1,0 +1,3 @@
+ALTER TABLE deals ADD COLUMN IF NOT EXISTS moved_to_approval BOOLEAN DEFAULT FALSE;
+ALTER TABLE deals ADD COLUMN IF NOT EXISTS deal_code VARCHAR(50);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_deals_deal_code ON deals(deal_code);
