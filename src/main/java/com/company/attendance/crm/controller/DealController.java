@@ -19,6 +19,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import java.net.URI;
 import java.time.OffsetDateTime;
@@ -204,8 +205,9 @@ public class DealController {
   }
 
   @GetMapping("/{dealId}/stages")
+  @Transactional(readOnly = true)
   public ResponseEntity<List<Map<String, Object>>> getStages(@PathVariable Long dealId) {
-    Deal deal = dealRepository.findByIdSafe(dealId);
+    Deal deal = dealRepository.findByIdWithRelations(dealId).orElseThrow(() -> new com.company.attendance.exception.ResourceNotFoundException("Deal not found: " + dealId));
     List<DealStageHistory> history = dealStageHistoryRepository.findByDealOrderByChangedAtDesc(deal, Pageable.unpaged()).getContent();
     List<Map<String, Object>> body = history.stream().map(h -> {
       Map<String, Object> m = new HashMap<>();
@@ -221,12 +223,13 @@ public class DealController {
   }
 
   @PostMapping("/{dealId}/stages")
+  @Transactional
   public ResponseEntity<DealDto> changeStage(
     @PathVariable Long dealId,
     @RequestBody Map<String, String> body,
     @RequestHeader(value = "X-User-Id", required = false) Long headerUserId
   ) {
-    Deal deal = dealRepository.findByIdSafe(dealId);
+    Deal deal = dealRepository.findByIdWithRelations(dealId).orElseThrow(() -> new com.company.attendance.exception.ResourceNotFoundException("Deal not found: " + dealId));
     String stageRaw = body.get("newStage");
     if (stageRaw == null || stageRaw.isBlank()) {
       stageRaw = body.get("stage");
@@ -272,8 +275,9 @@ public class DealController {
   }
 
   @GetMapping("/{dealId}/timeline")
+  @Transactional(readOnly = true)
   public ResponseEntity<List<Map<String, Object>>> timeline(@PathVariable Long dealId) {
-    Deal deal = dealRepository.findByIdSafe(dealId);
+    Deal deal = dealRepository.findByIdWithRelations(dealId).orElseThrow(() -> new com.company.attendance.exception.ResourceNotFoundException("Deal not found: " + dealId));
 
     List<Map<String, Object>> stageItems = dealStageHistoryRepository
       .findByDealOrderByChangedAtDesc(deal, Pageable.unpaged())

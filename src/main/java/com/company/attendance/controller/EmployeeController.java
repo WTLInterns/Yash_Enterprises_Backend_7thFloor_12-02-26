@@ -2,7 +2,9 @@ package com.company.attendance.controller;
 
 import com.company.attendance.dto.EmployeeDto;
 import com.company.attendance.entity.Employee;
+import com.company.attendance.entity.EmployeeDocument;
 import com.company.attendance.mapper.EmployeeMapper;
+import com.company.attendance.repository.EmployeeDocumentRepository;
 import com.company.attendance.service.EmployeeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -11,7 +13,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -25,6 +31,8 @@ public class EmployeeController {
     private final EmployeeService employeeService;
     @Autowired
     private final EmployeeMapper employeeMapper;
+    @Autowired
+    private EmployeeDocumentRepository employeeDocumentRepository;
 
     @GetMapping
 public ResponseEntity<List<EmployeeDto>> listEmployees() {
@@ -104,7 +112,10 @@ public ResponseEntity<List<EmployeeDto>> listEmployees() {
             
             Employee employee = employeeService.createFromDto(dto);
             Employee saved = employeeService.save(employee);
-            return ResponseEntity.ok(employeeMapper.toDto(saved));
+            // Reload with all relationships to avoid LazyInitializationException
+            Employee reloaded = employeeService.findById(saved.getId())
+                    .orElse(saved);
+            return ResponseEntity.ok(employeeMapper.toDto(reloaded));
             
         } catch (Exception e) {
             System.err.println("Error creating employee: " + e.getMessage());
@@ -396,48 +407,96 @@ public ResponseEntity<List<EmployeeDto>> listEmployees() {
             @RequestParam("file") MultipartFile file
     ) {
         try {
-            // Validate file
             if (file.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of(
-                    "error", "Please select a file to upload"
-                ));
+                return ResponseEntity.badRequest().body(Map.of("error", "Please select a file to upload"));
             }
-
-            // Validate file type (only images)
             String contentType = file.getContentType();
             if (contentType == null || !contentType.startsWith("image/")) {
-                return ResponseEntity.badRequest().body(Map.of(
-                    "error", "Only image files are allowed"
-                ));
+                return ResponseEntity.badRequest().body(Map.of("error", "Only image files are allowed"));
             }
-
-            // Save file (in real app, save to cloud storage or file system)
             String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
             String imageUrl = "/uploads/employees/" + fileName;
-            
-            // For now, save to local uploads directory
-            java.nio.file.Path uploadPath = java.nio.file.Paths.get("uploads/employees");
-            if (!java.nio.file.Files.exists(uploadPath)) {
-                java.nio.file.Files.createDirectories(uploadPath);
-            }
-            java.nio.file.Files.copy(file.getInputStream(), uploadPath.resolve(fileName));
-
-            // Update employee with image URL
+            Path uploadPath = Paths.get("uploads/employees");
+            if (!Files.exists(uploadPath)) Files.createDirectories(uploadPath);
+            Files.copy(file.getInputStream(), uploadPath.resolve(fileName));
             Employee employee = employeeService.findById(id)
                     .orElseThrow(() -> new RuntimeException("Employee not found"));
             employee.setProfileImageUrl(imageUrl);
             EmployeeDto dto = employeeMapper.toDto(employee);
             employeeService.update(id, dto);
-
-            return ResponseEntity.ok(Map.of(
-                    "message", "Image uploaded successfully",
-                    "imageUrl", imageUrl
-            ));
-
+            return ResponseEntity.ok(Map.of("message", "Image uploaded successfully", "imageUrl", imageUrl));
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of(
-                    "error", "Failed to upload image: " + e.getMessage()
-            ));
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to upload image: " + e.getMessage()));
         }
+    }
+
+    // ── Documents ────────────────────────────────────────────────────────────
+
+    @GetMapping("/{id}/documents")
+    public ResponseEntity<List<Map<String, Object>>> getDocuments(@PathVariable Long id) {
+        List<EmployeeDocument> docs = employeeDocumentRepository.findByEmployeeIdOrderByCreatedAtDesc(id);
+        List<Map<String, Object>> result = docs.stream().map(d -> {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", d.getId());
+            m.put("name", d.getName());
+            m.put("fileName", d.getFileName());
+            m.put("fileUrl", d.getFileUrl());
+            m.put("contentType", d.getContentType());
+            m.put("fileSize", d.getFileSize());
+            m.put("createdAt", d.getCreatedAt());
+            return m;
+        }).collect(Collectors.toList());
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/{id}/documents")
+    public ResponseEntity<Map<String, Object>> uploadDocument(
+            @PathVariable Long id,
+            @RequestParam("name") String name,
+            @RequestParam("file") MultipartFile file,
+            @RequestHeader(value = "X-User-Id", required = false) Long userId) throws Exception {
+        Employee employee = employeeService.findById(id)
+                .orElseThrow(() -> new RuntimeException("Employee not found"));
+        String uploadDir = "uploads/employees/" + id + "/";
+        Path dirPath = Paths.get(uploadDir);
+        Files.createDirectories(dirPath);
+        String uniqueName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
+        Path filePath = dirPath.resolve(uniqueName);
+        Files.write(filePath, file.getBytes());
+        EmployeeDocument doc = new EmployeeDocument();
+        doc.setEmployee(employee);
+        doc.setName(name);
+        doc.setFileName(file.getOriginalFilename());
+        doc.setFileUrl("/api/employees/" + id + "/documents/file/" + uniqueName);
+        doc.setContentType(file.getContentType());
+        doc.setFileSize(file.getSize());
+        doc.setUploadedBy(userId);
+        EmployeeDocument saved = employeeDocumentRepository.save(doc);
+        Map<String, Object> m = new HashMap<>();
+        m.put("id", saved.getId());
+        m.put("name", saved.getName());
+        m.put("fileName", saved.getFileName());
+        m.put("fileUrl", saved.getFileUrl());
+        m.put("contentType", saved.getContentType());
+        m.put("fileSize", saved.getFileSize());
+        return ResponseEntity.status(201).body(m);
+    }
+
+    @GetMapping("/{id}/documents/file/{fileName}")
+    public ResponseEntity<byte[]> serveDocument(@PathVariable Long id, @PathVariable String fileName) throws Exception {
+        Path filePath = Paths.get("uploads/employees/" + id + "/" + fileName);
+        if (!Files.exists(filePath)) return ResponseEntity.notFound().build();
+        byte[] bytes = Files.readAllBytes(filePath);
+        String contentType = Files.probeContentType(filePath);
+        return ResponseEntity.ok()
+                .header("Content-Type", contentType != null ? contentType : "application/octet-stream")
+                .header("Content-Disposition", "inline; filename=\"" + fileName + "\"")
+                .body(bytes);
+    }
+
+    @DeleteMapping("/{id}/documents/{docId}")
+    public ResponseEntity<Void> deleteDocument(@PathVariable Long id, @PathVariable Long docId) {
+        employeeDocumentRepository.deleteById(docId);
+        return ResponseEntity.noContent().build();
     }
 }

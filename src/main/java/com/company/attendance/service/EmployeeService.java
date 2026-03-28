@@ -150,6 +150,8 @@ public class EmployeeService {
         // Set additional fields
         employee.setDateOfBirth(dto.getDateOfBirth());
         employee.setGender(dto.getGender());
+        employee.setPanNumber(dto.getPanNumber());
+        employee.setBankAccountNumber(dto.getBankAccountNumber());
         
         // Handle profile image if provided as base64
         if (dto.getProfileImageBase64() != null && !dto.getProfileImageBase64().trim().isEmpty()) {
@@ -381,15 +383,17 @@ public class EmployeeService {
         
         // Update date of birth
         if (dto.getDateOfBirth() != null && !dto.getDateOfBirth().equals(existing.getDateOfBirth())) {
-            System.out.println("Updating date of birth from '" + existing.getDateOfBirth() + "' to '" + dto.getDateOfBirth() + "'");
             existing.setDateOfBirth(dto.getDateOfBirth());
         }
         
         // Update gender
         if (dto.getGender() != null && !dto.getGender().equals(existing.getGender())) {
-            System.out.println("Updating gender from '" + existing.getGender() + "' to '" + dto.getGender() + "'");
             existing.setGender(dto.getGender());
         }
+
+        // Update PAN and bank account
+        if (dto.getPanNumber() != null) existing.setPanNumber(dto.getPanNumber());
+        if (dto.getBankAccountNumber() != null) existing.setBankAccountNumber(dto.getBankAccountNumber());
         
         // Handle profile image update if provided as base64
         if (dto.getProfileImageBase64() != null && !dto.getProfileImageBase64().trim().isEmpty()) {
@@ -477,28 +481,22 @@ public class EmployeeService {
     }
     
     public String generateNextEmployeeId() {
-        // Find the highest numeric employee ID
         List<Employee> employees = employeeRepository.findAll();
         int maxId = 0;
-        
         for (Employee emp : employees) {
             if (emp.getEmployeeId() != null) {
                 try {
-                    // Extract numeric part from employee ID
-                    String numericPart = emp.getEmployeeId().replaceAll("[^0-9]", "");
+                    String upper = emp.getEmployeeId().toUpperCase();
+                    String numericPart = upper.startsWith("YE")
+                        ? upper.substring(2)
+                        : emp.getEmployeeId().replaceAll("[^0-9]", "");
                     if (!numericPart.isEmpty()) {
                         int id = Integer.parseInt(numericPart);
-                        if (id > maxId) {
-                            maxId = id;
-                        }
+                        if (id > maxId) maxId = id;
                     }
-                } catch (NumberFormatException e) {
-                    // Skip non-numeric IDs
-                }
+                } catch (NumberFormatException e) { /* skip */ }
             }
         }
-        
-        // Generate next ID (start from 1 if no existing IDs)
-        return String.valueOf(maxId + 1);
+        return "YE" + (maxId + 1);
     }
 }
