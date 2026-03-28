@@ -23,6 +23,11 @@ public class AttendanceController {
     private final AttendanceService attendanceService;
     private final AttendanceMapper attendanceMapper;
 
+    @GetMapping
+    public ResponseEntity<List<AttendanceDto>> listAll() {
+        return ResponseEntity.ok(attendanceService.findAllDtosEnriched());
+    }
+
     @PostMapping("/punch-in")
     public ResponseEntity<AttendanceDto> punchIn(@Valid @RequestBody AttendanceDto dto) {
         Attendance attendance = attendanceMapper.toEntity(dto);
