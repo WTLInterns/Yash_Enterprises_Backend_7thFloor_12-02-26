@@ -10,6 +10,7 @@ import com.company.attendance.crm.repository.DealRepository;
 import com.company.attendance.crm.repository.ProductRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
@@ -45,14 +46,15 @@ public class DealProductService {
         return dto;
     }
 
+    @Transactional(readOnly = true)
     public List<DealProductDto> list(Long dealId){
-        Deal deal = dealRepository.findByIdSafe(dealId);
-        return dealProductRepository.findByDeal(deal)
+        return dealProductRepository.findByDealIdWithProduct(dealId)
             .stream()
             .map(this::toDto)
             .collect(Collectors.toList());
     }
 
+    @Transactional
     public DealProductDto create(Long dealId, DealProductRequestDto incoming){
         if (incoming == null || incoming.getProductId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "productId is required");
@@ -74,6 +76,7 @@ public class DealProductService {
         return toDto(dealProductRepository.save(dp));
     }
 
+    @Transactional
     public DealProductDto update(Long dealId, Long dealProductId, DealProductRequestDto incoming){
         DealProduct db = dealProductRepository.findById(dealProductId).orElseThrow(() -> new IllegalArgumentException("DealProduct not found"));
         if (db.getDeal() == null || db.getDeal().getId() == null || !db.getDeal().getId().equals(dealId)) {
@@ -90,6 +93,7 @@ public class DealProductService {
         return toDto(dealProductRepository.save(db));
     }
 
+    @Transactional
     public void delete(Long dealId, Long dealProductId){
         DealProduct db = dealProductRepository.findById(dealProductId).orElseThrow(() -> new IllegalArgumentException("DealProduct not found"));
         if (db.getDeal() == null || db.getDeal().getId() == null || !db.getDeal().getId().equals(dealId)) {
