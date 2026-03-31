@@ -56,7 +56,9 @@ public class BankService {
     }
 
     public Page<Bank> list(Pageable pageable) {
-        return bankRepository.findAll(pageable);
+        // Only return active banks (soft-delete: active=false means deleted)
+        Specification<Bank> spec = BankSpecifications.active(true);
+        return bankRepository.findAll(spec, pageable);
     }
 
     public Page<Bank> search(Boolean active, Long ownerId, String q, Pageable pageable){

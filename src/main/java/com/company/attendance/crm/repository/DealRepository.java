@@ -48,6 +48,9 @@ public interface DealRepository extends JpaRepository<Deal, Long> {
     @Query("SELECT COUNT(d) FROM Deal d WHERE d.department = :dept")
     long countByDepartment(@Param("dept") String dept);
 
+    @Query("SELECT d FROM Deal d WHERE d.clientId = :clientId AND d.department = :department")
+    List<Deal> findByClientIdAndDepartment(@Param("clientId") Long clientId, @Param("department") String department);
+
     @Query("SELECT d FROM Deal d LEFT JOIN FETCH d.client LEFT JOIN FETCH d.bank WHERE d.clientId = :clientId")
     List<Deal> findByClientIdWithRelations(@Param("clientId") Long clientId);
 

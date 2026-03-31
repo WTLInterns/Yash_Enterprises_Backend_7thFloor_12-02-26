@@ -130,7 +130,11 @@ public class DealController {
     } else {
       deals = List.of();
     }
-    List<DealDto> dtos = deals.stream().map(mapper::toDealDto).collect(Collectors.toList());
+    List<DealDto> dtos = deals.stream().map(d -> {
+      DealDto dto = mapper.toDealDto(d);
+      dto.setCalculatedValue(d.getValueAmount());
+      return dto;
+    }).collect(Collectors.toList());
     return ResponseEntity.ok(dtos);
   }
 

@@ -288,7 +288,14 @@ public class DealExcelImportService {
         
         // Find or create client
         Client client = findOrCreateClient(customerName, contactName, department, appNo, ownerUserId);
-        
+
+        // Skip if this client already has a deal in this department (same name + same dept re-upload)
+        List<Deal> existingDealsInDept = dealRepository.findByClientIdAndDepartment(client.getId(), department);
+        if (!existingDealsInDept.isEmpty()) {
+            log.info("Skipping row {} - client {} already has deal in dept {}", row.getRowNum(), customerName, department);
+            return;
+        }
+
         // Find or create bank from Excel data
         Bank bank = findOrCreateBank(bankName, branchName, taluka, district);
         
@@ -397,66 +404,41 @@ public class DealExcelImportService {
     }
 
     private Client findOrCreateClient(String name, String contactName, String department, String appNo, Long ownerUserId) {
-        // 1. Agr No match (most reliable)
+        // 1. App/Agr No match - always reuse same physical record
         if (appNo != null && !appNo.trim().isEmpty()) {
             Optional<Client> byAppNo = clientRepository.findByCustomerNumber(appNo.trim());
             if (byAppNo.isPresent()) {
                 Client c = byAppNo.get();
-                if (!Boolean.TRUE.equals(c.getIsActive())) {
-                    c.setIsActive(true);
-                    clientRepository.save(c);
-                }
+                if (!Boolean.TRUE.equals(c.getIsActive())) { c.setIsActive(true); clientRepository.save(c); }
                 log.debug("Found client by Agr No: {}", appNo);
                 return c;
             }
         }
 
-        // 2. Name + Contact fallback
-        if (name != null && contactName != null && !contactName.trim().isEmpty()) {
-            Optional<Client> byNameContact = clientRepository.findByNameAndContactName(name.trim(), contactName.trim());
-            if (byNameContact.isPresent()) {
-                Client c = byNameContact.get();
-                if (!Boolean.TRUE.equals(c.getIsActive())) {
-                    c.setIsActive(true);
-                    clientRepository.save(c);
-                }
-                log.debug("Found client by name+contact: {}", name);
-                return c;
-            }
-        }
-
-        // 3. Name-only fallback (handles re-upload after delete)
+        // 2. Name-based lookup with department check:
+        //    - Same name + same department  -> reuse (skip creating duplicate)
+        //    - Same name + diff department  -> create new client for that department
         if (name != null) {
-            Optional<Client> byName = clientRepository.findByName(name.trim());
-            if (byName.isPresent()) {
-                Client c = byName.get();
-                // Only reuse if this client has no deal yet (avoid wrong reuse)
-                boolean hasDeal = !dealRepository.findByClientId(c.getId()).isEmpty();
-                if (!hasDeal) {
-                    if (!Boolean.TRUE.equals(c.getIsActive())) {
-                        c.setIsActive(true);
-                        clientRepository.save(c);
-                    }
-                    log.debug("Found dealless client by name: {}", name);
+            List<Client> byName = clientRepository.findAllByName(name.trim());
+            for (Client c : byName) {
+                if (!Boolean.TRUE.equals(c.getIsActive())) continue;
+                List<Deal> dealsInSameDept = dealRepository.findByClientIdAndDepartment(c.getId(), department);
+                if (!dealsInSameDept.isEmpty()) {
+                    // Already exists in this department - return existing client so caller skips deal creation
+                    log.info("Client {} already exists in dept {} - skipping", name, department);
                     return c;
                 }
             }
         }
 
-        // 4. Create new client
+        // 3. Create new client (new name, or same name but different department)
         Client client = new Client();
         client.setName(name.trim());
         client.setIsActive(true);
-        if (appNo != null && !appNo.trim().isEmpty()) {
-            client.setCustomerNumber(appNo.trim());
-        }
-        if (contactName != null && !contactName.trim().isEmpty()) {
-            client.setContactName(contactName.trim());
-        }
-        if (ownerUserId != null) {
-            client.setOwnerId(ownerUserId);
-        }
-        log.info("Creating new client: {} (Agr No: {})", name, appNo);
+        if (appNo != null && !appNo.trim().isEmpty()) { client.setCustomerNumber(appNo.trim()); }
+        if (contactName != null && !contactName.trim().isEmpty()) { client.setContactName(contactName.trim()); }
+        if (ownerUserId != null) { client.setOwnerId(ownerUserId); }
+        log.info("Creating new client: {} (dept: {}, Agr No: {})", name, department, appNo);
         return clientService.createClientEntity(client);
     }
 
