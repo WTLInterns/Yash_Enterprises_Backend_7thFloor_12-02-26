@@ -79,8 +79,8 @@ public class Bank {
     @Column(name = "updated_by")
     private Long updatedBy;
     
-    @Column(name = "is_active")
-    private Boolean active;
+    @Column(name = "is_active", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 1")
+    private Boolean active = true;
 
     @OneToMany(mappedBy = "bank", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<BankContactPerson> contactPersons = new ArrayList<>();

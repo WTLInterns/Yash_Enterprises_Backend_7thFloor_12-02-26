@@ -16,7 +16,7 @@ public class JwtService {
     @Value("${jwt.secret:your_super_secret_key_must_be_long_and_secure_123456789}")
     private String secret;
 
-    @Value("${jwt.expiration:36000000}") // 10 hours in milliseconds
+    @Value("${jwt.expiration:2592000000}") // 30 days in milliseconds
     private long expiration;
 
     private SecretKey getSigningKey() {

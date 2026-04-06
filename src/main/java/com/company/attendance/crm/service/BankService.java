@@ -6,6 +6,7 @@ import com.company.attendance.crm.repository.BankRepository;
 import com.company.attendance.crm.repository.BankSpecifications;
 import com.company.attendance.exception.ResourceNotFoundException;
 import com.company.attendance.exception.InvalidForeignKeyException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
+@Slf4j
 public class BankService {
     private final BankRepository bankRepository;
     private final AuditService auditService;
@@ -28,16 +30,19 @@ public class BankService {
         if (bank.getName() == null || bank.getName().isBlank()){
             throw new IllegalArgumentException("name is required");
         }
-        
-        // Check bank uniqueness by name + branch + taluka
-        List<Bank> existing = bankRepository
-            .findByNameIgnoreCaseAndBranchNameIgnoreCaseAndTalukaIgnoreCase(
-                bank.getName(),
-                bank.getBranchName(),
-                bank.getTaluka()
-            );
-        
+
+        // Duplicate check: name + branchName only (taluka/district NOT stored on bank)
+        String cleanName   = bank.getName().trim();
+        String cleanBranch = bank.getBranchName() != null ? bank.getBranchName().trim() : null;
+
+        List<Bank> existing = cleanBranch != null
+            ? bankRepository.findByNameIgnoreCaseAndBranchNameIgnoreCase(cleanName, cleanBranch)
+            : bankRepository.findByNameIgnoreCase(cleanName)
+                .map(java.util.Collections::singletonList)
+                .orElse(java.util.Collections.emptyList());
+
         if (!existing.isEmpty()) {
+            log.debug("Bank already exists: {} ({}), reusing id={}", cleanName, cleanBranch, existing.get(0).getId());
             return existing.get(0);
         }
         
@@ -45,8 +50,7 @@ public class BankService {
         if (bank.getCreatedBy() == null) {
             bank.setCreatedBy(auditService.getCurrentUserId() != null ? auditService.getCurrentUserId().longValue() : null);
         }
-        
-        // Set audit fields (createdBy, createdAt)
+        bank.setActive(true); // always active on create
         auditService.setAuditFields(bank);
         return bankRepository.save(bank);
     }

@@ -296,8 +296,8 @@ public class DealExcelImportService {
             return;
         }
 
-        // Find or create bank from Excel data
-        Bank bank = findOrCreateBank(bankName, branchName, taluka, district);
+        // Find or create bank — only name + branchName, NO taluka/district
+        Bank bank = findOrCreateBank(bankName, branchName);
         
         // Create or update address (village can be "-")
         CustomerAddress.AddressType addressTypeEnum = parseAddressType(addressType);
@@ -443,55 +443,40 @@ public class DealExcelImportService {
     }
 
     /**
-     * 🔥 FIX: Find existing bank or create new one from Excel data using BankService
+     * Find existing bank by name+branch only (NO taluka/district on bank).
+     * Taluka/district belong to customer PRIMARY address, not bank.
      */
-    private Bank findOrCreateBank(String bankName, String branchName, String taluka, String district) {
-        if (bankName == null || bankName.trim().isEmpty()) {
-            return null;
-        }
+    private Bank findOrCreateBank(String bankName, String branchName) {
+        if (bankName == null || bankName.trim().isEmpty()) return null;
 
-        // 🔥 FIX: Handle null values for branch and taluka
-        if (branchName != null && branchName.trim().isEmpty()) {
-            branchName = null;
-        }
-        if (taluka != null && taluka.trim().isEmpty()) {
-            taluka = null;
-        }
+        String cleanBank   = bankName.trim();
+        String cleanBranch = (branchName != null && !branchName.trim().isEmpty()) ? branchName.trim() : null;
 
-        // Find existing bank — use List to avoid NonUniqueResultException
-        List<Bank> matches;
-        if (branchName != null && taluka != null) {
-            matches = bankRepository.findByNameIgnoreCaseAndBranchNameIgnoreCaseAndTalukaIgnoreCase(
-                bankName.trim(), branchName.trim(), taluka.trim());
-        } else if (branchName != null) {
-            matches = bankRepository.findByNameIgnoreCaseAndBranchNameIgnoreCase(
-                bankName.trim(), branchName.trim());
-        } else {
-            matches = bankRepository.findByNameIgnoreCase(bankName.trim())
+        // Lookup by name + branch ONLY
+        List<Bank> matches = cleanBranch != null
+            ? bankRepository.findByNameIgnoreCaseAndBranchNameIgnoreCase(cleanBank, cleanBranch)
+            : bankRepository.findByNameIgnoreCase(cleanBank)
                 .map(java.util.Collections::singletonList)
                 .orElse(java.util.Collections.emptyList());
-        }
 
         if (!matches.isEmpty()) {
-            log.debug("Found existing bank: {} ({})", bankName, branchName);
+            log.debug("Reusing existing bank: {} ({})", cleanBank, cleanBranch);
             return matches.get(0);
         }
 
-        // 🔥 FIX: Create new bank using BankService (which now handles duplicates correctly)
+        // Create new bank — NO taluka/district
         Bank newBank = new Bank();
-        newBank.setName(bankName.trim());
-        newBank.setBranchName(branchName != null ? branchName.trim() : null);
-        newBank.setTaluka(taluka != null ? taluka.trim() : null);
-        newBank.setDistrict(district != null ? district.trim() : null);
+        newBank.setName(cleanBank);
+        newBank.setBranchName(cleanBranch);
         newBank.setActive(true);
 
         try {
-            Bank createdBank = bankService.create(newBank);
-            log.info("Created new bank: {} ({})", bankName, branchName);
-            return createdBank;
+            Bank created = bankService.create(newBank);
+            log.info("Created new bank: {} ({})", cleanBank, cleanBranch);
+            return created;
         } catch (Exception e) {
-            log.error("Failed to create bank: {} ({}) - {}", bankName, branchName, e.getMessage());
-            return null; // 🔥 FIX: Return null instead of breaking the import
+            log.error("Failed to create bank: {} ({}) - {}", cleanBank, cleanBranch, e.getMessage());
+            return null;
         }
     }
 
