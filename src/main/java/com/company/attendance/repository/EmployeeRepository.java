@@ -60,6 +60,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
            "LEFT JOIN FETCH e.team " +
            "LEFT JOIN FETCH e.designation " +
            "LEFT JOIN FETCH e.reportingManager " +
+           "LEFT JOIN FETCH e.tl " +
            "LEFT JOIN FETCH e.organization " +
            "LEFT JOIN FETCH e.department " +
            "LEFT JOIN FETCH e.shift " +

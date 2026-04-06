@@ -6,9 +6,11 @@ import com.company.attendance.repository.EmployeeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 @Service
 @RequiredArgsConstructor
@@ -101,6 +103,21 @@ public class ExpenseService {
 
     public List<Expense> findByEmployeeId(Long employeeId) {
         return expenseRepository.findByEmployeeId(employeeId);
+    }
+
+    // 🔥 NEW: Find expenses by clientId for CRM integration
+    public List<Expense> findByClientId(Long clientId) {
+        return expenseRepository.findByClientId(clientId);
+    }
+
+    // 🔥 NEW: Get total expenses by clientId for CRM accounting
+    public BigDecimal getTotalByClientId(Long clientId) {
+        List<Expense> expenses = findByClientId(clientId);
+        return expenses.stream()
+            .map(Expense::getAmount)
+            .filter(Objects::nonNull)
+            .map(BigDecimal::valueOf)          // Double → BigDecimal
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     public Optional<Expense> findById(Long id) {

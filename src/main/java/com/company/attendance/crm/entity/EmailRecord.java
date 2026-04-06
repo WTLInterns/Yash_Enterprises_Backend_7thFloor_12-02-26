@@ -29,6 +29,12 @@ public class EmailRecord {
 
     private String status; // SENT, FAILED, DRAFT
 
+    @Column(name = "attachment_name")
+    private String attachmentName;
+
+    @Column(name = "attachment_path")
+    private String attachmentPath;
+
     // getters/setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -48,4 +54,8 @@ public class EmailRecord {
     public void setSentAt(OffsetDateTime sentAt) { this.sentAt = sentAt; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+    public String getAttachmentName() { return attachmentName; }
+    public void setAttachmentName(String attachmentName) { this.attachmentName = attachmentName; }
+    public String getAttachmentPath() { return attachmentPath; }
+    public void setAttachmentPath(String attachmentPath) { this.attachmentPath = attachmentPath; }
 }

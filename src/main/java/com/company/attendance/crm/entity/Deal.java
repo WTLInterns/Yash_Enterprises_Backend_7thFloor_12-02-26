@@ -69,6 +69,12 @@ public class Deal {
     
     @Column(name = "is_active")
     private Boolean active = true;
+
+    @Column(name = "moved_to_approval")
+    private Boolean movedToApproval = false;
+
+    @Column(name = "deal_code", unique = true)
+    private String dealCode;
     
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

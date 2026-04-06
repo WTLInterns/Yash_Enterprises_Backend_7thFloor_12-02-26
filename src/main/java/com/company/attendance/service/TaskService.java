@@ -22,6 +22,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.transaction.annotation.Transactional;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -41,10 +43,12 @@ public class TaskService {
         CustomerAddress addr = customerAddressRepository.findById(task.getCustomerAddressId())
                 .orElseThrow(() -> new RuntimeException("CustomerAddress not found: " + task.getCustomerAddressId()));
         if (addr.getLatitude() == null || addr.getLongitude() == null) {
-            throw new RuntimeException("CustomerAddress coordinates are missing for: " + task.getCustomerAddressId());
+            // Warn only — coordinates are used for field tracking but should not block task save
+            log.warn("CustomerAddress {} has no GPS coordinates — task saved without location tracking", task.getCustomerAddressId());
         }
     }
 
+    @Transactional
     public Task create(Task task) {
         validateCustomerAddressLink(task);
         task.setCreatedAt(LocalDateTime.now());
@@ -111,7 +115,7 @@ public class TaskService {
     }
 
     public List<Task> findAll() {
-        return taskRepository.findAll();
+        return taskRepository.findAllWithRelations();
     }
     
     /**
@@ -152,6 +156,7 @@ public class TaskService {
                 .orElseThrow(() -> new RuntimeException("Task not found"));
     }
 
+    @Transactional
     public Task update(Long id, Task updated) {
         Task existing = getById(id);
 

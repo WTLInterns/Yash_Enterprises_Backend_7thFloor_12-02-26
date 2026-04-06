@@ -46,17 +46,14 @@ public class AuthController {
         try {
             log.info("Login attempt for email: {}", loginRequest.getEmail());
 
-            // Authenticate the user using Spring Security
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(
-                            loginRequest.getEmail(),
-                            loginRequest.getPassword()
-                    )
-            );
-
-            // Get employee details with department
+            // Load employee and validate password using existing legacy-compatible logic.
+            // This avoids breaking historical logins when Spring Security is enabled.
             Employee employee = employeeRepository.findByEmailWithDepartment(loginRequest.getEmail())
                     .orElseThrow(() -> new BadCredentialsException("User not found"));
+
+            if (!isValidPassword(loginRequest.getPassword(), employee)) {
+                throw new BadCredentialsException("Invalid credentials");
+            }
 
             // Extract role information (normalize to uppercase)
             String roleName = employee.getRole() != null

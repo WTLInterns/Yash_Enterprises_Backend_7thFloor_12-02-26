@@ -2,6 +2,9 @@ package com.company.attendance.crm.service;
 
 import com.company.attendance.entity.Employee;
 import com.company.attendance.repository.EmployeeRepository;
+import com.company.attendance.crm.repository.ActivityRepository;
+import com.company.attendance.crm.entity.Activity;
+import com.company.attendance.crm.enums.ActivityType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -12,12 +15,14 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.time.Instant;
+import java.time.OffsetDateTime;
 
 @Service
 @RequiredArgsConstructor
 public class AuditService {
     
     private final EmployeeRepository employeeRepository;
+    private final ActivityRepository activityRepository;
     
     public Integer getCurrentUserId() {
         try {
@@ -125,5 +130,18 @@ public class AuditService {
     
     public Employee getCurrentUser(Integer userId) {
         return employeeRepository.findById(userId.longValue()).orElse(null);
+    }
+    
+    public void logActivity(Long clientId, String action, String description, Long userId) {
+        try {
+            // Since Activity entity requires a Deal, and expenses are client-specific,
+            // we'll just log to console for now
+            // For a proper implementation, you might need a separate ExpenseLog entity
+            // or modify Activity to make deal optional and add EXPENSE type
+            System.out.println("Activity logged: " + action + " - " + description + " (Client: " + clientId + ", User: " + userId + ")");
+        } catch (Exception e) {
+            // Don't fail the main request if audit logging fails
+            System.err.println("Failed to log activity: " + e.getMessage());
+        }
     }
 }

@@ -22,4 +22,9 @@ public class ExpenseDto {
     private LocalTime expenseTime;
     private String receiptUrl;
     private String status;
+    private String rejectionReason;
+    
+    // 🔥 NEW: Client mapping for CRM integration
+    private Long clientId;
+    private String clientName;
 }

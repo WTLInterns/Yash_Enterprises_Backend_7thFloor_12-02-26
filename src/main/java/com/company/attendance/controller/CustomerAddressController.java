@@ -28,6 +28,15 @@ public class CustomerAddressController {
     private final GeocodingService geocodingService;
 
     /**
+     * Get ALL addresses for ALL customers in one call — used by the customers list page
+     * to avoid N per-customer requests.
+     */
+    @GetMapping("/addresses/all")
+    public ResponseEntity<List<CustomerAddress>> getAllAddresses() {
+        return ResponseEntity.ok(customerAddressRepository.findAll());
+    }
+
+    /**
      * Get all addresses for a customer
      */
     @GetMapping("/{clientId}/addresses")

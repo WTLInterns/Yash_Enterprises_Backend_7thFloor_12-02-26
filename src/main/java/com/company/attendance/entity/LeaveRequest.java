@@ -3,6 +3,7 @@ package com.company.attendance.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 
 @Entity
 @Table(name = "leaves")
@@ -30,6 +31,15 @@ public class LeaveRequest {
     private Status status;
 
     private String reason;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "approved_by")
+    private Employee approvedBy;
+
+    private OffsetDateTime approvedAt;
+
+    @Column(length = 32)
+    private String approvalRole;
 
     public enum LeaveType {
         SICK, CASUAL, PAID, UNPAID

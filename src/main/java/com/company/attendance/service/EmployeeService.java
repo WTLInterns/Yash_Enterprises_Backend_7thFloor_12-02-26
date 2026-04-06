@@ -7,6 +7,8 @@ import com.company.attendance.entity.Designation;
 import com.company.attendance.entity.Organization;
 import com.company.attendance.entity.Department;
 import com.company.attendance.entity.Shift;
+import com.company.attendance.repository.AttendanceRepository;
+import com.company.attendance.repository.ExpenseRepository;
 import com.company.attendance.repository.EmployeeRepository;
 import com.company.attendance.repository.RoleRepository;
 import com.company.attendance.repository.TeamRepository;
@@ -23,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +39,8 @@ public class EmployeeService {
     private final OrganizationRepository organizationRepository;
     private final DepartmentRepository departmentRepository;
     private final ShiftRepository shiftRepository;
+    private final AttendanceRepository attendanceRepository;
+    private final ExpenseRepository expenseRepository;
 
     public Employee save(Employee employee) {
         if (employee.getId() == null) {
@@ -158,6 +163,8 @@ public class EmployeeService {
         // Set additional fields
         employee.setDateOfBirth(dto.getDateOfBirth());
         employee.setGender(dto.getGender());
+        employee.setPanNumber(dto.getPanNumber());
+        employee.setBankAccountNumber(dto.getBankAccountNumber());
         
         // Handle profile image if provided as base64
         if (dto.getProfileImageBase64() != null && !dto.getProfileImageBase64().trim().isEmpty()) {
@@ -399,15 +406,17 @@ public class EmployeeService {
         
         // Update date of birth
         if (dto.getDateOfBirth() != null && !dto.getDateOfBirth().equals(existing.getDateOfBirth())) {
-            System.out.println("Updating date of birth from '" + existing.getDateOfBirth() + "' to '" + dto.getDateOfBirth() + "'");
             existing.setDateOfBirth(dto.getDateOfBirth());
         }
         
         // Update gender
         if (dto.getGender() != null && !dto.getGender().equals(existing.getGender())) {
-            System.out.println("Updating gender from '" + existing.getGender() + "' to '" + dto.getGender() + "'");
             existing.setGender(dto.getGender());
         }
+
+        // Update PAN and bank account
+        if (dto.getPanNumber() != null) existing.setPanNumber(dto.getPanNumber());
+        if (dto.getBankAccountNumber() != null) existing.setBankAccountNumber(dto.getBankAccountNumber());
         
         // Handle profile image update if provided as base64
         if (dto.getProfileImageBase64() != null && !dto.getProfileImageBase64().trim().isEmpty()) {
@@ -455,6 +464,37 @@ public class EmployeeService {
         employeeRepository.deleteById(id);
     }
 
+    /** Soft delete — marks INACTIVE, no FK violation */
+    @Transactional
+    public void deactivate(Long id) {
+        Employee emp = employeeRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Employee not found: " + id));
+        emp.setStatus(Employee.Status.INACTIVE);
+        emp.setUpdatedAt(LocalDateTime.now());
+        employeeRepository.save(emp);
+    }
+
+    /** Hard delete — removes all FK dependencies then deletes employee */
+    @Transactional
+    public void deleteWithCleanup(Long id) {
+        // 1. Null out self-referencing FKs: other employees who have this as TL or reporting manager
+        List<Employee> subordinates = employeeRepository.findAll().stream()
+                .filter(e -> (e.getTl() != null && e.getTl().getId().equals(id))
+                          || (e.getReportingManager() != null && e.getReportingManager().getId().equals(id)))
+                .collect(java.util.stream.Collectors.toList());
+        for (Employee sub : subordinates) {
+            if (sub.getTl() != null && sub.getTl().getId().equals(id)) sub.setTl(null);
+            if (sub.getReportingManager() != null && sub.getReportingManager().getId().equals(id)) sub.setReportingManager(null);
+            employeeRepository.save(sub);
+        }
+        // 2. Delete attendance records
+        attendanceRepository.deleteByEmployeeId(id);
+        // 3. Delete expense records
+        expenseRepository.deleteByEmployeeId(id);
+        // 4. Delete the employee
+        employeeRepository.deleteById(id);
+    }
+
     public boolean existsByUserId(String userId) {
         return employeeRepository.existsByUserId(userId);
     }
@@ -464,28 +504,22 @@ public class EmployeeService {
     }
     
     public String generateNextEmployeeId() {
-        // Find the highest numeric employee ID
         List<Employee> employees = employeeRepository.findAll();
         int maxId = 0;
-        
         for (Employee emp : employees) {
             if (emp.getEmployeeId() != null) {
                 try {
-                    // Extract numeric part from employee ID
-                    String numericPart = emp.getEmployeeId().replaceAll("[^0-9]", "");
+                    String upper = emp.getEmployeeId().toUpperCase();
+                    String numericPart = upper.startsWith("YE")
+                        ? upper.substring(2)
+                        : emp.getEmployeeId().replaceAll("[^0-9]", "");
                     if (!numericPart.isEmpty()) {
                         int id = Integer.parseInt(numericPart);
-                        if (id > maxId) {
-                            maxId = id;
-                        }
+                        if (id > maxId) maxId = id;
                     }
-                } catch (NumberFormatException e) {
-                    // Skip non-numeric IDs
-                }
+                } catch (NumberFormatException e) { /* skip */ }
             }
         }
-        
-        // Generate next ID (start from 1 if no existing IDs)
-        return String.valueOf(maxId + 1);
+        return "YE" + (maxId + 1);
     }
 }

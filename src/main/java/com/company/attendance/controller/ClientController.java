@@ -49,7 +49,7 @@ public class ClientController {
                 List<Long> clientIds = deals.stream().map(Deal::getClientId).distinct().toList();
                 clients = clientIds.stream()
                     .map(id -> clientService.getClientEntityById(id))
-                    .filter(client -> client != null && client.getIsActive())
+                    .filter(client -> client != null && (client.getIsActive() == null || client.getIsActive()))
                     .collect(Collectors.toList());
             } else if (department != null) {
                 // Filter by department only
@@ -57,7 +57,7 @@ public class ClientController {
                 List<Long> clientIds = deals.stream().map(Deal::getClientId).distinct().toList();
                 clients = clientIds.stream()
                     .map(id -> clientService.getClientEntityById(id))
-                    .filter(client -> client != null && client.getIsActive())
+                    .filter(client -> client != null && (client.getIsActive() == null || client.getIsActive()))
                     .collect(Collectors.toList());
             } else {
                 clients = clientService.getActiveClientEntities();
@@ -192,6 +192,25 @@ public class ClientController {
             log.error("Error deleting client: {}", e.getMessage());
             return ResponseEntity.internalServerError().build();
         }
+    }
+
+    @DeleteMapping("/bulk")
+    public ResponseEntity<java.util.Map<String, Object>> bulkDeleteClients(@RequestBody java.util.Map<String, List<Long>> body) {
+        List<Long> ids = body.get("ids");
+        if (ids == null || ids.isEmpty()) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", "No IDs provided"));
+        }
+        log.info("DELETE /api/clients/bulk - Hard deleting {} clients", ids.size());
+        int deleted = 0;
+        for (Long id : ids) {
+            try {
+                clientService.hardDeleteClientEntity(id);
+                deleted++;
+            } catch (Exception e) {
+                log.warn("Could not delete client {}: {}", id, e.getMessage());
+            }
+        }
+        return ResponseEntity.ok(java.util.Map.of("deleted", deleted, "message", deleted + " client(s) deleted successfully"));
     }
     
     @GetMapping("/count")

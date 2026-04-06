@@ -25,7 +25,7 @@ public class DealService {
     }
 
     public Page<Deal> list(Pageable pageable) {
-        return dealRepository.findAll(pageable);
+        return dealRepository.findAllWithClient(pageable);
     }
     
     /**
@@ -111,24 +111,40 @@ public class DealService {
     }
 
     public List<Deal> getAllDeals() {
-        return dealRepository.findAll();
+        return dealRepository.findAllWithClient();
     }
 
     @Transactional
     public Deal create(Deal deal) {
-        // Set audit fields
+        // Generate dealCode: DEPT + (count+1), e.g. PPO1, PPE2
+        if (deal.getDealCode() == null || deal.getDealCode().isBlank()) {
+            String dept = deal.getDepartment() != null ? deal.getDepartment().toUpperCase() : "GEN";
+            long count = dealRepository.countByDepartment(dept);
+            deal.setDealCode(dept + (count + 1));
+        }
         auditService.setAuditFields(deal);
         return dealRepository.save(deal);
     }
 
     @Transactional
     public Deal update(Deal deal) {
-        // Update audit fields
+        // ACCOUNT department: mark movedToApproval when stage is CLOSE_WIN or CLOSE_LOST
+        if ("ACCOUNT".equalsIgnoreCase(deal.getDepartment())) {
+            String stage = deal.getStageCode();
+            if ("CLOSE_WIN".equalsIgnoreCase(stage) || "CLOSE_LOST".equalsIgnoreCase(stage)) {
+                deal.setMovedToApproval(true);
+            }
+        }
         auditService.updateAuditFields(deal);
         return dealRepository.save(deal);
     }
 
     public void delete(Long id) {
         dealRepository.deleteById(id);
+    }
+
+    @Transactional
+    public void deleteAll(List<Long> ids) {
+        dealRepository.deleteAllById(ids);
     }
 }

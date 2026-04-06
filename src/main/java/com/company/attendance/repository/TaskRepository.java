@@ -12,43 +12,81 @@ import java.util.Optional;
 @Repository
 public interface TaskRepository extends JpaRepository<Task, Long> {
     
-    /**
-     * Find all tasks assigned to an employee
-     */
     List<Task> findByAssignedToEmployeeId(Long employeeId);
-    
-    /**
-     * Find all tasks assigned to an employee ordered by ID desc
-     */
-    List<Task> findByAssignedToEmployeeIdOrderByIdDesc(Long employeeId);
 
+    List<Task> findByClientId(Long clientId);
+    
+    @Query("""
+        SELECT t FROM Task t
+        LEFT JOIN FETCH t.client
+        LEFT JOIN FETCH t.assignedToEmployee ae
+        LEFT JOIN FETCH ae.role
+        LEFT JOIN FETCH ae.department
+        LEFT JOIN FETCH t.createdByEmployee
+        LEFT JOIN FETCH t.customerAddress
+        WHERE t.assignedToEmployeeId = :employeeId
+        ORDER BY t.id DESC
+        """)
+    List<Task> findByAssignedToEmployeeIdOrderByIdDesc(@Param("employeeId") Long employeeId);
+
+    @Query("""
+        SELECT t FROM Task t
+        LEFT JOIN FETCH t.client
+        LEFT JOIN FETCH t.assignedToEmployee ae
+        LEFT JOIN FETCH ae.role
+        LEFT JOIN FETCH ae.department
+        LEFT JOIN FETCH t.createdByEmployee
+        LEFT JOIN FETCH t.customerAddress
+        WHERE t.clientId = :clientId AND t.assignedToEmployeeId = :assignedToEmployeeId
+        ORDER BY t.id DESC
+        """)
     List<Task> findByClientIdAndAssignedToEmployeeIdOrderByIdDesc(
-        Long clientId,
-        Long assignedToEmployeeId
+        @Param("clientId") Long clientId,
+        @Param("assignedToEmployeeId") Long assignedToEmployeeId
     );
     
-    /**
-     * 🔥 DEPARTMENT-AWARE: Find all tasks in a department
-     */
     List<Task> findByDepartment(String department);
     
-    /**
-     * 🔥 DEPARTMENT-AWARE: Find all tasks in a department ordered by ID desc
-     */
-    List<Task> findByDepartmentOrderByIdDesc(String department);
-    
-    /**
-     * 🔥 DEPARTMENT-AWARE: Find all tasks created by a TL in their department
-     */
     @Query("""
-        SELECT t FROM Task t 
-        JOIN t.assignedToEmployee e 
-        WHERE t.createdByEmployeeId = :tlId 
-          AND e.department = :department 
+        SELECT t FROM Task t
+        LEFT JOIN FETCH t.client
+        LEFT JOIN FETCH t.assignedToEmployee ae
+        LEFT JOIN FETCH ae.role
+        LEFT JOIN FETCH ae.department
+        LEFT JOIN FETCH t.createdByEmployee
+        LEFT JOIN FETCH t.customerAddress
+        WHERE t.department = :department
+        ORDER BY t.id DESC
+        """)
+    List<Task> findByDepartmentOrderByIdDesc(@Param("department") String department);
+
+    @Query("""
+        SELECT t FROM Task t
+        LEFT JOIN FETCH t.client
+        LEFT JOIN FETCH t.assignedToEmployee ae
+        LEFT JOIN FETCH ae.role
+        LEFT JOIN FETCH ae.department
+        LEFT JOIN FETCH t.createdByEmployee
+        LEFT JOIN FETCH t.customerAddress
+        LEFT JOIN FETCH t.customFieldValues
+        ORDER BY t.id DESC
+        """)
+    List<Task> findAllWithRelations();
+    
+    @Query("""
+        SELECT t FROM Task t
+        LEFT JOIN FETCH t.client
+        LEFT JOIN FETCH t.assignedToEmployee ae
+        LEFT JOIN FETCH ae.role
+        LEFT JOIN FETCH ae.department
+        LEFT JOIN FETCH t.createdByEmployee
+        LEFT JOIN FETCH t.customerAddress
+        WHERE t.createdByEmployeeId = :tlId
+          AND ae.department = :department
         ORDER BY t.id DESC
         """)
     List<Task> findTasksCreatedByTlInDepartment(
-        @Param("tlId") Long tlId, 
+        @Param("tlId") Long tlId,
         @Param("department") String department
     );
     

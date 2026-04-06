@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -195,6 +196,9 @@ public class EmployeeLocationController {
                     log.warn("Auto punch-in check failed for employee {}: {}", employeeId, e.getMessage());
                 }
 
+                // ✅ FIX #6: Include decision in WebSocket push so frontend always has fresh decision
+                Map<String, Object> liveDecision = decisionService.makeEmployeeDecision(employeeId);
+
                 // WebSocket push
                 Map<String, Object> liveDto = new HashMap<>();
                 liveDto.put("id", employeeId);
@@ -213,6 +217,7 @@ public class EmployeeLocationController {
                 liveDto.put("status", "ONLINE");
                 liveDto.put("isPunchedIn", activePunch != null);
                 liveDto.put("punchType", activePunch != null ? activePunch.getPunchType() : null);
+                liveDto.put("decision", liveDecision);
                 messagingTemplate.convertAndSend("/topic/live-locations", liveDto);
                 messagingTemplate.convertAndSend("/topic/live-employees", liveDto);
             } catch (Exception e) {
@@ -315,34 +320,40 @@ public class EmployeeLocationController {
         }
     }
 
+    @Transactional(readOnly = true)
     @GetMapping("/live-employees")
     public ResponseEntity<Map<String, Object>> getLiveEmployees() {
         try {
-            List<Employee> employees = employeeRepository.findAll();
+            List<Employee> employees = employeeRepository.findAllWithRelationships();
+
+            // ✅ FIX #5: Single query for all latest tracking records (no N+1)
+            List<EmployeeTracking> latestTrackings = trackingRepo.findLatestPerEmployee();
+            Map<Long, EmployeeTracking> latestByEmpId = new HashMap<>();
+            latestTrackings.forEach(t -> latestByEmpId.put(t.getEmployee().getId(), t));
+
+            // Single query for all active punches
+            List<EmployeePunch> allActivePunches = employeePunchRepository.findAllActivePunches();
+            Map<Long, EmployeePunch> activePunchByEmpId = new HashMap<>();
+            allActivePunches.forEach(p -> activePunchByEmpId.put(p.getEmployee().getId(), p));
+
             List<Map<String, Object>> employeesData = employees.stream()
                     .map(emp -> {
-                        List<EmployeeTracking> latestList = trackingRepo.findLatestForEmployee(emp.getId());
-                        EmployeeTracking latest = latestList.isEmpty() ? null : latestList.get(0);
-                        
-                        // Get active punch for employee
-                        List<EmployeePunch> activePunches = employeePunchRepository.findActivePunchesByEmployeeId(emp.getId());
-                        EmployeePunch activePunch = activePunches.isEmpty() ? null : activePunches.get(0);
-                        
-                        // Get active task
+                        EmployeeTracking latest = latestByEmpId.get(emp.getId());
+                        EmployeePunch activePunch = activePunchByEmpId.get(emp.getId());
+
                         Task activeTask = null;
                         if (activePunch != null && activePunch.getTask() != null) {
                             activeTask = activePunch.getTask();
                         }
-                        
+
                         Map<String, Object> empData = new HashMap<>();
                         empData.put("id", emp.getId());
                         empData.put("name", (emp.getFirstName() + " " + emp.getLastName()).trim());
                         empData.put("email", emp.getEmail());
                         empData.put("phone", emp.getPhone());
                         empData.put("role", emp.getRole() != null ? emp.getRole().getName() : null);
-                        
+
                         if (latest != null) {
-                            // Flat fields for frontend compatibility
                             empData.put("lat", latest.getLatitude());
                             empData.put("lng", latest.getLongitude());
                             empData.put("latitude", latest.getLatitude());
@@ -363,23 +374,18 @@ public class EmployeeLocationController {
                             empData.put("address", null);
                             empData.put("currentAddress", null);
                         }
-                        
-                        // Location-based attendance information
+
                         empData.put("isPunchedIn", activePunch != null);
                         empData.put("punchInTime", activePunch != null ? activePunch.getPunchInTime() : null);
                         empData.put("lateMark", activePunch != null ? activePunch.getLateMark() : false);
                         empData.put("autoPunch", activePunch != null ? activePunch.getAutoPunch() : false);
                         empData.put("punchType", activePunch != null ? activePunch.getPunchType() : null);
-                        
-                        // CHANGE #3: SINGLE SOURCE OF TRUTH - DELEGATE TO DECISION SERVICE
+
                         Map<String, Object> decision = decisionService.makeEmployeeDecision(emp.getId());
                         empData.put("decision", decision);
-                        
+
                         if (activeTask != null) {
-                            // CHANGE #2: TASK ACCESS VISIBILITY - DELEGATE TO DECISION SERVICE
                             Map<String, Object> taskDecision = decisionService.makeTaskDecision(emp.getId(), activeTask.getId());
-                            
-                            // Get customer address for display
                             String customerAddressDisplay = null;
                             if (activeTask.getCustomerAddressId() != null) {
                                 CustomerAddress custAddr = locationBasedAttendanceService.getCustomerAddressByTaskId(activeTask.getId());
@@ -387,16 +393,14 @@ public class EmployeeLocationController {
                                     customerAddressDisplay = custAddr.getAddressLine() + ", " + custAddr.getCity();
                                 }
                             }
-                            
                             empData.put("activeTask", Map.of(
                                 "id", activeTask.getId(),
                                 "name", activeTask.getTaskName(),
                                 "status", activeTask.getStatus(),
-                                "clientName", null, // Client removed from decision flow
-                                "address", customerAddressDisplay,
+                                "clientName", "",
+                                "address", customerAddressDisplay != null ? customerAddressDisplay : "",
                                 "taskAccess", taskDecision
                             ));
-                            
                             empData.put("distanceToCustomer", decision.get("distanceToCustomer"));
                             empData.put("canOperate", taskDecision.get("canUpdate"));
                         } else {
@@ -404,7 +408,7 @@ public class EmployeeLocationController {
                             empData.put("distanceToCustomer", decision.get("distanceToCustomer"));
                             empData.put("canOperate", false);
                         }
-                        
+
                         return empData;
                     })
                     .collect(Collectors.toList());

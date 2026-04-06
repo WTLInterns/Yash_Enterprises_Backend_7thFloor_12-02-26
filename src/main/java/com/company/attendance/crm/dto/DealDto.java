@@ -38,6 +38,8 @@ public class DealDto {
     private LocalDate closingDate;
     private String stage;
     private String department;
+    private Boolean movedToApproval;
+    private String dealCode;
     
     // 🔥 HELPER: Get stage code for frontend consistency
     public String getStageCode() {
@@ -66,4 +68,6 @@ public class DealDto {
     // Related entity names for display
     private String clientName;
     private String bankName;
+    private String taluka;
+    private String district;
 }

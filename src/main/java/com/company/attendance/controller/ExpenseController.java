@@ -3,6 +3,7 @@ import com.company.attendance.dto.ExpenseDto;
 import com.company.attendance.entity.Expense;
 import com.company.attendance.mapper.ExpenseMapper;
 import com.company.attendance.service.ExpenseService;
+import com.company.attendance.crm.service.AuditService;
 import com.company.attendance.util.FileUploadUtil;
 import com.company.attendance.util.UploadUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,6 +31,7 @@ public class ExpenseController {
     private final ExpenseMapper expenseMapper;
     private final UploadUtil uploadUtil;
     private final ObjectMapper objectMapper;
+    private final AuditService auditService;
 
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
@@ -86,6 +88,15 @@ public class ExpenseController {
         var dtos = expenses.stream().map(expenseMapper::toDto).collect(Collectors.toList());
         return ResponseEntity.ok(dtos);
     }
+    
+    // 🔥 NEW: Get expenses by clientId for CRM integration
+    @GetMapping(params = "clientId")
+    public ResponseEntity<List<ExpenseDto>> getExpensesByClient(@RequestParam Long clientId) {
+        List<Expense> expenses = expenseService.findByClientId(clientId);
+        var dtos = expenses.stream().map(expenseMapper::toDto).collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
+    }
+    
     @GetMapping("/{id}")
     public ResponseEntity<ExpenseDto> getExpense(@PathVariable Long id) {
         return expenseService.findById(id)
@@ -113,7 +124,26 @@ public class ExpenseController {
             }
         }
         
-        Expense expense = expenseService.save(expenseMapper.toEntity(dto));
+        // 🔥 DEBUG: Check clientId
+        System.out.println("CLIENT ID: " + dto.getClientId());
+        
+        Expense expense = expenseMapper.toEntity(dto);
+        
+        // 🔥 IMPORTANT: Set clientId from DTO
+        expense.setClientId(dto.getClientId());
+        expense.setClientName(dto.getClientName());
+        
+        expense = expenseService.save(expense);
+        
+        // 🔥 NEW: Log expense to timeline if clientId exists
+        if (dto.getClientId() != null) {
+            auditService.logActivity(
+                dto.getClientId(),
+                "EXPENSE_ADDED",
+                "Expense added: ₹" + dto.getAmount() + " for " + dto.getCategory(),
+                dto.getEmployeeId()
+            );
+        }
         
         if(file != null && !file.isEmpty()){
             String receiptUrl = uploadUtil.saveFile(file, "expenses");
@@ -193,10 +223,14 @@ public class ExpenseController {
     }
 
     @PostMapping("/{id}/reject")
-    public ResponseEntity<ExpenseDto> rejectExpense(@PathVariable Long id) {
+    public ResponseEntity<ExpenseDto> rejectExpense(
+            @PathVariable Long id,
+            @RequestBody(required = false) java.util.Map<String, String> body) {
         Expense expense = expenseService.getById(id);
         expense.setStatus("REJECTED");
-        // expense.setApprovedBy(getCurrentUserId());
+        if (body != null && body.get("reason") != null && !body.get("reason").isBlank()) {
+            expense.setRejectionReason(body.get("reason"));
+        }
         Expense saved = expenseService.save(expense);
         return ResponseEntity.ok(expenseMapper.toDto(saved));
     }
@@ -213,6 +247,56 @@ public class ExpenseController {
     public ResponseEntity<Void> deleteExpense(@PathVariable Long id) {
         expenseService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/bulk-upload")
+    public ResponseEntity<java.util.Map<String, Object>> bulkUpload(
+            @RequestParam("file") MultipartFile file
+    ) {
+        try {
+            org.apache.poi.ss.usermodel.Workbook workbook =
+                new org.apache.poi.xssf.usermodel.XSSFWorkbook(file.getInputStream());
+            org.apache.poi.ss.usermodel.Sheet sheet = workbook.getSheetAt(0);
+            int count = 0;
+            for (int i = 1; i <= sheet.getLastRowNum(); i++) {
+                org.apache.poi.ss.usermodel.Row row = sheet.getRow(i);
+                if (row == null) continue;
+                try {
+                    Expense e = new Expense();
+                    e.setEmployeeName(getCellStr(row, 0));
+                    e.setClientName(getCellStr(row, 1));
+                    e.setDepartmentName(getCellStr(row, 2));
+                    e.setCategory(getCellStr(row, 3));
+                    e.setDescription(getCellStr(row, 4));
+                    String amtStr = getCellStr(row, 5);
+                    if (amtStr != null && !amtStr.isEmpty()) e.setAmount(Double.parseDouble(amtStr));
+                    String dateStr = getCellStr(row, 6);
+                    if (dateStr != null && !dateStr.isEmpty()) e.setExpenseDate(java.time.LocalDate.parse(dateStr));
+                    String status = getCellStr(row, 7);
+                    e.setStatus(status != null && !status.isEmpty() ? status.toUpperCase() : "PENDING");
+                    expenseService.save(e);
+                    count++;
+                } catch (Exception ex) {
+                    // skip bad rows
+                }
+            }
+            workbook.close();
+            return ResponseEntity.ok(java.util.Map.of("success", true, "count", count));
+        } catch (Exception ex) {
+            return ResponseEntity.internalServerError()
+                .body(java.util.Map.of("success", false, "message", ex.getMessage()));
+        }
+    }
+
+    private String getCellStr(org.apache.poi.ss.usermodel.Row row, int idx) {
+        org.apache.poi.ss.usermodel.Cell cell = row.getCell(idx);
+        if (cell == null) return "";
+        return switch (cell.getCellType()) {
+            case STRING -> cell.getStringCellValue().trim();
+            case NUMERIC -> String.valueOf(cell.getNumericCellValue());
+            case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
+            default -> "";
+        };
     }
 }
 

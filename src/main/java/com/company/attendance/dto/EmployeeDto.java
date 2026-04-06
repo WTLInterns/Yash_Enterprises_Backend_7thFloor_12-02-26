@@ -70,6 +70,9 @@ public class EmployeeDto {
 
     private String profileImageUrl;
     private String profileImageBase64; // if you use base64 upload
+
+    private String panNumber;
+    private String bankAccountNumber;
     
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

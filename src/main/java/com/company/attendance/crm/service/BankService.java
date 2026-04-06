@@ -11,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -28,16 +29,16 @@ public class BankService {
             throw new IllegalArgumentException("name is required");
         }
         
-        // 🔥 FIX: Check bank uniqueness by name + branch + taluka (real-world logic)
-        Optional<Bank> existing = bankRepository
+        // Check bank uniqueness by name + branch + taluka
+        List<Bank> existing = bankRepository
             .findByNameIgnoreCaseAndBranchNameIgnoreCaseAndTalukaIgnoreCase(
                 bank.getName(),
                 bank.getBranchName(),
                 bank.getTaluka()
             );
         
-        if (existing.isPresent()) {
-            return existing.get(); // 🔥 FIX: Return existing bank instead of throwing exception
+        if (!existing.isEmpty()) {
+            return existing.get(0);
         }
         
         // Set owner from logged-in user
@@ -55,7 +56,9 @@ public class BankService {
     }
 
     public Page<Bank> list(Pageable pageable) {
-        return bankRepository.findAll(pageable);
+        // Only return active banks (soft-delete: active=false means deleted)
+        Specification<Bank> spec = BankSpecifications.active(true);
+        return bankRepository.findAll(spec, pageable);
     }
 
     public Page<Bank> search(Boolean active, Long ownerId, String q, Pageable pageable){

@@ -54,6 +54,9 @@ public class Client {
     // ✅ NEW: Contact details
     @Column(name = "contact_name")
     private String contactName;
+
+    @Column(name = "customer_number", unique = true)
+    private String customerNumber;
     
     @Column(name = "contact_number")
     private String contactNumber;

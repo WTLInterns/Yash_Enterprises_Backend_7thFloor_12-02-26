@@ -20,5 +20,7 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
     @Query("SELECT a FROM Attendance a WHERE a.date BETWEEN :from AND :to AND a.employee.team.id = :teamId")
     List<Attendance> findByDateBetweenAndTeamId(@Param("from") LocalDate from, @Param("to") LocalDate to, @Param("teamId") Long teamId);
+
+    void deleteByEmployeeId(Long employeeId);
 }
 

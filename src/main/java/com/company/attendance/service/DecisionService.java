@@ -76,14 +76,15 @@ public class DecisionService {
                         latest.getLatitude(), latest.getLongitude(),
                         customerAddress.getLatitude(), customerAddress.getLongitude()
                     );
-                    withinGeofence = distanceToCustomer <= 200; // PRODUCTION: Aligned with LocationBasedAttendanceService
+                    withinGeofence = distanceToCustomer <= 200;
                     locationStatus = withinGeofence ? "IN_RANGE" : "OUT_OF_RANGE";
                     customerLocationConfigured = true;
                 } else {
-                    // FAIL CLOSED - cannot validate geofence without coordinates
+                    // ✅ FIX #1: Soft fallback — coordinates missing but don’t block everything
                     locationStatus = "CUSTOMER_LOCATION_MISSING";
                     withinGeofence = false;
                     distanceToCustomer = Double.MAX_VALUE;
+                    customerLocationConfigured = false; // treat as no task for display
                 }
             } else if (latest != null && activeTask != null && activeTask.getCustomerAddressId() == null) {
                 // FAIL CLOSED - active task exists but not linked to customer address
@@ -94,7 +95,9 @@ public class DecisionService {
             
             // Work status determination
             String workStatus = determineWorkStatus(latest, activePunch, withinGeofence);
-            if (activeTask != null && !customerLocationConfigured) {
+            // ✅ FIX #1: Only show LOCATION_UNAVAILABLE if task exists AND coords truly missing
+            if (activeTask != null && !customerLocationConfigured
+                    && !"NO_ACTIVE_TASK".equals(locationStatus)) {
                 workStatus = "LOCATION_UNAVAILABLE";
             }
             decision.put("workStatus", workStatus);
@@ -121,8 +124,12 @@ public class DecisionService {
             
             // User message
             String message;
-            if (activeTask != null && !customerLocationConfigured) {
-                message = "Customer location is not configured";
+            if ("CUSTOMER_LOCATION_MISSING".equals(locationStatus)) {
+                message = "GPS coordinates not set for customer address";
+            } else if ("CUSTOMER_ADDRESS_ID_MISSING".equals(locationStatus)) {
+                message = "No customer address linked to task";
+            } else if ("NO_ACTIVE_TASK".equals(locationStatus)) {
+                message = latest != null ? "Online" : "Offline";
             } else {
                 message = generateUserMessage(locationStatus, distanceToCustomerOut, activePunch);
             }
