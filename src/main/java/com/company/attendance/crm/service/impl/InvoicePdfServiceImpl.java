@@ -134,7 +134,7 @@ public class InvoicePdfServiceImpl implements InvoicePdfService {
             renderer.setDocumentFromString(htmlContent);
             
             // Configure renderer for better quality
-            renderer.getSharedContext().setBaseURL("http://localhost:8080");
+            renderer.getSharedContext().setBaseURL("https://api.yashrajent.com");
             renderer.getSharedContext().setInteractive(false);
             renderer.getSharedContext().setDPI(96);
             

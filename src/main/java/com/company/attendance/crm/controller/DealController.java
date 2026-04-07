@@ -4,6 +4,7 @@ import com.company.attendance.crm.dto.DealDto;
 import com.company.attendance.crm.entity.Deal;
 import com.company.attendance.crm.entity.DealStageHistory;
 import com.company.attendance.crm.mapper.CrmMapper;
+import com.company.attendance.crm.repository.DealProductRepository;
 import com.company.attendance.crm.repository.ActivityRepository;
 import com.company.attendance.crm.repository.DealRepository;
 import com.company.attendance.crm.repository.DealStageHistoryRepository;
@@ -35,6 +36,7 @@ import java.util.stream.Collectors;
 public class DealController {
   private final DealService dealService;
   private final DealRepository dealRepository;
+  private final DealProductRepository dealProductRepository;
   private final DealStageHistoryRepository dealStageHistoryRepository;
   private final NoteRepository noteRepository;
   private final ActivityRepository activityRepository;
@@ -47,6 +49,7 @@ public class DealController {
   public DealController(
     DealService dealService,
     DealRepository dealRepository,
+    DealProductRepository dealProductRepository,
     DealStageHistoryRepository dealStageHistoryRepository,
     NoteRepository noteRepository,
     ActivityRepository activityRepository,
@@ -58,6 +61,7 @@ public class DealController {
   ) {
     this.dealService = dealService;
     this.dealRepository = dealRepository;
+    this.dealProductRepository = dealProductRepository;
     this.dealStageHistoryRepository = dealStageHistoryRepository;
     this.noteRepository = noteRepository;
     this.activityRepository = activityRepository;
@@ -294,6 +298,21 @@ public class DealController {
     dealStageHistoryRepository.save(h);
 
     return ResponseEntity.ok(mapper.toDealDto(saved));
+  }
+
+  @GetMapping("/products/sales-summary")
+  @Transactional(readOnly = true)
+  public ResponseEntity<List<Map<String, Object>>> productSalesSummary() {
+    List<Object[]> rows = dealProductRepository.countByProductName();
+    List<Map<String, Object>> result = rows.stream().map(r -> {
+      Map<String, Object> m = new HashMap<>();
+      m.put("productName", r[0]);
+      m.put("dealCount",   r[1]);
+      m.put("totalQty",    r[2]);
+      m.put("totalPrice",  r[3]);
+      return m;
+    }).collect(Collectors.toList());
+    return ResponseEntity.ok(result);
   }
 
   @GetMapping("/{dealId}/timeline")

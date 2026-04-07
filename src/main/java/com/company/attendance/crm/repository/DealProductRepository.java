@@ -15,4 +15,7 @@ public interface DealProductRepository extends JpaRepository<DealProduct, Long> 
 
     @Query("SELECT dp FROM DealProduct dp JOIN FETCH dp.product WHERE dp.deal.id = :dealId")
     List<DealProduct> findByDealIdWithProduct(@Param("dealId") Long dealId);
+
+    @Query("SELECT dp.product.name, COUNT(dp), SUM(dp.quantity), SUM(dp.unitPrice * dp.quantity) FROM DealProduct dp GROUP BY dp.product.name ORDER BY COUNT(dp) DESC")
+    List<Object[]> countByProductName();
 }
