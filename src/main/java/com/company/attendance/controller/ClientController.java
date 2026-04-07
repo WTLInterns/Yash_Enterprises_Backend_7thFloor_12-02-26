@@ -109,17 +109,12 @@ public class ClientController {
     @GetMapping("/{id}")
     public ResponseEntity<com.company.attendance.crm.dto.ClientDto> getClient(@PathVariable Long id) {
         log.info("GET /api/clients/{} - Fetching client", id);
-        try {
-            Client client = clientService.getClientEntityById(id);
-            if (client == null) {
-                return ResponseEntity.notFound().build();
-            }
-            com.company.attendance.crm.dto.ClientDto clientDto = crmMapper.toClientDto(client);
-            return ResponseEntity.ok(clientDto);
-        } catch (Exception e) {
-            log.error("Error fetching client: {}", e.getMessage());
+        Client client = clientService.getClientEntityById(id);
+        if (client == null) {
+            log.warn("Client not found with id={}", id);
             return ResponseEntity.notFound().build();
         }
+        return ResponseEntity.ok(crmMapper.toClientDto(client));
     }
 
     @GetMapping("/{id}/deal")

@@ -13,7 +13,6 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -27,24 +26,30 @@ public class BankService {
         this.auditService = auditService;
     }
 
+    private String normalize(String value) {
+        if (value == null) return null;
+        return value.trim().replaceAll("\\s+", " ").toLowerCase();
+    }
+
     public Bank create(Bank bank){
         if (bank.getName() == null || bank.getName().isBlank()){
             throw new IllegalArgumentException("name is required");
         }
 
-        // Duplicate check: name + branchName only (taluka/district NOT stored on bank)
-        String cleanName   = bank.getName().trim();
-        String cleanBranch = bank.getBranchName() != null ? bank.getBranchName().trim() : null;
+        String normalizedName   = normalize(bank.getName());
+        String normalizedBranch = normalize(bank.getBranchName());
 
-        // 🔥 FIX: Use List to handle existing duplicates gracefully
-        List<Bank> existing = cleanBranch != null && !cleanBranch.isEmpty()
-            ? bankRepository.findByNameIgnoreCaseAndBranchNameIgnoreCase(cleanName, cleanBranch)
-            : bankRepository.findByNameIgnoreCase(cleanName);
+        Optional<Bank> match = bankRepository.findAll().stream()
+            .filter(b -> normalizedName.equals(normalize(b.getName())))
+            .filter(b -> {
+                if (normalizedBranch == null || normalizedBranch.isEmpty()) return true;
+                return normalizedBranch.equals(normalize(b.getBranchName()));
+            })
+            .findFirst();
 
-        if (!existing.isEmpty()) {
-            Bank first = existing.get(0);
-            log.debug("Bank already exists: {} ({}), reusing id={}", cleanName, cleanBranch, first.getId());
-            return first;
+        if (match.isPresent()) {
+            log.debug("Bank already exists: {} ({}), reusing id={}", normalizedName, normalizedBranch, match.get().getId());
+            return match.get();
         }
         
         // Set owner from logged-in user
