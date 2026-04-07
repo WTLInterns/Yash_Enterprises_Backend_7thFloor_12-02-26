@@ -11,6 +11,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -35,15 +36,15 @@ public class BankService {
         String cleanName   = bank.getName().trim();
         String cleanBranch = bank.getBranchName() != null ? bank.getBranchName().trim() : null;
 
-        List<Bank> existing = cleanBranch != null
+        // 🔥 FIX: Use List to handle existing duplicates gracefully
+        List<Bank> existing = cleanBranch != null && !cleanBranch.isEmpty()
             ? bankRepository.findByNameIgnoreCaseAndBranchNameIgnoreCase(cleanName, cleanBranch)
-            : bankRepository.findByNameIgnoreCase(cleanName)
-                .map(java.util.Collections::singletonList)
-                .orElse(java.util.Collections.emptyList());
+            : bankRepository.findByNameIgnoreCase(cleanName);
 
         if (!existing.isEmpty()) {
-            log.debug("Bank already exists: {} ({}), reusing id={}", cleanName, cleanBranch, existing.get(0).getId());
-            return existing.get(0);
+            Bank first = existing.get(0);
+            log.debug("Bank already exists: {} ({}), reusing id={}", cleanName, cleanBranch, first.getId());
+            return first;
         }
         
         // Set owner from logged-in user
@@ -59,16 +60,28 @@ public class BankService {
         return bankRepository.findById(id);
     }
 
+    @Transactional(readOnly = true)
     public Page<Bank> list(Pageable pageable) {
-        // Only return active banks (soft-delete: active=false means deleted)
-        Specification<Bank> spec = BankSpecifications.active(true);
+        // active field maps to is_active TINYINT(1) — use equal(true) OR isNull
+        Specification<Bank> spec = (root, query, cb) ->
+            cb.or(
+                cb.equal(root.get("active"), true),
+                cb.isNull(root.get("active"))
+            );
         return bankRepository.findAll(spec, pageable);
     }
 
+    @Transactional(readOnly = true)
     public Page<Bank> search(Boolean active, Long ownerId, String q, Pageable pageable){
-        Specification<Bank> spec = Specification.where(BankSpecifications.active(active))
-                .and(BankSpecifications.owner(ownerId))
-                .and(BankSpecifications.q(q));
+        Specification<Bank> spec;
+        if (active == null || Boolean.TRUE.equals(active)) {
+            // include active=true AND active=null (Excel-imported banks have null)
+            spec = (root, query, cb) ->
+                cb.or(cb.equal(root.get("active"), true), cb.isNull(root.get("active")));
+        } else {
+            spec = (root, query, cb) -> cb.equal(root.get("active"), false);
+        }
+        spec = spec.and(BankSpecifications.owner(ownerId)).and(BankSpecifications.q(q));
         return bankRepository.findAll(spec, pageable);
     }
 

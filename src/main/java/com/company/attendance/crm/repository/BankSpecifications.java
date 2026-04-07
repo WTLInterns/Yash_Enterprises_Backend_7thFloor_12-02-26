@@ -13,9 +13,10 @@ public class BankSpecifications {
     public static Specification<Bank> q(String term){
         return (root, q, cb) -> term == null || term.isBlank() ? cb.conjunction() : cb.or(
                 cb.like(cb.lower(root.get("name")), "%"+term.toLowerCase()+"%"),
+                cb.like(cb.lower(root.get("branchName")), "%"+term.toLowerCase()+"%"),
                 cb.like(cb.lower(root.get("address")), "%"+term.toLowerCase()+"%"),
-                cb.like(cb.lower(root.get("city")), "%"+term.toLowerCase()+"%"),
-                cb.like(cb.lower(root.get("state")), "%"+term.toLowerCase()+"%")
+                cb.like(cb.lower(root.get("district")), "%"+term.toLowerCase()+"%"),
+                cb.like(cb.lower(root.get("taluka")), "%"+term.toLowerCase()+"%")
         );
     }
 }

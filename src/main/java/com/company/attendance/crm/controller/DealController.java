@@ -94,6 +94,9 @@ public class DealController {
       .map(deal -> {
         DealDto dto = mapper.toDealDto(deal);
         dto.setCalculatedValue(deal.getValueAmount());
+        if (dto.getClientId() == null) dto.setClientId(deal.getClientId());
+        if (dto.getBankId() == null) dto.setBankId(deal.getBankId());
+        if (dto.getBranchName() == null) dto.setBranchName(deal.getBranchName());
         return dto;
       })
       .collect(Collectors.toList());
@@ -104,14 +107,26 @@ public class DealController {
   public ResponseEntity<List<DealDto>> listByClientId(@RequestParam Long clientId) {
     List<DealDto> deals = dealRepository.findByClientIdWithRelations(clientId)
       .stream()
-      .map(mapper::toDealDto)
+      .map(d -> {
+        DealDto dto = mapper.toDealDto(d);
+        if (dto.getClientId() == null) dto.setClientId(d.getClientId());
+        if (dto.getBankId() == null) dto.setBankId(d.getBankId());
+        return dto;
+      })
       .collect(Collectors.toList());
     return ResponseEntity.ok(deals);
   }
 
   @GetMapping("/all")
   public ResponseEntity<List<DealDto>> getAllDeals() {
-    List<DealDto> dtos = dealService.getAllDeals().stream().map(mapper::toDealDto).collect(Collectors.toList());
+    List<DealDto> dtos = dealService.getAllDeals().stream().map(d -> {
+      DealDto dto = mapper.toDealDto(d);
+      dto.setCalculatedValue(d.getValueAmount());
+      if (dto.getClientId() == null) dto.setClientId(d.getClientId());
+      if (dto.getBankId() == null) dto.setBankId(d.getBankId());
+      if (dto.getBranchName() == null) dto.setBranchName(d.getBranchName());
+      return dto;
+    }).collect(Collectors.toList());
     return ResponseEntity.ok(dtos);
   }
 
@@ -133,6 +148,9 @@ public class DealController {
     List<DealDto> dtos = deals.stream().map(d -> {
       DealDto dto = mapper.toDealDto(d);
       dto.setCalculatedValue(d.getValueAmount());
+      if (dto.getClientId() == null && d.getClientId() != null) dto.setClientId(d.getClientId());
+      if (dto.getBankId() == null && d.getBankId() != null) dto.setBankId(d.getBankId());
+      if (dto.getBranchName() == null && d.getBranchName() != null) dto.setBranchName(d.getBranchName());
       return dto;
     }).collect(Collectors.toList());
     return ResponseEntity.ok(dtos);

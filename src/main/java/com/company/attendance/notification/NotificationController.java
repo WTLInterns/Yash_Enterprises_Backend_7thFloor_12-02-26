@@ -122,9 +122,12 @@ public class NotificationController {
     }
 
     @GetMapping
-    public ResponseEntity<Page<AppNotification>> list(@RequestParam Long employeeId,
+    public ResponseEntity<Page<AppNotification>> list(@RequestParam(required = false) Long employeeId,
                                                       @RequestParam(defaultValue = "0") int page,
                                                       @RequestParam(defaultValue = "25") int size) {
+        if (employeeId == null) {
+            return ResponseEntity.ok(org.springframework.data.domain.Page.empty());
+        }
         return ResponseEntity.ok(
                 notificationRepository.findByRecipientEmployeeIdOrderByCreatedAtDesc(employeeId, PageRequest.of(page, size))
         );

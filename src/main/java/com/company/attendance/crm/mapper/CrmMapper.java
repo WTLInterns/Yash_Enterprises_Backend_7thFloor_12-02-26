@@ -209,7 +209,8 @@ public Client toClientEntity(ClientDto dto) {
     dto.setDescription(deal.getDescription());
     dto.setRequiredAmount(deal.getRequiredAmount());
     dto.setOutstandingAmount(deal.getOutstandingAmount());
-    dto.setStageCode(deal.getStageCode()); // 🔥 FIX: Use stageCode field for frontend 
+    dto.setStage(deal.getStageCode());     // 🔥 FIX: Set both so frontend works with d.stage || d.stageCode
+    dto.setStageCode(deal.getStageCode());
     dto.setDepartment(deal.getDepartment());
     dto.setActive(deal.getActive());
 
@@ -236,8 +237,9 @@ public Client toClientEntity(ClientDto dto) {
 
     // Optional display fields if relations loaded
     dto.setBankName(deal.getBank() != null ? deal.getBank().getName() : null);
-    dto.setTaluka(deal.getBank() != null ? deal.getBank().getTaluka() : null);
-    dto.setDistrict(deal.getBank() != null ? deal.getBank().getDistrict() : null);
+    // 🔥 FIX: DO NOT map bank.taluka/bank.district to deal DTO
+    // Taluka/District come from CLIENT's PRIMARY address, not bank entity
+    // Frontend getCustomerLocation() reads from customer.addresses[PRIMARY].city/state
 
     if (dto.getCustomFields() == null) {
       dto.setCustomFields("{}");
