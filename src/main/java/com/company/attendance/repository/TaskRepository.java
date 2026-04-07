@@ -15,6 +15,10 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     List<Task> findByAssignedToEmployeeId(Long employeeId);
 
     List<Task> findByClientId(Long clientId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM Task t WHERE t.clientId IN :ids")
+    void deleteAllByClientIdIn(@org.springframework.data.repository.query.Param("ids") List<Long> ids);
     
     @Query("""
         SELECT t FROM Task t

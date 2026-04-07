@@ -16,6 +16,10 @@ import java.util.Optional;
 public interface DealRepository extends JpaRepository<Deal, Long> {
     
     List<Deal> findByClientId(Long clientId);
+
+    List<Deal> findByBankId(Long bankId);
+
+    List<Deal> findAllByClientIdIn(List<Long> clientIds);
     
     Optional<Deal> findFirstByClientIdOrderByCreatedAtDesc(Long clientId);
     

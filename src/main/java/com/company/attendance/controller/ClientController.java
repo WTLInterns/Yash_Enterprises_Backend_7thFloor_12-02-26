@@ -39,30 +39,26 @@ public class ClientController {
     public ResponseEntity<List<com.company.attendance.crm.dto.ClientDto>> listClients(
             @RequestParam(required = false) String department,
             @RequestParam(required = false) String stage) {
-        log.info("GET /api/clients - Fetching clients with filters department={}, stage={}", department, stage);
         try {
             List<Client> clients;
-            
-            if (department != null && stage != null) {
-                // Filter by deals with both department and stage criteria
-                List<Deal> deals = dealRepository.findByDepartmentAndStage(department, stage);
+
+            if (department != null || stage != null) {
+                List<Deal> deals = (department != null && stage != null)
+                    ? dealRepository.findByDepartmentAndStage(department, stage)
+                    : department != null
+                        ? dealRepository.findByDepartment(department)
+                        : dealRepository.findAll();
+
                 List<Long> clientIds = deals.stream().map(Deal::getClientId).distinct().toList();
-                clients = clientIds.stream()
-                    .map(id -> clientService.getClientEntityById(id))
-                    .filter(client -> client != null && (client.getIsActive() == null || client.getIsActive()))
-                    .collect(Collectors.toList());
-            } else if (department != null) {
-                // Filter by department only
-                List<Deal> deals = dealRepository.findByDepartment(department);
-                List<Long> clientIds = deals.stream().map(Deal::getClientId).distinct().toList();
-                clients = clientIds.stream()
-                    .map(id -> clientService.getClientEntityById(id))
-                    .filter(client -> client != null && (client.getIsActive() == null || client.getIsActive()))
-                    .collect(Collectors.toList());
+                // Single IN query instead of N individual queries
+                clients = clientIds.isEmpty() ? List.of()
+                    : clientService.getClientEntitiesByIds(clientIds).stream()
+                        .filter(c -> c.getIsActive() == null || c.getIsActive())
+                        .toList();
             } else {
                 clients = clientService.getActiveClientEntities();
             }
-            
+
             List<com.company.attendance.crm.dto.ClientDto> dtos = clients.stream()
                 .map(crmMapper::toClientDto)
                 .collect(Collectors.toList());
@@ -190,21 +186,14 @@ public class ClientController {
     }
 
     @DeleteMapping("/bulk")
+    @org.springframework.transaction.annotation.Transactional
     public ResponseEntity<java.util.Map<String, Object>> bulkDeleteClients(@RequestBody java.util.Map<String, List<Long>> body) {
         List<Long> ids = body.get("ids");
         if (ids == null || ids.isEmpty()) {
             return ResponseEntity.badRequest().body(java.util.Map.of("error", "No IDs provided"));
         }
         log.info("DELETE /api/clients/bulk - Hard deleting {} clients", ids.size());
-        int deleted = 0;
-        for (Long id : ids) {
-            try {
-                clientService.hardDeleteClientEntity(id);
-                deleted++;
-            } catch (Exception e) {
-                log.warn("Could not delete client {}: {}", id, e.getMessage());
-            }
-        }
+        int deleted = clientService.bulkHardDeleteClients(ids);
         return ResponseEntity.ok(java.util.Map.of("deleted", deleted, "message", deleted + " client(s) deleted successfully"));
     }
     

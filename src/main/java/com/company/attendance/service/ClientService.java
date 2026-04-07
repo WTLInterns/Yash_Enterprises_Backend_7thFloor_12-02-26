@@ -73,6 +73,10 @@ public class ClientService {
         return clientRepository.findById(id).orElse(null);
     }
 
+    public List<Client> getClientEntitiesByIds(List<Long> ids) {
+        return clientRepository.findAllById(ids);
+    }
+
     public List<ClientWithOwnerDto> getAllClientsWithOwner() {
         log.info("Fetching all clients with owner information");
         List<Client> clients = clientRepository.findAll();
@@ -200,6 +204,30 @@ public class ClientService {
         Client updatedClient = clientRepository.save(existingClient);
         log.info("Client entity updated successfully with ID: {}", updatedClient.getId());
         return updatedClient;
+    }
+
+    @Transactional
+    public int bulkHardDeleteClients(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) return 0;
+        log.info("Bulk hard deleting {} clients", ids.size());
+        // Delete dependents in batch using IN queries
+        taskRepository.deleteAllByClientIdIn(ids);
+        entityManager.flush();
+        customerAddressRepository.deleteAllByClientIdIn(ids);
+        entityManager.flush();
+        List<Long> dealIds = dealRepository.findAllByClientIdIn(ids)
+            .stream().map(d -> d.getId().longValue()).toList();
+        if (!dealIds.isEmpty()) {
+            dealRepository.deleteAllById(dealIds);
+            entityManager.flush();
+        }
+        List<com.company.attendance.entity.Case> cases = caseRepository.findAllByClientIdIn(ids);
+        if (!cases.isEmpty()) {
+            caseRepository.deleteAll(cases);
+            entityManager.flush();
+        }
+        clientRepository.deleteAllById(ids);
+        return ids.size();
     }
 
     @Transactional

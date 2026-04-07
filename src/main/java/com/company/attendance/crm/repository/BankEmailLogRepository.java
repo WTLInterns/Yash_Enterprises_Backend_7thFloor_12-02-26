@@ -9,4 +9,5 @@ import java.util.List;
 @Repository
 public interface BankEmailLogRepository extends JpaRepository<BankEmailLog, Long> {
     List<BankEmailLog> findByBankIdOrderBySentAtDesc(Long bankId);
+    void deleteByBankId(Long bankId);
 }

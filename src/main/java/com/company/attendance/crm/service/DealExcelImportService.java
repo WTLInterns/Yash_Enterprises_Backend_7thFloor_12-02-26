@@ -46,7 +46,7 @@ public class DealExcelImportService {
     // ── Services (only for deal code generation) ─────────────────────────────
     private final DealService dealService;
 
-    // Per-upload in-memory caches — prevent duplicate DB hits within one file
+    // Per-upload in-memory caches — cleared at start of each upload
     private final Map<String, Bank>    bankCache    = new HashMap<>();
     private final Map<String, Product> productCache = new HashMap<>();
 
@@ -263,32 +263,104 @@ public class DealExcelImportService {
     // STEP 5 — BANK
     // ─────────────────────────────────────────────────────────────────────────
 
+    // ── Bank name canonical aliases ────────────────────────────────────────
+    private static final Map<String, String> BANK_NAME_ALIASES = new HashMap<>();
+    private static final Map<String, String> BRANCH_NAME_ALIASES = new HashMap<>();
+    static {
+        // Bank name aliases → canonical name
+        BANK_NAME_ALIASES.put("sbi",                        "State Bank Of India");
+        BANK_NAME_ALIASES.put("state bank of india",        "State Bank Of India");
+        BANK_NAME_ALIASES.put("ubi",                        "Union Bank Of India");
+        BANK_NAME_ALIASES.put("union bank of india",        "Union Bank Of India");
+        BANK_NAME_ALIASES.put("smbt",                       "Sahkar Maharshi Bhausaheb Thorat Amrutvahini Sahkari Bank LTD.");
+        BANK_NAME_ALIASES.put("sahkar maharshi bhausaheb thorat amrutvahini sahkari bank ltd.", "Sahkar Maharshi Bhausaheb Thorat Amrutvahini Sahkari Bank LTD.");
+        BANK_NAME_ALIASES.put("indian bank",                "Indian Bank");
+        BANK_NAME_ALIASES.put("aavas financiers limited",   "Aavas Financiers Limited");
+        BANK_NAME_ALIASES.put("au small finance",           "Au Small Finance");
+        BANK_NAME_ALIASES.put("kogta financiers ltd",       "Kogta Financiers Ltd");
+        BANK_NAME_ALIASES.put("tyger finance",              "Tyger Finance");
+        BANK_NAME_ALIASES.put("vijay nagri",                "Vijay Nagari Patsanstha");
+        BANK_NAME_ALIASES.put("vijay nagri patsanstha",     "Vijay Nagari Patsanstha");
+        BANK_NAME_ALIASES.put("vijay nagari patsanstha",    "Vijay Nagari Patsanstha");
+
+        // Branch name aliases → canonical branch
+        BRANCH_NAME_ALIASES.put("ahmadnagar",       "Ahmednagar");
+        BRANCH_NAME_ALIASES.put("ahilyanagar",       "Ahmednagar");
+        BRANCH_NAME_ALIASES.put("aahilyanagar",      "Ahmednagar");
+        BRANCH_NAME_ALIASES.put("ahmenagar",         "Ahmednagar");
+        BRANCH_NAME_ALIASES.put("ahmednagar",        "Ahmednagar");
+        BRANCH_NAME_ALIASES.put("sarb",              "SARB Pune");
+        BRANCH_NAME_ALIASES.put("sarb pune",         "SARB Pune");
+        BRANCH_NAME_ALIASES.put("sarb-pune",         "SARB Pune");
+        BRANCH_NAME_ALIASES.put("sarb branch",       "SARB Pune");
+        BRANCH_NAME_ALIASES.put("arb",               "ARB Pune");
+        BRANCH_NAME_ALIASES.put("arb pune",          "ARB Pune");
+        BRANCH_NAME_ALIASES.put("arb-pune",          "ARB Pune");
+        BRANCH_NAME_ALIASES.put("arb -pune",         "ARB Pune");
+        BRANCH_NAME_ALIASES.put("arb- pune",         "ARB Pune");
+        BRANCH_NAME_ALIASES.put("racpc wakde",       "RACPC Wakdevadi");
+        BRANCH_NAME_ALIASES.put("racpc wakdevadi",   "RACPC Wakdevadi");
+    }
+
+    /** Normalize for lookup key: lowercase, collapse spaces, strip punctuation */
+    private String normalize(String val) {
+        if (val == null) return "";
+        return val.trim().toLowerCase().replaceAll("[-_]", " ").replaceAll("\\s+", " ");
+    }
+
+    /** Normalize to a compact key for duplicate matching (no spaces/punctuation) */
+    private String normKey(String val) {
+        if (val == null) return "";
+        return val.trim().toLowerCase().replaceAll("[^a-z0-9]", "");
+    }
+
+    /** Return canonical bank name (handles SBI/sbi/State Bank Of India → same) */
+    private String canonicalBankName(String raw) {
+        if (blank(raw)) return raw;
+        String key = normalize(raw);
+        return BANK_NAME_ALIASES.getOrDefault(key, raw.trim());
+    }
+
+    /** Return canonical branch name (handles spelling variants) */
+    private String canonicalBranchName(String raw) {
+        if (blank(raw)) return raw;
+        String key = normalize(raw);
+        return BRANCH_NAME_ALIASES.getOrDefault(key, raw.trim());
+    }
+
     private Bank findOrCreateBank(String bankName, String branchName) {
         if (blank(bankName)) return null;
 
-        String cleanBank   = bankName.trim();
-        String cleanBranch = blank(branchName) ? "" : branchName.trim();
-        String cacheKey    = (cleanBank + "|" + cleanBranch).toLowerCase();
+        // Canonicalize both name and branch before any lookup
+        String canonName   = canonicalBankName(bankName);
+        String canonBranch = canonicalBranchName(branchName);
+
+        // Compact key for duplicate matching (ignores case/spaces/punctuation)
+        String cacheKey = normKey(canonName) + "|" + normKey(canonBranch);
 
         if (bankCache.containsKey(cacheKey)) return bankCache.get(cacheKey);
 
-        List<Bank> existing = blank(cleanBranch)
-            ? bankRepository.findByNameIgnoreCase(cleanBank)
-            : bankRepository.findByNameIgnoreCaseAndBranchNameIgnoreCase(cleanBank, cleanBranch);
-
-        if (!existing.isEmpty()) {
-            Bank first = existing.get(0);
-            bankCache.put(cacheKey, first);
-            return first;
+        // Load ALL active banks from DB once per upload into cache
+        if (bankCache.isEmpty()) {
+            bankRepository.findAll().stream()
+                .filter(b -> Boolean.TRUE.equals(b.getActive()))
+                .forEach(b -> {
+                    String cn = canonicalBankName(b.getName());
+                    String cb = canonicalBranchName(b.getBranchName());
+                    String k  = normKey(cn) + "|" + normKey(cb);
+                    bankCache.putIfAbsent(k, b);
+                });
+            if (bankCache.containsKey(cacheKey)) return bankCache.get(cacheKey);
         }
 
+        // Not found → create with canonical name/branch and active=true
         Bank bank = new Bank();
-        bank.setName(cleanBank);
-        bank.setBranchName(blank(cleanBranch) ? null : cleanBranch);
+        bank.setName(canonName);
+        bank.setBranchName(blank(canonBranch) ? null : canonBranch);
         bank.setActive(true);
         Bank saved = bankRepository.save(bank);
         bankCache.put(cacheKey, saved);
-        log.info("✅ Bank created: id={}, name={}, branch={}", saved.getId(), cleanBank, cleanBranch);
+        log.info("✅ Bank created: id={}, name={}, branch={}", saved.getId(), canonName, canonBranch);
         return saved;
     }
 
