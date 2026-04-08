@@ -50,17 +50,35 @@ public class ClientController {
                         : dealRepository.findAll();
 
                 List<Long> clientIds = deals.stream().map(Deal::getClientId).distinct().toList();
-                // Single IN query instead of N individual queries
                 clients = clientIds.isEmpty() ? List.of()
                     : clientService.getClientEntitiesByIds(clientIds).stream()
                         .filter(c -> c.getIsActive() == null || c.getIsActive())
                         .toList();
             } else {
-                clients = clientService.getActiveClientEntities();
+                // Return all clients that have at least one deal (active or not)
+                // This prevents soft-deleted+re-imported clients from disappearing
+                clients = clientService.getAllClientEntities().stream()
+                    .filter(c -> c.getIsActive() == null || c.getIsActive())
+                    .collect(Collectors.toList());
+            }
+
+            // Batch-load owner names — one query for all unique ownerIds
+            List<Long> ownerIds = clients.stream()
+                .map(Client::getOwnerId)
+                .filter(java.util.Objects::nonNull)
+                .distinct().toList();
+            java.util.Map<Long, String> ownerNames = new java.util.HashMap<>();
+            if (!ownerIds.isEmpty()) {
+                employeeRepository.findAllById(ownerIds)
+                    .forEach(e -> ownerNames.put(e.getId(), e.getFullName()));
             }
 
             List<com.company.attendance.crm.dto.ClientDto> dtos = clients.stream()
-                .map(crmMapper::toClientDto)
+                .map(c -> {
+                    com.company.attendance.crm.dto.ClientDto dto = crmMapper.toClientDto(c);
+                    if (c.getOwnerId() != null) dto.setOwnerName(ownerNames.get(c.getOwnerId()));
+                    return dto;
+                })
                 .collect(Collectors.toList());
             return ResponseEntity.ok(dtos);
         } catch (Exception e) {

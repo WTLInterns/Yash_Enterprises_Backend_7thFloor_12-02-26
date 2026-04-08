@@ -46,9 +46,8 @@ public class DealExcelImportService {
     // ── Services (only for deal code generation) ─────────────────────────────
     private final DealService dealService;
 
-    // Per-upload in-memory caches — cleared at start of each upload
-    private final Map<String, Bank>    bankCache    = new HashMap<>();
-    private final Map<String, Product> productCache = new HashMap<>();
+    // Per-upload in-memory caches — passed as parameters, NOT class fields (thread-safe)
+    // bankCache and productCache are now local to each importDealsFromExcel call
 
     // ─────────────────────────────────────────────────────────────────────────
     // PUBLIC ENTRY POINT
@@ -61,11 +60,11 @@ public class DealExcelImportService {
             Long ownerUserId) throws Exception {
 
         List<String> errors = new ArrayList<>();
-        int success = 0, total = 0;
+        int success = 0, skipped = 0, total = 0;
 
-        // Clear per-upload caches
-        bankCache.clear();
-        productCache.clear();
+        // Local caches per upload — thread-safe, no stale data between uploads
+        Map<String, Bank>    bankCache    = new HashMap<>();
+        Map<String, Product> productCache = new HashMap<>();
 
         try (InputStream is = file.getInputStream();
              Workbook wb = new XSSFWorkbook(is)) {
@@ -85,10 +84,15 @@ public class DealExcelImportService {
                 if (row == null || isRowEmpty(row)) continue;
                 total++;
                 try {
-                    processRow(row, headers, userDepartment, allowDepartmentOverride,
-                               deptCountCache, ownerUserId);
-                    success++;
-                    log.info("✅ Row {} imported successfully", i + 1);
+                    boolean wasSkipped = processRow(row, headers, userDepartment, allowDepartmentOverride,
+                               deptCountCache, ownerUserId, bankCache, productCache);
+                    if (wasSkipped) {
+                        skipped++;
+                        log.info("⏭ Row {} skipped (duplicate)", i + 1);
+                    } else {
+                        success++;
+                        log.info("✅ Row {} imported successfully", i + 1);
+                    }
                 } catch (Exception e) {
                     String msg = "Row " + (i + 1) + ": " + e.getMessage();
                     errors.add(msg);
@@ -100,7 +104,8 @@ public class DealExcelImportService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("totalRows", total);
         result.put("success",   success);
-        result.put("failed",    total - success);
+        result.put("skipped",   skipped);
+        result.put("failed",    total - success - skipped);
         result.put("errors",    errors);
         return result;
     }
@@ -110,9 +115,10 @@ public class DealExcelImportService {
     // ─────────────────────────────────────────────────────────────────────────
 
     @Transactional
-    public void processRow(Row row, Map<String, Integer> headers,
+    public boolean processRow(Row row, Map<String, Integer> headers,
                            String userDepartment, boolean allowDepartmentOverride,
-                           Map<String, Long> deptCountCache, Long ownerUserId) {
+                           Map<String, Long> deptCountCache, Long ownerUserId,
+                           Map<String, Bank> bankCache, Map<String, Product> productCache) {
 
         // ── 1. Read all columns ───────────────────────────────────────────────
         String customerName  = str(row, headers, "customername", "customer name", "name");
@@ -154,15 +160,18 @@ public class DealExcelImportService {
         // ── 4. CREATE / FIND CLIENT ───────────────────────────────────────────
         Client client = findOrCreateClient(customerName, contactName, appNo, ownerUserId, department);
 
-        // Skip if this client already has a deal in this department (re-upload guard)
-        if (!dealRepository.findByClientIdAndDepartment(client.getId(), department).isEmpty()) {
-            log.info("Skipping row {} — client '{}' already has a deal in dept '{}'",
-                     row.getRowNum() + 1, customerName, department);
-            return;
+        // Skip ONLY if this exact client already has a deal in this exact department
+        boolean dealExists = !dealRepository.findByClientIdAndDepartment(client.getId(), department).isEmpty();
+        if (dealExists) {
+            log.info("⏭ Skipping row {} — client '{}' (id={}) already has deal in dept '{}'",
+                     row.getRowNum() + 1, customerName, client.getId(), department);
+            return true; // skipped
         }
+        log.info("✅ Row {} — client '{}' (id={}) has NO deal in dept '{}' → creating deal",
+                 row.getRowNum() + 1, customerName, client.getId(), department);
 
         // ── 5. CREATE / FIND BANK ─────────────────────────────────────────────
-        Bank bank = findOrCreateBank(bankName, branchName);
+        Bank bank = findOrCreateBank(bankName, branchName, bankCache);
 
         // ── 6. CREATE ADDRESS ─────────────────────────────────────────────────
         CustomerAddress.AddressType addrType = parseAddressType(addressType);
@@ -203,7 +212,7 @@ public class DealExcelImportService {
         log.info("✅ Deal created: id={}, code={}, client={}", deal.getId(), deal.getDealCode(), customerName);
 
         // ── 8. CREATE / FIND PRODUCT ──────────────────────────────────────────
-        Product product = findOrCreateProduct(productName.trim(), ownerUserId);
+        Product product = findOrCreateProduct(productName.trim(), ownerUserId, productCache);
 
         // ── 9. LINK DEAL ↔ PRODUCT ────────────────────────────────────────────
         DealProduct dp = new DealProduct();
@@ -217,6 +226,7 @@ public class DealExcelImportService {
         dealProductRepository.save(dp);
 
         log.info("✅ Product '{}' linked to deal {}", productName, deal.getId());
+        return false; // not skipped, successfully created
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -225,7 +235,7 @@ public class DealExcelImportService {
 
     private Client findOrCreateClient(String name, String contactName,
                                       String appNo, Long ownerUserId, String department) {
-        // a) Match by App/Agr No
+        // a) Match by App/Agr No — most precise
         if (!blank(appNo)) {
             Optional<Client> byNo = clientRepository.findByCustomerNumber(appNo.trim());
             if (byNo.isPresent()) {
@@ -235,21 +245,25 @@ public class DealExcelImportService {
             }
         }
 
-        // b) Match by name — only reuse if already has a deal in this dept (otherwise create new)
-        List<Client> byName = clientRepository.findAllByName(name.trim());
-        for (Client c : byName) {
-            if (!Boolean.TRUE.equals(c.getIsActive())) continue;
-            if (!dealRepository.findByClientIdAndDepartment(c.getId(), department).isEmpty()) {
-                return c; // already processed — caller will skip deal creation
-            }
+        // b) Match by name + department — reuse a client ONLY if they already have a deal
+        //    in this exact department. Same name in a different department = new client.
+        List<Client> byName = clientRepository.findAllByNameNormalized(name.trim());
+        Optional<Client> sameNameSameDept = byName.stream()
+            .filter(c -> Boolean.TRUE.equals(c.getIsActive()))
+            .filter(c -> !dealRepository.findByClientIdAndDepartment(c.getId(), department).isEmpty())
+            .findFirst();
+        if (sameNameSameDept.isPresent()) {
+            log.info("♻ Reusing existing client '{}' (id={}) for dept '{}'",
+                     name, sameNameSameDept.get().getId(), department);
+            return sameNameSameDept.get();
         }
 
-        // c) Create new client — direct repository save, NO geocoding
+        // c) Create new client
         Client client = new Client();
         client.setName(name.trim());
         client.setIsActive(true);
-        if (!blank(appNo))         client.setCustomerNumber(appNo.trim());
-        if (!blank(contactName))   client.setContactName(contactName.trim());
+        if (!blank(appNo))       client.setCustomerNumber(appNo.trim());
+        if (!blank(contactName)) client.setContactName(contactName.trim());
         if (ownerUserId != null) {
             client.setOwnerId(ownerUserId);
             client.setCreatedBy(ownerUserId);
@@ -328,7 +342,7 @@ public class DealExcelImportService {
         return BRANCH_NAME_ALIASES.getOrDefault(key, raw.trim());
     }
 
-    private Bank findOrCreateBank(String bankName, String branchName) {
+    private Bank findOrCreateBank(String bankName, String branchName, Map<String, Bank> bankCache) {
         if (blank(bankName)) return null;
 
         // Canonicalize both name and branch before any lookup
@@ -368,7 +382,7 @@ public class DealExcelImportService {
     // STEP 8 — PRODUCT
     // ─────────────────────────────────────────────────────────────────────────
 
-    private Product findOrCreateProduct(String productName, Long ownerUserId) {
+    private Product findOrCreateProduct(String productName, Long ownerUserId, Map<String, Product> productCache) {
         String cacheKey = productName.toLowerCase();
         if (productCache.containsKey(cacheKey)) return productCache.get(cacheKey);
 
@@ -394,18 +408,18 @@ public class DealExcelImportService {
 
     private void saveAddress(Long clientId, String village, String taluka,
                              String district, CustomerAddress.AddressType type) {
-        CustomerAddress addr = customerAddressRepository
-            .findByClientIdAndAddressType(clientId, type)
-            .orElseGet(() -> {
-                CustomerAddress a = new CustomerAddress();
-                a.setClientId(clientId);
-                a.setAddressType(type);
-                return a;
-            });
+        // Only create address if one doesn't already exist for this client+type
+        // Never overwrite existing address data from a previous upload
+        boolean exists = customerAddressRepository
+            .findByClientIdAndAddressType(clientId, type).isPresent();
+        if (exists) return;
 
-        addr.setAddressLine(blank(village) ? "N/A" : village.trim());
-        addr.setCity(blank(taluka)   ? "N/A" : taluka.trim());
-        addr.setState(blank(district) ? "N/A" : district.trim());
+        CustomerAddress addr = new CustomerAddress();
+        addr.setClientId(clientId);
+        addr.setAddressType(type);
+        addr.setAddressLine(blank(village)  ? "N/A" : village.trim());
+        addr.setCity(blank(taluka)          ? "N/A" : taluka.trim());
+        addr.setState(blank(district)       ? "N/A" : district.trim());
         addr.setCountry("India");
         customerAddressRepository.save(addr);
     }

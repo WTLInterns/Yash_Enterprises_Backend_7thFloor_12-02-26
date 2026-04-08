@@ -63,8 +63,8 @@ public class DealExcelUploadController {
                 return ResponseEntity.status(403).body(Map.of("error", "Access denied for Excel upload"));
             }
 
-            // Admin can override department from Excel, others use their own department
-            boolean allowDepartmentOverride = "ADMIN".equals(derivedUserRole);
+            // ADMIN and MANAGER can override department from Excel column
+            boolean allowDepartmentOverride = "ADMIN".equals(derivedUserRole) || "MANAGER".equals(derivedUserRole);
             
             var result = dealExcelImportService.importDealsFromExcel(
                 file, 

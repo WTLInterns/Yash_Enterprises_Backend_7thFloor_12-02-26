@@ -18,6 +18,9 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
 
     List<Client> findAllByName(String name);
 
+    @Query("SELECT c FROM Client c WHERE LOWER(TRIM(c.name)) = LOWER(TRIM(:name)) AND (c.isActive = true OR c.isActive IS NULL)")
+    List<Client> findAllByNameNormalized(@Param("name") String name);
+
     Optional<Client> findByCustomerNumber(String customerNumber);
 
     Optional<Client> findByNameAndContactName(String name, String contactName);

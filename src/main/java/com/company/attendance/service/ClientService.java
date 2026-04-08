@@ -194,7 +194,10 @@ public class ClientService {
 
         Integer currentUserId = auditService.getCurrentUserId();
         if (currentUserId != null) {
-            existingClient.setOwnerId(currentUserId.longValue());
+            // Only set ownerId if not already assigned — never override existing owner
+            if (existingClient.getOwnerId() == null) {
+                existingClient.setOwnerId(currentUserId.longValue());
+            }
             existingClient.setUpdatedBy(currentUserId.longValue());
         }
 

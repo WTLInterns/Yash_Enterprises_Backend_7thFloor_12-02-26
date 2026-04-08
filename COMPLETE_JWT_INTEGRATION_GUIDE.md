@@ -21,7 +21,7 @@ cd E:\Zoho\Yash_backend_latest
 mvn spring-boot:run
 
 # 2. Test login (get JWT token)
-curl -X POST "https://api.yashrajent.com/api/auth/login" \
+curl -X POST "http://localhost:8080/api/auth/login" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "your-email@company.com",
@@ -39,7 +39,7 @@ curl -X POST "https://api.yashrajent.com/api/auth/login" \
 
 # 3. Test secured endpoint with token
 TOKEN="eyJhbGciOiJIUzI1NiJ9..."
-curl -X GET "https://api.yashrajent.com/api/tasks" \
+curl -X GET "http://localhost:8080/api/tasks" \
   -H "Authorization: Bearer $TOKEN"
 
 # Should return 200 (not 403)
