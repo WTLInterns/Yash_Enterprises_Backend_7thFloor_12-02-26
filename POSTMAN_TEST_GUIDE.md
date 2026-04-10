@@ -16,7 +16,7 @@
 
 **Request:**
 ```
-POST http://localhost:8080/api/auth/login
+POST https://api.yashrajent.com/api/auth/login
 Content-Type: application/json
 ```
 
@@ -60,13 +60,13 @@ Content-Type: application/json
 
 #### Test Tasks Endpoint:
 ```
-GET http://localhost:8080/api/tasks
+GET https://api.yashrajent.com/api/tasks
 Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
 ```
 
 #### Test Location Endpoint:
 ```
-POST http://localhost:8080/api/employee-locations/2/location
+POST https://api.yashrajent.com/api/employee-locations/2/location
 Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
 Content-Type: application/json
 
@@ -78,7 +78,7 @@ Content-Type: application/json
 
 #### Test Debug Role:
 ```
-GET http://localhost:8080/api/debug/role
+GET https://api.yashrajent.com/api/debug/role
 Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
 ```
 
@@ -137,7 +137,7 @@ localStorage.setItem('jwt_token', response.data.token);
 
 // Add to all API calls
 const api = axios.create({
-  baseURL: 'http://localhost:8080/api',
+  baseURL: 'https://api.yashrajent.com/api',
   headers: {
     'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`
   }

@@ -68,6 +68,9 @@ public interface DealRepository extends JpaRepository<Deal, Long> {
     @Query("SELECT d FROM Deal d LEFT JOIN FETCH d.client LEFT JOIN FETCH d.bank")
     List<Deal> findAllWithClient();
 
+    @Query("SELECT DISTINCT d FROM Deal d LEFT JOIN FETCH d.client LEFT JOIN FETCH d.bank LEFT JOIN FETCH d.dealProducts dp LEFT JOIN FETCH dp.product")
+    List<Deal> findAllWithClientAndProducts();
+
     default Deal findByIdSafe(Long id) {
         return findById(id).orElseThrow(() -> new ResourceNotFoundException("Deal not found: " + id));
     }

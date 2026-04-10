@@ -70,4 +70,7 @@ public class DealDto {
     private String bankName;
     private String taluka;
     private String district;
+
+    // Products linked to this deal
+    private java.util.List<String> productNames;
 }

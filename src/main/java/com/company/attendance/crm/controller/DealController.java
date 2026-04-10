@@ -123,12 +123,20 @@ public class DealController {
 
   @GetMapping("/all")
   public ResponseEntity<List<DealDto>> getAllDeals() {
-    List<DealDto> dtos = dealService.getAllDeals().stream().map(d -> {
+    List<DealDto> dtos = dealRepository.findAllWithClientAndProducts().stream().map(d -> {
       DealDto dto = mapper.toDealDto(d);
       dto.setCalculatedValue(d.getValueAmount());
       if (dto.getClientId() == null) dto.setClientId(d.getClientId());
       if (dto.getBankId() == null) dto.setBankId(d.getBankId());
       if (dto.getBranchName() == null) dto.setBranchName(d.getBranchName());
+      if (d.getDealProducts() != null) {
+        List<String> names = d.getDealProducts().stream()
+          .filter(dp -> dp.getProduct() != null)
+          .map(dp -> dp.getProduct().getName())
+          .filter(n -> n != null && !n.isBlank())
+          .collect(Collectors.toList());
+        dto.setProductNames(names);
+      }
       return dto;
     }).collect(Collectors.toList());
     return ResponseEntity.ok(dtos);

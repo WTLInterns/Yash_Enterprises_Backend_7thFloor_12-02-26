@@ -22,7 +22,7 @@ mvn spring-boot:run
 ### **STEP 2 - TEST PUBLIC ENDPOINT (No Token)**
 ```bash
 # This should NOT crash now
-curl -X GET "http://localhost:8080/api/debug/health"
+curl -X GET "https://api.yashrajent.com/api/debug/health"
 
 # Expected Response:
 {"status":"OK","timestamp":"1676300000000"}
@@ -30,7 +30,7 @@ curl -X GET "http://localhost:8080/api/debug/health"
 
 ### **STEP 3 - TEST LOGIN (Get JWT Token)**
 ```bash
-curl -X POST "http://localhost:8080/api/auth/login" \
+curl -X POST "https://api.yashrajent.com/api/auth/login" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "your-email@company.com",
@@ -55,7 +55,7 @@ curl -X POST "http://localhost:8080/api/auth/login" \
 TOKEN="eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ5b3VyLWVtYWlsQGNvbXBhbnkuY29tIiwicm9sZSI6IkVYRUNVVElWRSIsImlhdCI6MTY3NjMwMDAwMCwiZXhwIjoxNjc2MzM2MDAwfQ.signature"
 
 # Test tasks endpoint
-curl -X GET "http://localhost:8080/api/tasks" \
+curl -X GET "https://api.yashrajent.com/api/tasks" \
   -H "Authorization: Bearer $TOKEN"
 
 # Should return 200 (not 403)
@@ -63,7 +63,7 @@ curl -X GET "http://localhost:8080/api/tasks" \
 
 ### **STEP 5 - TEST DEBUG ENDPOINT (Check Role)**
 ```bash
-curl -X GET "http://localhost:8080/api/debug/role" \
+curl -X GET "https://api.yashrajent.com/api/debug/role" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -83,7 +83,7 @@ curl -X GET "http://localhost:8080/api/debug/role" \
 
 ### **Test Invalid Token:**
 ```bash
-curl -X GET "http://localhost:8080/api/tasks" \
+curl -X GET "https://api.yashrajent.com/api/tasks" \
   -H "Authorization: Bearer invalid-token"
 
 # Should return 403, NOT crash server
@@ -91,7 +91,7 @@ curl -X GET "http://localhost:8080/api/tasks" \
 
 ### **Test Empty Token:**
 ```bash
-curl -X GET "http://localhost:8080/api/tasks" \
+curl -X GET "https://api.yashrajent.com/api/tasks" \
   -H "Authorization: Bearer "
 
 # Should return 403, NOT crash server
@@ -99,7 +99,7 @@ curl -X GET "http://localhost:8080/api/tasks" \
 
 ### **Test No Authorization Header:**
 ```bash
-curl -X GET "http://localhost:8080/api/tasks"
+curl -X GET "https://api.yashrajent.com/api/tasks"
 
 # Should return 403, NOT crash server
 ```

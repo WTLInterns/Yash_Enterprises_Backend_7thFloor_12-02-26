@@ -26,9 +26,9 @@ A production-ready HR Attendance backend in Java 17 using Spring Boot, Spring Se
     mvn clean package
     java -jar target/attendance-backend-1.0.0.jar
     ```
-   App is on http://localhost:8080
+   App is on https://api.yashrajent.com
 3. **Swagger API Docs**
-   Visit [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
+   Visit [https://api.yashrajent.com/swagger-ui.html](https://api.yashrajent.com/swagger-ui.html)
 4. **Uploading Files**
    Files are stored in the `uploads/` folder in your project root.
 5. **Flyway Migration**
