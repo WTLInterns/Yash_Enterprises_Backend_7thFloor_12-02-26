@@ -149,11 +149,20 @@ public class DealController {
   ) {
     List<Deal> deals;
     if ("ADMIN".equalsIgnoreCase(role) || "MANAGER".equalsIgnoreCase(role) || "HR".equalsIgnoreCase(role)) {
-      // ADMIN / MANAGER / HR → full access, all deals
       deals = dealRepository.findAllWithClient();
     } else if (department != null && !department.isBlank()) {
-      // Department-based users → only their department's deals
-      deals = dealRepository.findByDepartment(department.trim().toUpperCase());
+      String dept = department.trim().toUpperCase();
+      deals = dealRepository.findByDepartment(dept);
+      // ACCOUNT dept: exclude CLOSE_WIN and CLOSE_LOST
+      if ("ACCOUNT".equals(dept)) {
+        deals = deals.stream()
+          .filter(d -> {
+            String stage = (d.getStageCode() != null ? d.getStageCode() : "").toUpperCase();
+            return !"CLOSE_WIN".equals(stage) && !"CLOSE_LOST".equals(stage)
+                   && !Boolean.TRUE.equals(d.getMovedToApproval());
+          })
+          .collect(Collectors.toList());
+      }
     } else {
       deals = List.of();
     }
