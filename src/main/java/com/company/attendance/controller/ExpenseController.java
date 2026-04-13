@@ -253,6 +253,7 @@ public class ExpenseController {
     public ResponseEntity<java.util.Map<String, Object>> bulkUpload(
             @RequestParam("file") MultipartFile file
     ) {
+        java.util.List<String> errors = new java.util.ArrayList<>();
         try {
             org.apache.poi.ss.usermodel.Workbook workbook =
                 new org.apache.poi.xssf.usermodel.XSSFWorkbook(file.getInputStream());
@@ -261,6 +262,12 @@ public class ExpenseController {
             for (int i = 1; i <= sheet.getLastRowNum(); i++) {
                 org.apache.poi.ss.usermodel.Row row = sheet.getRow(i);
                 if (row == null) continue;
+                // Skip completely empty rows
+                boolean allEmpty = true;
+                for (int c = 0; c <= 7; c++) {
+                    if (!getCellStr(row, c).isEmpty()) { allEmpty = false; break; }
+                }
+                if (allEmpty) continue;
                 try {
                     Expense e = new Expense();
                     e.setEmployeeName(getCellStr(row, 0));
@@ -268,20 +275,45 @@ public class ExpenseController {
                     e.setDepartmentName(getCellStr(row, 2));
                     e.setCategory(getCellStr(row, 3));
                     e.setDescription(getCellStr(row, 4));
+                    // Amount
                     String amtStr = getCellStr(row, 5);
-                    if (amtStr != null && !amtStr.isEmpty()) e.setAmount(Double.parseDouble(amtStr));
-                    String dateStr = getCellStr(row, 6);
-                    if (dateStr != null && !dateStr.isEmpty()) e.setExpenseDate(java.time.LocalDate.parse(dateStr));
+                    if (amtStr != null && !amtStr.isEmpty()) {
+                        // Remove trailing .0 from numeric cells
+                        amtStr = amtStr.replaceAll("\\.0$", "");
+                        e.setAmount(Double.parseDouble(amtStr));
+                    }
+                    // Date - handle both string "YYYY-MM-DD" and Excel numeric date
+                    org.apache.poi.ss.usermodel.Cell dateCell = row.getCell(6);
+                    if (dateCell != null) {
+                        if (dateCell.getCellType() == org.apache.poi.ss.usermodel.CellType.NUMERIC
+                                && org.apache.poi.ss.usermodel.DateUtil.isCellDateFormatted(dateCell)) {
+                            // Excel stores dates as numeric - convert directly
+                            java.util.Date d = dateCell.getDateCellValue();
+                            e.setExpenseDate(d.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate());
+                        } else {
+                            String dateStr = getCellStr(row, 6);
+                            if (dateStr != null && !dateStr.isEmpty()) {
+                                // Remove trailing .0 if numeric was read as string
+                                dateStr = dateStr.replaceAll("\\.0$", "");
+                                e.setExpenseDate(java.time.LocalDate.parse(dateStr));
+                            }
+                        }
+                    }
+                    // Status
                     String status = getCellStr(row, 7);
                     e.setStatus(status != null && !status.isEmpty() ? status.toUpperCase() : "PENDING");
                     expenseService.save(e);
                     count++;
                 } catch (Exception ex) {
-                    // skip bad rows
+                    errors.add("Row " + (i + 1) + ": " + ex.getMessage());
                 }
             }
             workbook.close();
-            return ResponseEntity.ok(java.util.Map.of("success", true, "count", count));
+            java.util.Map<String, Object> result = new java.util.HashMap<>();
+            result.put("success", true);
+            result.put("count", count);
+            if (!errors.isEmpty()) result.put("errors", errors);
+            return ResponseEntity.ok(result);
         } catch (Exception ex) {
             return ResponseEntity.internalServerError()
                 .body(java.util.Map.of("success", false, "message", ex.getMessage()));
@@ -293,7 +325,16 @@ public class ExpenseController {
         if (cell == null) return "";
         return switch (cell.getCellType()) {
             case STRING -> cell.getStringCellValue().trim();
-            case NUMERIC -> String.valueOf(cell.getNumericCellValue());
+            case NUMERIC -> {
+                // Check if it's a date cell
+                if (org.apache.poi.ss.usermodel.DateUtil.isCellDateFormatted(cell)) {
+                    java.util.Date d = cell.getDateCellValue();
+                    yield d.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate().toString();
+                }
+                double val = cell.getNumericCellValue();
+                // Return as integer string if it's a whole number
+                yield val == Math.floor(val) ? String.valueOf((long) val) : String.valueOf(val);
+            }
             case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
             default -> "";
         };
