@@ -62,7 +62,8 @@ public class LocationBasedAttendanceService {
         
         try {
             // Get active task for employee
-            Task activeTask = taskRepository.findActiveTaskByEmployeeId(employeeId);
+            List<Task> activeTasks = taskRepository.findActiveTasksByEmployeeId(employeeId);
+            Task activeTask = activeTasks.isEmpty() ? null : activeTasks.get(0);
             if (activeTask == null) {
                 log.debug("No active task found for employee {}", employeeId);
                 return;
@@ -212,10 +213,10 @@ public class LocationBasedAttendanceService {
     /**
      * 12 AM Midnight Auto Punch-Out (Scheduler)
      */
-    @Scheduled(cron = "0 0 0 * * ?")
+    @Scheduled(cron = "0 0 19 * * ?")
     @Transactional
     public void autoPunchOutAll() {
-        log.info("Running 12 AM midnight auto punch-out scheduler");
+        log.info("Running 7 PM auto punch-out scheduler");
         
         List<EmployeePunch> activePunches = employeePunchRepository.findAllActivePunches();
         

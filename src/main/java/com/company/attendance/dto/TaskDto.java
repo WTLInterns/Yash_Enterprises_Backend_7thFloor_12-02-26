@@ -54,6 +54,9 @@ public class TaskDto {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    private String timeTaken;        // e.g. "1h 20m" — computed at status update
+    private Long timeTakenMinutes;   // raw minutes for sorting/filtering
+
     private List<TaskCustomFieldValueDto> customFieldValues;
 }
 

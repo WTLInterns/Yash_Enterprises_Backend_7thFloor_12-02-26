@@ -12,6 +12,7 @@ import com.company.attendance.repository.HolidayRepository;
 import com.company.attendance.repository.LeaveRequestRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -22,6 +23,7 @@ import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +57,20 @@ public class AttendanceService {
     private final LeaveRequestRepository leaveRequestRepository;
 
     private static final LocalTime PRESENT_CUTOFF = LocalTime.of(10, 0);
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Kolkata");
+
+    private Attendance safeSave(Attendance attendance) {
+        try {
+            return attendanceRepository.save(attendance);
+        } catch (DataIntegrityViolationException e) {
+            if (attendance != null && Attendance.Status.LATE.equals(attendance.getStatus())) {
+                // Backward compatibility: some DBs may still have attendance.status ENUM without LATE
+                attendance.setStatus(Attendance.Status.PRESENT);
+                return attendanceRepository.save(attendance);
+            }
+            throw e;
+        }
+    }
 
     /**
      * DERIVED ONLY - Generate attendance from employee_punch
@@ -80,11 +96,11 @@ public class AttendanceService {
         // Set status based on business rules
         attendance.setStatus(resolveStatus(punch.getEmployee().getId(), date, punch, attendance));
         
-        return attendanceRepository.save(attendance);
+        return safeSave(attendance);
     }
 
     public AttendanceDto getTodaySummary(Long employeeId) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(BUSINESS_ZONE);
         var attendance = attendanceRepository.findFirstByEmployee_IdAndDate(employeeId, today)
                 .orElse(null);
 
@@ -267,7 +283,7 @@ public class AttendanceService {
             attendance.setStatus(resolveStatus(employeeId, date, punch, attendance));
         }
 
-        return attendanceRepository.save(attendance);
+        return safeSave(attendance);
     }
 
     public Attendance markAbsentIfNotExists(com.company.attendance.entity.Employee employee, LocalDate date) {
@@ -287,14 +303,14 @@ public class AttendanceService {
             // Defensive fallback
             attendance.setStatus(Attendance.Status.PRESENT);
         }
-        return attendanceRepository.save(attendance);
+        return safeSave(attendance);
     }
 
     private Attendance.Status determineStatusFromPunchInTime(LocalTime punchInTime) {
         if (punchInTime == null) {
             return Attendance.Status.PRESENT;
         }
-        return punchInTime.isAfter(PRESENT_CUTOFF) ? Attendance.Status.HALF_DAY : Attendance.Status.PRESENT;
+        return punchInTime.isAfter(PRESENT_CUTOFF) ? Attendance.Status.LATE : Attendance.Status.PRESENT;
     }
 
     private Attendance.Status resolveNoPunchStatus(Long employeeId, LocalDate date) {
@@ -317,9 +333,9 @@ public class AttendanceService {
 
         LocalTime punchInTime = null;
         if (attendance != null && attendance.getPunchInTime() != null) {
-            punchInTime = attendance.getPunchInTime().atZoneSameInstant(ZoneOffset.UTC).toLocalTime();
+            punchInTime = attendance.getPunchInTime().atZoneSameInstant(BUSINESS_ZONE).toLocalTime();
         } else if (punch != null && punch.getPunchTime() != null) {
-            punchInTime = punch.getPunchTime().toLocalTime();
+            punchInTime = punch.getPunchTime().atZone(BUSINESS_ZONE).toLocalTime();
         }
 
         return determineStatusFromPunchInTime(punchInTime);

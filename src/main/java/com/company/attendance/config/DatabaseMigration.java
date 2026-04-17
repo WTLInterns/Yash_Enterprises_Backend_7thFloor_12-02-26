@@ -55,5 +55,32 @@ public class DatabaseMigration {
         } catch (Exception e) {
             log.error("Error during database migration", e);
         }
+
+        // Task time tracking columns
+        try {
+            boolean timeTakenMinutesExists = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.columns " +
+                "WHERE table_name = 'tasks' AND column_name = 'time_taken_minutes'",
+                Integer.class
+            ) > 0;
+            if (!timeTakenMinutesExists) {
+                log.info("Adding time_taken_minutes column to tasks table...");
+                jdbcTemplate.execute("ALTER TABLE tasks ADD COLUMN time_taken_minutes BIGINT");
+                log.info("Added time_taken_minutes to tasks");
+            }
+
+            boolean timeTakenExists = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.columns " +
+                "WHERE table_name = 'tasks' AND column_name = 'time_taken'",
+                Integer.class
+            ) > 0;
+            if (!timeTakenExists) {
+                log.info("Adding time_taken column to tasks table...");
+                jdbcTemplate.execute("ALTER TABLE tasks ADD COLUMN time_taken VARCHAR(20)");
+                log.info("Added time_taken to tasks");
+            }
+        } catch (Exception e) {
+            log.error("Error adding time tracking columns to tasks", e);
+        }
     }
 }

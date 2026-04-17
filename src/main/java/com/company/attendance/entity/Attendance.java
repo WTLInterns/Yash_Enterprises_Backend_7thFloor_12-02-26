@@ -53,7 +53,7 @@ public class Attendance {
         PUNCHED_IN, PUNCHED_OUT,
 
         // Attendance status (business)
-        PRESENT, HALF_DAY, ABSENT, ON_LEAVE,
+        PRESENT, LATE, HALF_DAY, ABSENT, ON_LEAVE,
 
         // Dashboard / HR statuses
         PENDING, HOLIDAY, WEEKLY_OFF

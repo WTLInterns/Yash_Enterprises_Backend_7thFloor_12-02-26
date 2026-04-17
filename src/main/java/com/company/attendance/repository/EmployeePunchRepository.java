@@ -34,6 +34,28 @@ public interface EmployeePunchRepository extends JpaRepository<EmployeePunch, Lo
     List<EmployeePunch> findAllActivePunches();
     
     /**
+     * Find latest punch record for a given employee and task (for time tracking)
+     */
+    @Query("SELECT ep FROM EmployeePunch ep " +
+            "WHERE ep.employee.id = :employeeId AND ep.task.id = :taskId " +
+            "AND ep.punchInTime = (SELECT MAX(ep2.punchInTime) FROM EmployeePunch ep2 WHERE ep2.employee.id = :employeeId AND ep2.task.id = :taskId) " +
+            "ORDER BY ep.id DESC")
+    List<EmployeePunch> findLatestPunchesByEmployeeIdAndTaskId(@Param("employeeId") Long employeeId, @Param("taskId") Long taskId);
+
+    default Optional<EmployeePunch> findTopByEmployeeIdAndTaskIdOrderByPunchInTimeDesc(Long employeeId, Long taskId) {
+        List<EmployeePunch> rows = findLatestPunchesByEmployeeIdAndTaskId(employeeId, taskId);
+        if (rows == null || rows.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(rows.get(0));
+    }
+
+    @Query("SELECT ep FROM EmployeePunch ep WHERE ep.employee.id = :employeeId AND ep.task.id = :taskId AND ep.punchOutTime IS NULL ORDER BY ep.punchInTime DESC")
+    List<EmployeePunch> findActivePunchesByEmployeeIdAndTaskId(@Param("employeeId") Long employeeId, @Param("taskId") Long taskId);
+
+    Optional<EmployeePunch> findFirstByEmployee_IdAndTask_IdAndPunchOutTimeIsNullOrderByPunchInTimeDesc(Long employeeId, Long taskId);
+
+    /**
      * Find punch by employee and task
      */
     @Query("SELECT ep FROM EmployeePunch ep WHERE ep.employee.id = :employeeId AND ep.task.id = :taskId ORDER BY ep.punchInTime DESC")

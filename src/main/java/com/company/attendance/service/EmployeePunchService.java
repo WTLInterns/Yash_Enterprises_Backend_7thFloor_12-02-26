@@ -4,9 +4,11 @@ import com.company.attendance.dto.EmployeePunchDto;
 import com.company.attendance.entity.Employee;
 import com.company.attendance.entity.EmployeePunch;
 import com.company.attendance.entity.GeofenceZone;
+import com.company.attendance.entity.Task;
 import com.company.attendance.repository.EmployeePunchRepository;
 import com.company.attendance.repository.EmployeeRepository;
 import com.company.attendance.repository.GeofenceZoneRepository;
+import com.company.attendance.repository.TaskRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,10 +24,16 @@ public class EmployeePunchService {
     private final EmployeePunchRepository punchRepository;
     private final EmployeeRepository employeeRepository;
     private final GeofenceZoneRepository geofenceRepository;
+    private final TaskRepository taskRepository;
     private final GeocodingService geocodingService;
     private final AttendanceService attendanceService;
 
     public EmployeePunch savePunch(EmployeePunchDto dto) {
+        System.out.println("========== DEBUG: PUNCH SAVE START ==========");
+        System.out.println("Employee ID: " + dto.getEmployeeId());
+        System.out.println("Task ID from DTO: " + dto.getTaskId());
+        System.out.println("Punch Type: " + dto.getPunchType());
+        
         Employee employee = employeeRepository.findById(dto.getEmployeeId())
                 .orElseThrow(() -> new RuntimeException("Employee not found"));
 
@@ -44,8 +52,67 @@ public class EmployeePunchService {
             }
         }
 
+        Task linkedTask = null;
+        if (dto.getTaskId() != null) {
+            linkedTask = taskRepository.findById(dto.getTaskId()).orElse(null);
+            System.out.println("Task found: " + (linkedTask != null));
+            if (linkedTask != null) {
+                System.out.println("Task ID: " + linkedTask.getId());
+                System.out.println("Task Name: " + linkedTask.getTaskName());
+            }
+        } else {
+            System.out.println("⚠️ CRITICAL: taskId is NULL in DTO - task will NOT be linked!");
+        }
+
+        Double distanceFromCustomer = null;
+        if ("IN".equals(dto.getPunchType())) {
+            if (dto.getEmployeeId() != null && dto.getTaskId() != null) {
+                var existingActive = punchRepository
+                        .findFirstByEmployee_IdAndTask_IdAndPunchOutTimeIsNullOrderByPunchInTimeDesc(dto.getEmployeeId(), dto.getTaskId());
+                if (existingActive.isPresent()) {
+                    throw new IllegalStateException("Already punched in for this task. Please punch out first.");
+                }
+            }
+            if (linkedTask == null || linkedTask.getCustomerAddressId() == null) {
+                throw new RuntimeException("Task location not configured");
+            }
+            var customerAddress = linkedTask.getCustomerAddress();
+            if (customerAddress == null) {
+                throw new RuntimeException("Task address not available");
+            }
+            if (customerAddress.getLatitude() == null || customerAddress.getLongitude() == null) {
+                throw new RuntimeException("Task location coordinates not available");
+            }
+            if (dto.getLatitude() == null || dto.getLongitude() == null) {
+                throw new RuntimeException("Latitude/Longitude required");
+            }
+            double distanceMeters = distanceMeters(
+                    dto.getLatitude(), dto.getLongitude(),
+                    customerAddress.getLatitude(), customerAddress.getLongitude());
+            distanceFromCustomer = distanceMeters;
+            if (distanceMeters > 200.0) {
+                throw new RuntimeException("Not within 200 meters of task location");
+            }
+        }
+
+        // Determine punch times based on punch type
+        LocalDateTime punchInTime = null;
+        LocalDateTime punchOutTime = null;
+        
+        if ("IN".equals(dto.getPunchType())) {
+            punchInTime = dto.getPunchTime() != null ? dto.getPunchTime() : LocalDateTime.now();
+            System.out.println("Setting punchInTime: " + punchInTime);
+        } else if ("OUT".equals(dto.getPunchType())) {
+            punchOutTime = dto.getPunchTime() != null ? dto.getPunchTime() : LocalDateTime.now();
+            System.out.println("Setting punchOutTime: " + punchOutTime);
+        }
+
         EmployeePunch punch = EmployeePunch.builder()
                 .employee(employee)
+                .task(linkedTask)
+                .punchInTime(punchInTime)
+                .punchOutTime(punchOutTime)
+                .attendanceStatus(dto.getAttendanceStatus())
                 .punchType(dto.getPunchType())
                 .punchTime(dto.getPunchTime() != null ? dto.getPunchTime() : LocalDateTime.now())
                 .latitude(dto.getLatitude())
@@ -63,7 +130,19 @@ public class EmployeePunchService {
                 .createdAt(LocalDateTime.now())
                 .build();
 
+        if (distanceFromCustomer != null) {
+            punch.setDistanceFromCustomer(distanceFromCustomer);
+        }
+        if (dto.getAttendanceStatus() != null) {
+            punch.setLateMark("LATE".equalsIgnoreCase(dto.getAttendanceStatus()));
+        }
+
         EmployeePunch saved = punchRepository.save(punch);
+        
+        System.out.println("Punch saved with ID: " + saved.getId());
+        System.out.println("Task in saved punch: " + (saved.getTask() != null ? saved.getTask().getId() : "NULL"));
+        System.out.println("punchInTime in saved punch: " + saved.getPunchInTime());
+        System.out.println("========== DEBUG: PUNCH SAVE END ==========");
 
         // Derived attendance update (summary table)
         try {
@@ -87,6 +166,36 @@ public class EmployeePunchService {
 
     public List<EmployeePunch> findByEmployeeId(Long employeeId) {
         return punchRepository.findRecentPunchesByEmployee(employeeId, LocalDateTime.now().minusDays(30));
+    }
+
+    public EmployeePunch closePunchSession(EmployeePunchDto dto) {
+        Long sessionId = dto.getSessionId();
+        if (sessionId == null) {
+            throw new IllegalArgumentException("sessionId is required for punch out");
+        }
+        EmployeePunch punch = punchRepository.findById(sessionId)
+                .orElseThrow(() -> new RuntimeException("Punch session not found: " + sessionId));
+
+        LocalDateTime punchOutTime = dto.getPunchTime() != null ? dto.getPunchTime() : LocalDateTime.now();
+        punch.setPunchOutTime(punchOutTime);
+        punch.setPunchTime(punchOutTime);
+        punch.setPunchType("OUT");
+        if (dto.getLatitude() != null) punch.setLatitude(dto.getLatitude());
+        if (dto.getLongitude() != null) punch.setLongitude(dto.getLongitude());
+        if (dto.getAltitude() != null) punch.setAltitude(dto.getAltitude());
+        if (dto.getAccuracy() != null) punch.setAccuracy(dto.getAccuracy());
+        if (dto.getDeviceInfo() != null) punch.setDeviceInfo(dto.getDeviceInfo());
+        punch.setUpdatedAt(LocalDateTime.now());
+
+        EmployeePunch saved = punchRepository.save(punch);
+        try {
+            attendanceService.upsertFromLegacyPunchEvent(saved);
+        } catch (Exception ignored) {}
+        return saved;
+    }
+
+    public java.util.Optional<EmployeePunch> findActiveSession(Long employeeId) {
+        return punchRepository.findFirstByEmployee_IdAndPunchOutTimeIsNullOrderByPunchInTimeDesc(employeeId);
     }
 
     public List<EmployeePunch> findByEmployeeIdAndDate(Long employeeId, LocalDate date) {

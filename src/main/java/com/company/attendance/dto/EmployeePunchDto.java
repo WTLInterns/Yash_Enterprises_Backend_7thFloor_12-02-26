@@ -11,8 +11,11 @@ import java.time.LocalDateTime;
 @Builder
 public class EmployeePunchDto {
     private Long id;
+    private Long sessionId;
     private Long employeeId;
     private String employeeName;
+    private Long taskId;
+    private String attendanceStatus;
     
     @NotBlank(message = "Punch type is required")
     private String punchType; // IN, OUT, BREAK_IN, BREAK_OUT

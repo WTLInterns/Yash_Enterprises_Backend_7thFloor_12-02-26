@@ -52,7 +52,8 @@ public class DecisionService {
             EmployeePunch activePunch = activePunches.isEmpty() ? null : activePunches.get(0);
             
             // Get active task (independent of punch - same logic as LocationBasedAttendanceService)
-            Task activeTask = taskRepository.findActiveTaskByEmployeeId(employeeId);
+            List<Task> activeTasks = taskRepository.findActiveTasksByEmployeeId(employeeId);
+            Task activeTask = activeTasks.isEmpty() ? null : activeTasks.get(0);
             
             // Connection status
             String connectionStatus = latest != null ? "ONLINE" : "OFFLINE";

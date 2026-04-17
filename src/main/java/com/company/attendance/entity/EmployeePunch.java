@@ -31,6 +31,9 @@ public class EmployeePunch {
     @Column(name = "punch_out_time")
     private LocalDateTime punchOutTime;
 
+    @Column(name = "attendance_status")
+    private String attendanceStatus;
+
     @Column(name = "late_mark")
     private Boolean lateMark = false;
 

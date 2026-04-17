@@ -98,7 +98,7 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
      * Find active task for employee (INQUIRY, IN_PROGRESS, ASSIGNED status) with customer address
      */
     @Query("SELECT t FROM Task t LEFT JOIN FETCH t.customerAddress WHERE t.assignedToEmployeeId = :employeeId AND t.status IN ('INQUIRY', 'IN_PROGRESS', 'ASSIGNED') ORDER BY t.scheduledStartTime DESC")
-    Task findActiveTaskByEmployeeId(@Param("employeeId") Long employeeId);
+    List<Task> findActiveTasksByEmployeeId(@Param("employeeId") Long employeeId);
     
     /**
      * Find tasks by employee and status

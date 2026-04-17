@@ -13,10 +13,15 @@ public interface TaskMapper {
 
     @Mapping(target = "assignedToEmployeeName", ignore = true)
     @Mapping(target = "createdByEmployeeName", ignore = true)
+    @Mapping(target = "clientName", ignore = true)
     @Mapping(target = "customFieldValues", ignore = true)
     TaskDto toDto(Task task);
 
     @Mapping(target = "customFieldValues", ignore = true)
+    @Mapping(target = "assignedToEmployee", ignore = true)
+    @Mapping(target = "createdByEmployee", ignore = true)
+    @Mapping(target = "client", ignore = true)
+    @Mapping(target = "customerAddress", ignore = true)
     Task toEntity(TaskDto dto);
 
     // custom fields mapping

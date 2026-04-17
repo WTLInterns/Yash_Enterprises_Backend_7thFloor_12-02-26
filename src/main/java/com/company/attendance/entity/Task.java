@@ -96,6 +96,12 @@ public class Task {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    @Column(name = "time_taken_minutes")
+    private Long timeTakenMinutes;
+
+    @Column(name = "time_taken")
+    private String timeTaken;
+
     // Dynamic Custom Field Values
     @OneToMany(mappedBy = "task", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

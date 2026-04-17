@@ -4,9 +4,11 @@ import com.company.attendance.entity.Task;
 import com.company.attendance.entity.Employee;
 import com.company.attendance.entity.Client;
 import com.company.attendance.entity.CustomerAddress;
+import com.company.attendance.entity.EmployeePunch;
 import com.company.attendance.enums.TaskStatus;
 import com.company.attendance.notification.NotificationService;
 import com.company.attendance.repository.EmployeeRepository;
+import com.company.attendance.repository.EmployeePunchRepository;
 import com.company.attendance.repository.TaskRepository;
 import com.company.attendance.repository.ClientRepository;
 import com.company.attendance.repository.CustomerAddressRepository;
@@ -15,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.HashMap;
@@ -31,6 +34,7 @@ public class TaskService {
 
     private final TaskRepository taskRepository;
     private final EmployeeRepository employeeRepository;
+    private final EmployeePunchRepository employeePunchRepository;
     private final ClientRepository clientRepository;
     private final CustomerAddressRepository customerAddressRepository;
     private final NotificationService notificationService;
@@ -286,6 +290,54 @@ public class TaskService {
 
             task.setStatus(taskStatus);
             task.setUpdatedAt(LocalDateTime.now());
+
+            // ⏱ TIME TRACKING: compute time taken from latest punch-in for this employee+task
+            System.out.println("========== DEBUG: TIME TRACKING START ==========");
+            System.out.println("Employee ID: " + employeeId);
+            System.out.println("Task ID: " + taskId);
+            
+            var punchOptional = employeePunchRepository
+                    .findTopByEmployeeIdAndTaskIdOrderByPunchInTimeDesc(employeeId, taskId);
+            
+            System.out.println("Punch found: " + punchOptional.isPresent());
+            
+            punchOptional.ifPresent(punch -> {
+                System.out.println("Punch ID: " + punch.getId());
+                System.out.println("Punch In Time: " + punch.getPunchInTime());
+                System.out.println("Task in Punch: " + (punch.getTask() != null ? punch.getTask().getId() : "NULL"));
+                
+                if (punch.getPunchInTime() != null) {
+                    LocalDateTime now = LocalDateTime.now();
+                    long minutes = Duration.between(punch.getPunchInTime(), now).toMinutes();
+                    
+                    System.out.println("Now: " + now);
+                    System.out.println("Minutes: " + minutes);
+                    
+                    if (minutes > 0) {
+                        long hours = minutes / 60;
+                        long mins = minutes % 60;
+                        String timeTaken = (hours > 0 ? hours + "h " : "") + mins + "m";
+                        
+                        task.setTimeTakenMinutes(minutes);
+                        task.setTimeTaken(timeTaken);
+                        
+                        System.out.println("timeTaken: " + timeTaken);
+                        System.out.println("timeTakenMinutes: " + minutes);
+                    } else {
+                        System.out.println("Minutes <= 0, not setting timeTaken");
+                    }
+                } else {
+                    System.out.println("Punch In Time is NULL");
+                }
+            });
+            
+            if (!punchOptional.isPresent()) {
+                System.out.println("⚠️ CRITICAL: No punch found for employeeId=" + employeeId + ", taskId=" + taskId);
+                System.out.println("This means task_id was NOT saved during Punch IN");
+            }
+            
+            System.out.println("========== DEBUG: TIME TRACKING END ==========");
+
             taskRepository.save(task);
 
             // 🔔 SEND NOTIFICATION TO ALL ADMINS (both MOBILE and WEB) - with error handling

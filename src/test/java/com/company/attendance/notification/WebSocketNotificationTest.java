@@ -1,5 +1,6 @@
 package com.company.attendance.notification;
 
+import com.company.attendance.notification.NotificationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
