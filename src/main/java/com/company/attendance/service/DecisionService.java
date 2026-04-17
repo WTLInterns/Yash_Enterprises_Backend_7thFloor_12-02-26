@@ -12,6 +12,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +37,8 @@ public class DecisionService {
     private final TaskRepository taskRepository;
     private final IdleDetectionService idleDetectionService;
 
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Kolkata");
+
     /**
      * Make unified decision for employee state
      * This is the SINGLE SOURCE OF TRUTH for frontend
@@ -43,12 +47,13 @@ public class DecisionService {
         Map<String, Object> decision = new HashMap<>();
         
         try {
+            final LocalDate today = LocalDate.now(BUSINESS_ZONE);
             // Get latest tracking
             List<EmployeeTracking> latestList = trackingRepo.findLatestForEmployee(employeeId);
             EmployeeTracking latest = latestList.isEmpty() ? null : latestList.get(0);
             
             // Get active punch
-            List<EmployeePunch> activePunches = employeePunchRepository.findActivePunchesByEmployeeId(employeeId);
+            List<EmployeePunch> activePunches = employeePunchRepository.findActivePunchesByEmployeeIdAndDate(employeeId, today);
             EmployeePunch activePunch = activePunches.isEmpty() ? null : activePunches.get(0);
             
             // Get active task (independent of punch - same logic as LocationBasedAttendanceService)
@@ -174,6 +179,7 @@ public class DecisionService {
         Map<String, Object> decision = new HashMap<>();
         
         try {
+            final LocalDate today = LocalDate.now(BUSINESS_ZONE);
             // Get task
             Optional<Task> taskOpt = taskRepository.findById(taskId);
             if (taskOpt.isEmpty()) {
@@ -189,7 +195,7 @@ public class DecisionService {
             EmployeeTracking latest = latestList.isEmpty() ? null : latestList.get(0);
             
             // Get active punch
-            List<EmployeePunch> activePunches = employeePunchRepository.findActivePunchesByEmployeeId(employeeId);
+            List<EmployeePunch> activePunches = employeePunchRepository.findActivePunchesByEmployeeIdAndDate(employeeId, today);
             EmployeePunch activePunch = activePunches.isEmpty() ? null : activePunches.get(0);
             
             // Calculate distance

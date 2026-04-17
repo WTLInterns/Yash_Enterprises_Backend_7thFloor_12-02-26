@@ -10,16 +10,19 @@ import com.company.attendance.repository.EmployeeRepository;
 import com.company.attendance.repository.GeofenceZoneRepository;
 import com.company.attendance.repository.TaskRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class EmployeePunchService {
     private final EmployeePunchRepository punchRepository;
     private final EmployeeRepository employeeRepository;
@@ -27,6 +30,43 @@ public class EmployeePunchService {
     private final TaskRepository taskRepository;
     private final GeocodingService geocodingService;
     private final AttendanceService attendanceService;
+
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Kolkata");
+
+    private void autoCloseStaleOpenSessions(Long employeeId, LocalDate today) {
+        if (employeeId == null) return;
+        try {
+            LocalDateTime startOfToday = today.atStartOfDay();
+            List<EmployeePunch> staleOpen = punchRepository.findOpenPunchesByEmployeeIdBefore(employeeId, startOfToday);
+            if (staleOpen == null || staleOpen.isEmpty()) return;
+
+            LocalDateTime now = LocalDateTime.now(BUSINESS_ZONE);
+            for (EmployeePunch punch : staleOpen) {
+                if (punch.getPunchOutTime() != null) continue;
+                punch.setPunchOutTime(now);
+                punch.setPunchTime(now);
+                punch.setPunchType("OUT");
+                punch.setUpdatedAt(now);
+                punchRepository.save(punch);
+                try {
+                    attendanceService.upsertFromLegacyPunchEvent(punch);
+                } catch (Exception e) {
+                    log.warn("Auto-close stale session: attendance update failed for punchId={} employeeId={} taskId={}",
+                            punch.getId(),
+                            punch.getEmployee() != null ? punch.getEmployee().getId() : null,
+                            punch.getTask() != null ? punch.getTask().getId() : null,
+                            e);
+                }
+                log.info("Auto-closed stale punch session punchId={} employeeId={} taskId={} punchInTime={}",
+                        punch.getId(),
+                        punch.getEmployee() != null ? punch.getEmployee().getId() : null,
+                        punch.getTask() != null ? punch.getTask().getId() : null,
+                        punch.getPunchInTime());
+            }
+        } catch (Exception e) {
+            log.warn("Failed to auto-close stale open sessions for employeeId={}", employeeId, e);
+        }
+    }
 
     public EmployeePunch savePunch(EmployeePunchDto dto) {
         System.out.println("========== DEBUG: PUNCH SAVE START ==========");
@@ -66,10 +106,22 @@ public class EmployeePunchService {
 
         Double distanceFromCustomer = null;
         if ("IN".equals(dto.getPunchType())) {
+            final LocalDate today = LocalDate.now(BUSINESS_ZONE);
+            autoCloseStaleOpenSessions(dto.getEmployeeId(), today);
+
             if (dto.getEmployeeId() != null && dto.getTaskId() != null) {
-                var existingActive = punchRepository
-                        .findFirstByEmployee_IdAndTask_IdAndPunchOutTimeIsNullOrderByPunchInTimeDesc(dto.getEmployeeId(), dto.getTaskId());
-                if (existingActive.isPresent()) {
+                var activeTodayAnyTask = punchRepository.findActivePunchesByEmployeeIdAndDate(dto.getEmployeeId(), today);
+                if (activeTodayAnyTask != null && !activeTodayAnyTask.isEmpty()) {
+                    EmployeePunch active = activeTodayAnyTask.get(0);
+                    Long activeTaskId = active.getTask() != null ? active.getTask().getId() : null;
+                    if (activeTaskId != null && activeTaskId.equals(dto.getTaskId())) {
+                        throw new IllegalStateException("Already punched in for this task. Please punch out first.");
+                    }
+                    throw new IllegalStateException("Already punched in. Please punch out first.");
+                }
+
+                var activeTodaySameTask = punchRepository.findActivePunchesByEmployeeIdAndTaskIdAndDate(dto.getEmployeeId(), dto.getTaskId(), today);
+                if (activeTodaySameTask != null && !activeTodaySameTask.isEmpty()) {
                     throw new IllegalStateException("Already punched in for this task. Please punch out first.");
                 }
             }
@@ -176,6 +228,15 @@ public class EmployeePunchService {
         EmployeePunch punch = punchRepository.findById(sessionId)
                 .orElseThrow(() -> new RuntimeException("Punch session not found: " + sessionId));
 
+        if (punch.getPunchOutTime() != null) {
+            log.info("Punch-out called for already closed sessionId={} employeeId={} taskId={} existingPunchOutTime={}",
+                    sessionId,
+                    punch.getEmployee() != null ? punch.getEmployee().getId() : null,
+                    punch.getTask() != null ? punch.getTask().getId() : null,
+                    punch.getPunchOutTime());
+            return punch;
+        }
+
         LocalDateTime punchOutTime = dto.getPunchTime() != null ? dto.getPunchTime() : LocalDateTime.now();
         punch.setPunchOutTime(punchOutTime);
         punch.setPunchTime(punchOutTime);
@@ -191,11 +252,23 @@ public class EmployeePunchService {
         try {
             attendanceService.upsertFromLegacyPunchEvent(saved);
         } catch (Exception ignored) {}
+
+        log.info("Punch-out successful sessionId={} employeeId={} taskId={} punchOutTime={}",
+                saved.getId(),
+                saved.getEmployee() != null ? saved.getEmployee().getId() : null,
+                saved.getTask() != null ? saved.getTask().getId() : null,
+                saved.getPunchOutTime());
         return saved;
     }
 
     public java.util.Optional<EmployeePunch> findActiveSession(Long employeeId) {
-        return punchRepository.findFirstByEmployee_IdAndPunchOutTimeIsNullOrderByPunchInTimeDesc(employeeId);
+        final LocalDate today = LocalDate.now(BUSINESS_ZONE);
+        autoCloseStaleOpenSessions(employeeId, today);
+        List<EmployeePunch> activeToday = punchRepository.findActivePunchesByEmployeeIdAndDate(employeeId, today);
+        if (activeToday == null || activeToday.isEmpty()) {
+            return java.util.Optional.empty();
+        }
+        return java.util.Optional.ofNullable(activeToday.get(0));
     }
 
     public List<EmployeePunch> findByEmployeeIdAndDate(Long employeeId, LocalDate date) {

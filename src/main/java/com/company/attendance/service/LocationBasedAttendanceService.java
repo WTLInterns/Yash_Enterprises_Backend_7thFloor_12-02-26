@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +45,7 @@ public class LocationBasedAttendanceService {
     private final SimpMessagingTemplate messagingTemplate;
     
     private static final LocalTime LATE_THRESHOLD = LocalTime.of(10, 0);
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Kolkata");
 
     /**
      * LOCATION-FIRST PUNCH LOGIC (CRITICAL)
@@ -61,6 +63,7 @@ public class LocationBasedAttendanceService {
         log.info("LOCATION-FIRST punch check for employee {}", employeeId);
         
         try {
+            final java.time.LocalDate today = java.time.LocalDate.now(BUSINESS_ZONE);
             // Get active task for employee
             List<Task> activeTasks = taskRepository.findActiveTasksByEmployeeId(employeeId);
             Task activeTask = activeTasks.isEmpty() ? null : activeTasks.get(0);
@@ -104,7 +107,10 @@ public class LocationBasedAttendanceService {
                 employeeId, Math.round(distance), isWithinGeofence);
             
             // Update punch record with geofence info
-            Optional<EmployeePunch> activePunchOpt = employeePunchRepository.findFirstByEmployee_IdAndPunchOutTimeIsNullOrderByPunchInTimeDesc(employeeId);
+            List<EmployeePunch> activeToday = employeePunchRepository.findActivePunchesByEmployeeIdAndDate(employeeId, today);
+            Optional<EmployeePunch> activePunchOpt = (activeToday == null || activeToday.isEmpty())
+                    ? Optional.empty()
+                    : Optional.ofNullable(activeToday.get(0));
             
             // ✅ RESTORED: Auto punch creation when inside geofence
             if (isWithinGeofence && activePunchOpt.isEmpty()) {
@@ -207,25 +213,44 @@ public class LocationBasedAttendanceService {
      * Check if employee has active punch
      */
     public boolean hasActivePunch(Long employeeId) {
-        return !employeePunchRepository.findActivePunchesByEmployeeId(employeeId).isEmpty();
+        final java.time.LocalDate today = java.time.LocalDate.now(BUSINESS_ZONE);
+        return !employeePunchRepository.findActivePunchesByEmployeeIdAndDate(employeeId, today).isEmpty();
     }
     
     /**
      * 12 AM Midnight Auto Punch-Out (Scheduler)
      */
-    @Scheduled(cron = "0 0 19 * * ?")
+    @Scheduled(cron = "0 0 19 * * ?", zone = "Asia/Kolkata")
     @Transactional
     public void autoPunchOutAll() {
-        log.info("Running 7 PM auto punch-out scheduler");
+        log.info("Running 7 PM auto punch-out scheduler zone={}", BUSINESS_ZONE);
         
         List<EmployeePunch> activePunches = employeePunchRepository.findAllActivePunches();
+
+        LocalDateTime now = LocalDateTime.now(BUSINESS_ZONE);
         
         for (EmployeePunch punch : activePunches) {
-            punch.setPunchOutTime(LocalDateTime.now());
+            if (punch.getPunchOutTime() != null) {
+                continue;
+            }
+            punch.setPunchOutTime(now);
+            punch.setPunchTime(now);
+            punch.setPunchType("OUT");
             punch.setAutoPunch(true);
+            punch.setUpdatedAt(now);
             employeePunchRepository.save(punch);
             
             log.info("Auto punched out employee {} from task {}", punch.getEmployee().getId(), punch.getTask().getId());
+
+            try {
+                attendanceService.upsertFromLegacyPunchEvent(punch);
+            } catch (Exception e) {
+                log.warn("Auto punch-out: attendance update failed punchId={} employeeId={} taskId={}",
+                        punch.getId(),
+                        punch.getEmployee() != null ? punch.getEmployee().getId() : null,
+                        punch.getTask() != null ? punch.getTask().getId() : null,
+                        e);
+            }
             
             // Send notification
             sendAutoPunchOutNotification(punch.getEmployee().getId(), punch.getTask().getId());
