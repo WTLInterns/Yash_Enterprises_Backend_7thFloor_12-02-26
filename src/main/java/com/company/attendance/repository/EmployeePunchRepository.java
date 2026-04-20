@@ -55,6 +55,15 @@ public interface EmployeePunchRepository extends JpaRepository<EmployeePunch, Lo
 
     Optional<EmployeePunch> findFirstByEmployee_IdAndTask_IdAndPunchOutTimeIsNullOrderByPunchInTimeDesc(Long employeeId, Long taskId);
 
+    @Query("SELECT ep FROM EmployeePunch ep WHERE ep.employee.id = :employeeId AND ep.task.id = :taskId AND ep.punchOutTime IS NULL AND DATE(ep.punchInTime) = :date ORDER BY ep.punchInTime DESC")
+    List<EmployeePunch> findActivePunchesByEmployeeIdAndTaskIdAndDate(@Param("employeeId") Long employeeId, @Param("taskId") Long taskId, @Param("date") LocalDate date);
+
+    @Query("SELECT ep FROM EmployeePunch ep WHERE ep.employee.id = :employeeId AND ep.punchOutTime IS NULL AND DATE(ep.punchInTime) = :date ORDER BY ep.punchInTime DESC")
+    List<EmployeePunch> findActivePunchesByEmployeeIdAndDate(@Param("employeeId") Long employeeId, @Param("date") LocalDate date);
+
+    @Query("SELECT ep FROM EmployeePunch ep WHERE ep.employee.id = :employeeId AND ep.punchOutTime IS NULL AND ep.punchInTime < :before ORDER BY ep.punchInTime DESC")
+    List<EmployeePunch> findOpenPunchesByEmployeeIdBefore(@Param("employeeId") Long employeeId, @Param("before") LocalDateTime before);
+
     /**
      * Find punch by employee and task
      */

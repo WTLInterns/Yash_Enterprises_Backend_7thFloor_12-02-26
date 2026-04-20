@@ -30,6 +30,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -52,6 +53,8 @@ public class EmployeeLocationController {
     private final IdleDetectionService idleDetectionService;
     private final LocationBasedAttendanceService locationBasedAttendanceService;
     private final DecisionService decisionService;
+
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Kolkata");
     private final SimpMessagingTemplate messagingTemplate;
 
     @GetMapping
@@ -186,7 +189,8 @@ public class EmployeeLocationController {
                         .build();
                 EmployeeTracking saved = employeeTrackingService.saveTracking(trackingDto);
 
-                List<EmployeePunch> activePunches = employeePunchRepository.findActivePunchesByEmployeeId(employeeId);
+                final LocalDate today = LocalDate.now(BUSINESS_ZONE);
+                List<EmployeePunch> activePunches = employeePunchRepository.findActivePunchesByEmployeeIdAndDate(employeeId, today);
                 EmployeePunch activePunch = activePunches.isEmpty() ? null : activePunches.get(0);
 
                 // Auto Punch-In Logic - Check if employee is at customer location
@@ -326,13 +330,18 @@ public class EmployeeLocationController {
         try {
             List<Employee> employees = employeeRepository.findAllWithRelationships();
 
+            final LocalDate today = LocalDate.now(BUSINESS_ZONE);
+
             // ✅ FIX #5: Single query for all latest tracking records (no N+1)
             List<EmployeeTracking> latestTrackings = trackingRepo.findLatestPerEmployee();
             Map<Long, EmployeeTracking> latestByEmpId = new HashMap<>();
             latestTrackings.forEach(t -> latestByEmpId.put(t.getEmployee().getId(), t));
 
-            // Single query for all active punches
-            List<EmployeePunch> allActivePunches = employeePunchRepository.findAllActivePunches();
+            // Single query for all active punches (today only)
+            List<EmployeePunch> allActivePunches = employeePunchRepository.findAllActivePunches()
+                    .stream()
+                    .filter(p -> p.getPunchInTime() != null && p.getPunchInTime().toLocalDate().equals(today))
+                    .toList();
             Map<Long, EmployeePunch> activePunchByEmpId = new HashMap<>();
             allActivePunches.forEach(p -> activePunchByEmpId.put(p.getEmployee().getId(), p));
 

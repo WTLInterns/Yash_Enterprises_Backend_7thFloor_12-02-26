@@ -19,7 +19,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -51,6 +53,7 @@ public class IdleDetectionService {
     private final NotificationService notificationService;
     private final Map<Long, LocalDateTime> lastAlertTime = new HashMap<>();
     private static final long ALERT_COOLDOWN_MINUTES = 15; // Repeat every 15 minutes as per requirements
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Kolkata");
 
     private static double distanceMeters(Double lat1, Double lon1, Double lat2, Double lon2) {
         if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return Double.NaN;
@@ -75,6 +78,8 @@ public class IdleDetectionService {
     public void detectIdleEmployees() {
         log.info("Running TASK-SCOPED idle detection scheduler");
 
+        final LocalDate today = LocalDate.now(BUSINESS_ZONE);
+
         List<Long> employeeIds = trackingRepo.findEmployeesWithAtLeastTwoTrackingRecords()
                     .stream()
                     .map(r -> (Long) r[0])
@@ -82,7 +87,7 @@ public class IdleDetectionService {
 
         for (Long empId : employeeIds) {
             // STEP 1: Check if employee has active punch (task-based)
-            List<EmployeePunch> activePunches = employeePunchRepository.findActivePunchesByEmployeeId(empId);
+            List<EmployeePunch> activePunches = employeePunchRepository.findActivePunchesByEmployeeIdAndDate(empId, today);
             if (activePunches.isEmpty()) {
                 log.debug("No active punch for employee {} - skipping idle detection", empId);
                 continue; // No active task, skip idle detection
