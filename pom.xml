@@ -13,6 +13,8 @@
         <mapstruct.version>1.5.5.Final</mapstruct.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <!-- Used by spring-boot-maven-plugin; override with -Plow-mem on memory-starved machines -->
+        <run.jvm.args>-Xms256m -Xmx512m -XX:MaxMetaspaceSize=256m</run.jvm.args>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -158,10 +160,18 @@
                 <version>${spring-boot.version}</version>
                 <configuration>
                     <mainClass>com.company.attendance.AttendanceApplication</mainClass>
-                    <jvmArguments>-Xms256m -Xmx512m -XX:MaxMetaspaceSize=256m</jvmArguments>
+                    <jvmArguments>${run.jvm.args}</jvmArguments>
                 </configuration>
             </plugin>
         </plugins>
     </build>
+    <profiles>
+        <profile>
+            <id>low-mem</id>
+            <properties>
+                <run.jvm.args>-Xms64m -Xmx256m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC</run.jvm.args>
+            </properties>
+        </profile>
+    </profiles>
 </project>
 

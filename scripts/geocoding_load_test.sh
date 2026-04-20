@@ -3,7 +3,7 @@
 # Simple load test for geocoding endpoint
 # Tests moderate load (10 concurrent users, 50 requests each)
 
-BASE_URL="http://localhost:8080"
+BASE_URL="https://api.yashrajent.com"
 CONCURRENT_USERS=10
 REQUESTS_PER_USER=50
 

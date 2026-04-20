@@ -119,8 +119,15 @@ public class DealService {
         // Generate dealCode: DEPT + (count+1), e.g. PPO1, PPE2
         if (deal.getDealCode() == null || deal.getDealCode().isBlank()) {
             String dept = deal.getDepartment() != null ? deal.getDepartment().toUpperCase() : "GEN";
-            long count = dealRepository.countByDepartment(dept);
-            deal.setDealCode(dept + (count + 1));
+            // Use max id approach to avoid duplicates when deals are deleted
+            String candidate;
+            int attempt = 0;
+            do {
+                long count = dealRepository.countByDepartment(dept) + attempt;
+                candidate = dept + (count + 1);
+                attempt++;
+            } while (dealRepository.existsByDealCode(candidate) && attempt < 1000);
+            deal.setDealCode(candidate);
         }
         auditService.setAuditFields(deal);
         return dealRepository.save(deal);

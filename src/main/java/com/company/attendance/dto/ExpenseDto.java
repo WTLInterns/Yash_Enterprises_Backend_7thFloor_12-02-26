@@ -24,7 +24,10 @@ public class ExpenseDto {
     private String status;
     private String rejectionReason;
     
-    // 🔥 NEW: Client mapping for CRM integration
+    // CRM integration
     private Long clientId;
     private String clientName;
+    private Long dealId;
+    private String stageCode;
+    private String expenseType; // DEAL | CLIENT | COMPANY
 }

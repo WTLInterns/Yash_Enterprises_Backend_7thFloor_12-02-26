@@ -9,6 +9,7 @@ import com.company.attendance.crm.repository.ActivityRepository;
 import com.company.attendance.crm.repository.DealRepository;
 import com.company.attendance.crm.repository.DealStageHistoryRepository;
 import com.company.attendance.crm.repository.NoteRepository;
+import com.company.attendance.crm.repository.StageMasterRepository;
 import com.company.attendance.crm.service.DealService;
 import com.company.attendance.crm.service.AuditService;
 import com.company.attendance.crm.service.StageService;
@@ -44,7 +45,9 @@ public class DealController {
   private final AuditService auditService;
   private final CrmMapper mapper;
   private final StageService stageService;
+  private final StageMasterRepository stageMasterRepository;
   private final NotificationService notificationService;
+  private final com.company.attendance.repository.ExpenseRepository expenseRepository;
 
   public DealController(
     DealService dealService,
@@ -57,7 +60,9 @@ public class DealController {
     AuditService auditService,
     CrmMapper mapper,
     StageService stageService,
-    NotificationService notificationService
+    StageMasterRepository stageMasterRepository,
+    NotificationService notificationService,
+    com.company.attendance.repository.ExpenseRepository expenseRepository
   ) {
     this.dealService = dealService;
     this.dealRepository = dealRepository;
@@ -69,7 +74,9 @@ public class DealController {
     this.auditService = auditService;
     this.mapper = mapper;
     this.stageService = stageService;
+    this.stageMasterRepository = stageMasterRepository;
     this.notificationService = notificationService;
+    this.expenseRepository = expenseRepository;
   }
 
   private String employeeName(Long employeeId) {
@@ -125,7 +132,30 @@ public class DealController {
   public ResponseEntity<List<DealDto>> getAllDeals() {
     List<DealDto> dtos = dealRepository.findAllWithClientAndProducts().stream().map(d -> {
       DealDto dto = mapper.toDealDto(d);
-      dto.setCalculatedValue(d.getValueAmount());
+      // Calculate: products total - expenses total
+      java.math.BigDecimal productTotal = java.math.BigDecimal.ZERO;
+      if (d.getDealProducts() != null) {
+        for (var dp : d.getDealProducts()) {
+          java.math.BigDecimal price = dp.getUnitPrice() != null ? dp.getUnitPrice() : java.math.BigDecimal.ZERO;
+          java.math.BigDecimal qty   = dp.getQuantity()  != null ? dp.getQuantity()  : java.math.BigDecimal.ONE;
+          java.math.BigDecimal disc  = dp.getDiscount()  != null ? dp.getDiscount()  : java.math.BigDecimal.ZERO;
+          java.math.BigDecimal tax   = dp.getTax()       != null ? dp.getTax()       : java.math.BigDecimal.ZERO;
+          productTotal = productTotal.add(price.multiply(qty).subtract(disc).add(tax));
+        }
+      }
+      java.math.BigDecimal expenseTotal = java.math.BigDecimal.ZERO;
+      if (d.getId() != null) {
+        try {
+          for (var e : expenseRepository.findByDealId(d.getId())) {
+            if (e.getAmount() != null) expenseTotal = expenseTotal.add(java.math.BigDecimal.valueOf(e.getAmount()));
+          }
+        } catch (Exception ignored) {}
+      }
+      java.math.BigDecimal baseValue = d.getValueAmount() != null ? d.getValueAmount() : java.math.BigDecimal.ZERO;
+      java.math.BigDecimal finalAmount = productTotal.compareTo(java.math.BigDecimal.ZERO) != 0
+          ? productTotal.subtract(expenseTotal)
+          : baseValue.subtract(expenseTotal);
+      dto.setCalculatedValue(finalAmount);
       if (dto.getClientId() == null) dto.setClientId(d.getClientId());
       if (dto.getBankId() == null) dto.setBankId(d.getBankId());
       if (dto.getBranchName() == null) dto.setBranchName(d.getBranchName());
@@ -149,10 +179,10 @@ public class DealController {
   ) {
     List<Deal> deals;
     if ("ADMIN".equalsIgnoreCase(role) || "MANAGER".equalsIgnoreCase(role) || "HR".equalsIgnoreCase(role)) {
-      deals = dealRepository.findAllWithClient();
+      deals = dealRepository.findAllWithClientAndProductsFull();
     } else if (department != null && !department.isBlank()) {
       String dept = department.trim().toUpperCase();
-      deals = dealRepository.findByDepartment(dept);
+      deals = dealRepository.findByDepartmentWithProducts(dept);
       // ACCOUNT dept: exclude CLOSE_WIN and CLOSE_LOST
       if ("ACCOUNT".equals(dept)) {
         deals = deals.stream()
@@ -168,7 +198,27 @@ public class DealController {
     }
     List<DealDto> dtos = deals.stream().map(d -> {
       DealDto dto = mapper.toDealDto(d);
-      dto.setCalculatedValue(d.getValueAmount());
+      java.math.BigDecimal pt = java.math.BigDecimal.ZERO;
+      if (d.getDealProducts() != null) {
+        for (var dp : d.getDealProducts()) {
+          java.math.BigDecimal p = dp.getUnitPrice() != null ? dp.getUnitPrice() : java.math.BigDecimal.ZERO;
+          java.math.BigDecimal q = dp.getQuantity()  != null ? dp.getQuantity()  : java.math.BigDecimal.ONE;
+          java.math.BigDecimal di = dp.getDiscount() != null ? dp.getDiscount()  : java.math.BigDecimal.ZERO;
+          java.math.BigDecimal tx = dp.getTax()      != null ? dp.getTax()       : java.math.BigDecimal.ZERO;
+          pt = pt.add(p.multiply(q).subtract(di).add(tx));
+        }
+      }
+      java.math.BigDecimal et = java.math.BigDecimal.ZERO;
+      if (d.getId() != null) {
+        try {
+          for (var ex : expenseRepository.findByDealId(d.getId())) {
+            if (ex.getAmount() != null) et = et.add(java.math.BigDecimal.valueOf(ex.getAmount()));
+          }
+        } catch (Exception ignored) {}
+      }
+      java.math.BigDecimal bv = d.getValueAmount() != null ? d.getValueAmount() : java.math.BigDecimal.ZERO;
+      java.math.BigDecimal fa = pt.compareTo(java.math.BigDecimal.ZERO) != 0 ? pt.subtract(et) : bv.subtract(et);
+      dto.setCalculatedValue(fa);
       if (dto.getClientId() == null && d.getClientId() != null) dto.setClientId(d.getClientId());
       if (dto.getBankId() == null && d.getBankId() != null) dto.setBankId(d.getBankId());
       if (dto.getBranchName() == null && d.getBranchName() != null) dto.setBranchName(d.getBranchName());
@@ -282,14 +332,24 @@ public class DealController {
       return ResponseEntity.badRequest().build();
     }
 
+    // Validate stage belongs to deal's department
+    String dept = deal.getDepartment();
+    if (dept != null && !dept.isBlank()) {
+      final String stageToValidate = stageRaw;
+      boolean validStage = stageMasterRepository
+          .findByDepartmentOrderByStageOrder(dept)
+          .stream()
+          .anyMatch(s -> s.getStageCode().equalsIgnoreCase(stageToValidate));
+      if (!validStage) {
+        return ResponseEntity.badRequest().body(null);
+      }
+    }
+
     String prevDepartment = deal.getDepartment();
     String prevStageCode = deal.getStageCode();
 
-    // ✅ FIXED: Directly set new stage — NO auto ACCOUNT transfer
-    // Account transfer is now handled via LeadClosureApprovalService (approval flow)
     deal.setStageCode(stageRaw);
 
-    // Only update department if explicitly provided in request body
     if (body.get("department") != null && !body.get("department").isBlank()) {
       deal.setDepartment(body.get("department"));
     }

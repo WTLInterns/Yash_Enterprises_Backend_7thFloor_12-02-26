@@ -40,9 +40,13 @@ public class Expense {
 
     private String rejectionReason;
 
-    // 🔥 NEW: Client mapping for CRM integration
+    // CRM integration
     private Long clientId;
     private String clientName;
+    private Long dealId;
+    private String stageCode;
+    // DEAL | CLIENT | COMPANY
+    private String expenseType;
 
     // Add employee relationship for mapping
     @ManyToOne(fetch = FetchType.LAZY)

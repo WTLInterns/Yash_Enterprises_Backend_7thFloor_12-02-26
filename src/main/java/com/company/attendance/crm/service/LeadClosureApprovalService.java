@@ -279,6 +279,7 @@ public class LeadClosureApprovalService {
         LeadClosureApprovalDto dto = new LeadClosureApprovalDto();
         dto.setId(a.getId());
         dto.setDealId(a.getDealId());
+        dto.setDealCode(deal != null ? deal.getDealCode() : null);
         dto.setDealName(a.getDealName() != null ? a.getDealName()
             : (deal != null ? deal.getName() : ""));
         dto.setClientId(a.getClientId() != null ? a.getClientId()

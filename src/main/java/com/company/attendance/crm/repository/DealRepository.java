@@ -52,6 +52,10 @@ public interface DealRepository extends JpaRepository<Deal, Long> {
     @Query("SELECT COUNT(d) FROM Deal d WHERE d.department = :dept")
     long countByDepartment(@Param("dept") String dept);
 
+    boolean existsByDealCode(String dealCode);
+
+    Optional<Deal> findByDealCodeIgnoreCase(String dealCode);
+
     @Query("SELECT d FROM Deal d WHERE d.clientId = :clientId AND d.department = :department")
     List<Deal> findByClientIdAndDepartment(@Param("clientId") Long clientId, @Param("department") String department);
 
@@ -70,6 +74,12 @@ public interface DealRepository extends JpaRepository<Deal, Long> {
 
     @Query("SELECT DISTINCT d FROM Deal d LEFT JOIN FETCH d.client LEFT JOIN FETCH d.bank LEFT JOIN FETCH d.dealProducts dp LEFT JOIN FETCH dp.product")
     List<Deal> findAllWithClientAndProducts();
+
+    @Query("SELECT DISTINCT d FROM Deal d LEFT JOIN FETCH d.client LEFT JOIN FETCH d.bank LEFT JOIN FETCH d.dealProducts dp LEFT JOIN FETCH dp.product WHERE d.department = :department")
+    List<Deal> findByDepartmentWithProducts(@Param("department") String department);
+
+    @Query("SELECT DISTINCT d FROM Deal d LEFT JOIN FETCH d.client LEFT JOIN FETCH d.bank LEFT JOIN FETCH d.dealProducts dp LEFT JOIN FETCH dp.product")
+    List<Deal> findAllWithClientAndProductsFull();
 
     default Deal findByIdSafe(Long id) {
         return findById(id).orElseThrow(() -> new ResourceNotFoundException("Deal not found: " + id));

@@ -38,6 +38,7 @@ public class TaskController {
     private final NotificationService notificationService;
     private final LocationBasedAttendanceService locationBasedAttendanceService;
     private final com.company.attendance.repository.CustomerAddressRepository customerAddressRepository;
+    private final com.company.attendance.repository.TaskRepository taskRepository;
 
     // Resolve all lazy relations via IDs — no open session required
     private TaskDto toEnrichedDto(Task task) {
@@ -94,11 +95,19 @@ public class TaskController {
     @GetMapping
     public ResponseEntity<List<TaskDto>> listTasks(
             @RequestParam(value = "department", required = false) String departmentParam,
+            @RequestParam(value = "clientId", required = false) Long clientIdParam,
             @RequestHeader(value = "X-User-Id", required = false) String userId,
             @RequestHeader(value = "X-User-Role", required = false) String userRole,
             @RequestHeader(value = "X-User-Department", required = false) String userDepartment) {
         
         try {
+            // 🔥 clientId filter — return tasks for this client regardless of role
+            if (clientIdParam != null) {
+                List<Task> clientTasks = taskRepository.findByClientId(clientIdParam);
+                List<TaskDto> clientDtos = clientTasks.stream().map(this::toEnrichedDto).toList();
+                return ResponseEntity.ok(clientDtos);
+            }
+
             // 🔥 HEADER FALLBACK: Derive from employeeId if headers missing
             String derivedUserRole = userRole;
             String derivedUserDepartment = userDepartment;
@@ -512,6 +521,143 @@ public class TaskController {
     public ResponseEntity<Void> deleteTask(@PathVariable Long id) {
         taskService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @Transactional
+    @PostMapping("/bulk")
+    public ResponseEntity<?> createBulkTasks(
+            @RequestBody List<Map<String, String>> rows,
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Role", required = false) String userRole) {
+        try {
+            if (rows == null || rows.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "No tasks provided"));
+            }
+
+            List<Map<String, Object>> results = new ArrayList<>();
+
+            for (Map<String, String> row : rows) {
+                String taskName       = row.getOrDefault("taskName", "").trim();
+                String clientName     = row.getOrDefault("clientName", "").trim();
+                String employeeName   = row.getOrDefault("employeeName", "").trim();
+                String department     = row.getOrDefault("department", "").trim();
+                String startTime      = row.getOrDefault("scheduledStartTime", "").trim();
+                String endTime        = row.getOrDefault("scheduledEndTime", "").trim();
+                String status         = row.getOrDefault("status", "INQUIRY").trim();
+                String description    = row.getOrDefault("taskDescription", "").trim();
+
+                if (taskName.isEmpty()) {
+                    results.add(Map.of("row", row, "status", "SKIPPED", "reason", "taskName is required"));
+                    continue;
+                }
+
+                log.info("[BULK] Processing row: taskName='{}' clientName='{}' employeeName='{}' dept='{}'",
+                    taskName, clientName, employeeName, department);
+
+                // Resolve clientId from clientName
+                Long resolvedClientId = null;
+                Long resolvedAddressId = null;
+                if (!clientName.isEmpty()) {
+                    log.info("[BULK] Resolving client: '{}'", clientName);
+                    var clients = clientRepository.findAll().stream()
+                        .filter(c -> c.getName() != null && c.getName().equalsIgnoreCase(clientName))
+                        .toList();
+                    log.info("[BULK] Matched clients for '{}': {}", clientName, clients.size());
+                    if (!clients.isEmpty()) {
+                        resolvedClientId = clients.get(0).getId();
+                        log.info("[BULK] Resolved clientId={} for name='{}'", resolvedClientId, clientName);
+                        var addrs = customerAddressRepository.findByClientIdOrderByAddressType(resolvedClientId);
+                        log.info("[BULK] Found {} addresses for clientId={}", addrs.size(), resolvedClientId);
+                        var primary = addrs.stream()
+                            .filter(a -> a.getAddressType() != null && "PRIMARY".equalsIgnoreCase(a.getAddressType().name()))
+                            .findFirst()
+                            .orElse(addrs.isEmpty() ? null : addrs.get(0));
+                        if (primary != null) {
+                            resolvedAddressId = primary.getId();
+                            log.info("[BULK] Resolved addressId={} for clientId={}", resolvedAddressId, resolvedClientId);
+                        } else {
+                            log.warn("[BULK] No address found for clientId={}", resolvedClientId);
+                        }
+                    } else {
+                        log.warn("[BULK] No client found for name='{}'", clientName);
+                    }
+                }
+
+                if (resolvedAddressId == null) {
+                    results.add(Map.of("row", row, "status", "SKIPPED", "reason", "Client '" + clientName + "' not found or has no address"));
+                    continue;
+                }
+
+                // Resolve employeeId from employeeName
+                Long resolvedEmployeeId = null;
+                if (!employeeName.isEmpty()) {
+                    String[] parts = employeeName.trim().split("\\s+", 2);
+                    String firstName = parts[0];
+                    String lastName  = parts.length > 1 ? parts[1] : "";
+                    log.info("[BULK] Resolving employee: '{}' -> firstName='{}', lastName='{}'", employeeName, firstName, lastName);
+                    var allEmps = employeeRepository.findAll();
+                    log.info("[BULK] Total employees in DB: {}", allEmps.size());
+                    allEmps.forEach(e -> log.info("[BULK]   Employee id={} firstName='{}' lastName='{}'", e.getId(), e.getFirstName(), e.getLastName()));
+                    var matched = allEmps.stream()
+                        .filter(e -> firstName.equalsIgnoreCase(e.getFirstName() != null ? e.getFirstName().trim() : "") &&
+                                     (lastName.isEmpty() || lastName.equalsIgnoreCase(e.getLastName() != null ? e.getLastName().trim() : "")))
+                        .toList();
+                    log.info("[BULK] Matched employees for '{}': {}", employeeName, matched.size());
+                    if (!matched.isEmpty()) {
+                        resolvedEmployeeId = matched.get(0).getId();
+                        log.info("[BULK] Resolved employeeId={} for name='{}'", resolvedEmployeeId, employeeName);
+                    } else {
+                        log.warn("[BULK] No employee found for name='{}'", employeeName);
+                    }
+                }
+
+                try {
+                    Task task = new Task();
+                    task.setTaskName(taskName);
+                    task.setTaskDescription(description);
+                    task.setDepartment(department.isEmpty() ? null : department);
+                    task.setClientId(resolvedClientId);
+                    task.setCustomerAddressId(resolvedAddressId);
+                    task.setAssignedToEmployeeId(resolvedEmployeeId);
+                    task.setCustomTaskType("Default Task");
+                    try { task.setStatus(com.company.attendance.enums.TaskStatus.valueOf(status.toUpperCase())); }
+                    catch (Exception ex) { task.setStatus(com.company.attendance.enums.TaskStatus.INQUIRY); }
+                    if (!startTime.isEmpty()) {
+                        try { task.setScheduledStartTime(java.time.LocalDateTime.parse(startTime.length() == 16 ? startTime + ":00" : startTime)); } catch (Exception ignored) {}
+                    }
+                    if (!endTime.isEmpty()) {
+                        try { task.setScheduledEndTime(java.time.LocalDateTime.parse(endTime.length() == 16 ? endTime + ":00" : endTime)); } catch (Exception ignored) {}
+                    }
+
+                    Task created = taskService.create(task);
+
+                    // Notify assigned employee
+                    if (resolvedEmployeeId != null) {
+                        Map<String, String> data = new HashMap<>();
+                        data.put("taskId", created.getId().toString());
+                        data.put("taskTitle", created.getTaskName());
+                        data.put("clientName", clientName);
+                        data.put("action", "bulk_assigned");
+                        String notifBody = "New task assigned: " + created.getTaskName() + " for client: " + clientName;
+                        notificationService.notifyEmployeeMobile(resolvedEmployeeId, "New Task Assigned", notifBody, "TASK_ASSIGNED", "TASK", created.getId(), data);
+                        notificationService.notifyEmployeeWeb(resolvedEmployeeId, "New Task Assigned", notifBody, "TASK_ASSIGNED", "TASK", created.getId(), data);
+                    }
+
+                    results.add(Map.of("taskId", created.getId(), "taskName", taskName, "status", "SAVED",
+                        "clientName", clientName, "employeeName", employeeName.isEmpty() ? "Unassigned" : employeeName));
+                } catch (Exception e) {
+                    log.warn("Bulk task skipped (taskName={}): {}", taskName, e.getMessage());
+                    results.add(Map.of("row", row, "status", "ERROR", "reason", e.getMessage()));
+                }
+            }
+
+            long saved = results.stream().filter(r -> "SAVED".equals(r.get("status"))).count();
+            log.info("Bulk task upload: {} submitted, {} saved", rows.size(), saved);
+            return ResponseEntity.ok(Map.of("total", rows.size(), "saved", saved, "results", results));
+        } catch (Exception e) {
+            log.error("Bulk task creation failed: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
     }
 
     @PostMapping("/test-notification")

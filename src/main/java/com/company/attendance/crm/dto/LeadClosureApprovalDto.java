@@ -15,6 +15,7 @@ public class LeadClosureApprovalDto {
 
     private Long id;
     private Long dealId;
+    private String dealCode;
     private String dealName;
     private Long clientId;
     private String clientName;

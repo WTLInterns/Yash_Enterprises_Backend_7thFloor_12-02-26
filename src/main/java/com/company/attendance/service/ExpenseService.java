@@ -1,9 +1,12 @@
 package com.company.attendance.service;
 import com.company.attendance.entity.Expense;
-import com.company.attendance.entity.Employee;
 import com.company.attendance.repository.ExpenseRepository;
 import com.company.attendance.repository.EmployeeRepository;
+import com.company.attendance.repository.ClientRepository;
+import com.company.attendance.crm.repository.DealRepository;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -12,82 +15,67 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+
 @Service
 @RequiredArgsConstructor
 public class ExpenseService {
+    private static final Logger log = LoggerFactory.getLogger(ExpenseService.class);
+
     private final ExpenseRepository expenseRepository;
     private final EmployeeRepository employeeRepository;
+    private final DealRepository dealRepository;
+    private final ClientRepository clientRepository;
 
     public Expense save(Expense expense) {
-        // Debug logging
-        System.out.println("🔥 [EXPENSE SERVICE] Saving expense: " + expense);
-        System.out.println("🔥 [EXPENSE SERVICE] Employee ID: " + expense.getEmployeeId());
-        System.out.println("🔥 [EXPENSE SERVICE] Employee Name: " + expense.getEmployeeName());
-        System.out.println("🔥 [EXPENSE SERVICE] Department: " + expense.getDepartmentName());
-        
-        // Auto-fill missing fields
-        if (expense.getExpenseDate() == null) {
-            expense.setExpenseDate(LocalDate.now());
-            System.out.println("🔥 [EXPENSE SERVICE] Auto-filled date: " + expense.getExpenseDate());
+        if (expense.getExpenseDate() == null) expense.setExpenseDate(LocalDate.now());
+        if (expense.getExpenseTime() == null) expense.setExpenseTime(LocalTime.now());
+        if (expense.getStatus() == null)      expense.setStatus("PENDING");
+
+        // Auto-fill employeeName from employee record
+        if (expense.getEmployeeId() != null &&
+                (expense.getEmployeeName() == null || expense.getEmployeeName().isBlank())) {
+            employeeRepository.findById(expense.getEmployeeId()).ifPresent(emp ->
+                expense.setEmployeeName(emp.getFirstName() + " " + emp.getLastName()));
         }
-        if (expense.getExpenseTime() == null) {
-            expense.setExpenseTime(LocalTime.now());
-            System.out.println("🔥 [EXPENSE SERVICE] Auto-filled time: " + expense.getExpenseTime());
-        }
-        if (expense.getStatus() == null) {
-            expense.setStatus("PENDING");
-            System.out.println("🔥 [EXPENSE SERVICE] Auto-filled status: " + expense.getStatus());
-        }
-        
-        // Auto-fill employee name and department if employeeId is provided
-        if (expense.getEmployeeId() != null && 
-            (expense.getEmployeeName() == null || expense.getEmployeeName().isEmpty() ||
-             expense.getDepartmentName() == null || expense.getDepartmentName().isEmpty())) {
-            
-            System.out.println("🔥 [EXPENSE SERVICE] Looking up employee for ID: " + expense.getEmployeeId());
-            Optional<Employee> employee = employeeRepository.findById(expense.getEmployeeId());
-            if (employee.isPresent()) {
-                Employee emp = employee.get();
-                String fullName = emp.getFirstName() + " " + emp.getLastName();
-                String deptName = emp.getDepartment() != null ? emp.getDepartment().getName() : null;
-                System.out.println("🔥 [EXPENSE SERVICE] Found employee: " + fullName + ", Dept: " + deptName);
-                
-                if (expense.getEmployeeName() == null || expense.getEmployeeName().isEmpty()) {
-                    expense.setEmployeeName(fullName);
-                    System.out.println("🔥 [EXPENSE SERVICE] Auto-filled employee name: " + expense.getEmployeeName());
+
+        // DEAL is single source of truth: ALWAYS derive clientId, clientName, departmentName, stageCode from deal
+        if (expense.getDealId() != null) {
+            log.info("[EXPENSE SAVE] dealId={} present — deriving from deal. Before: clientId={} dept='{}' stage='{}'",
+                expense.getDealId(), expense.getClientId(), expense.getDepartmentName(), expense.getStageCode());
+            dealRepository.findById(expense.getDealId()).ifPresent(deal -> {
+                expense.setClientId(deal.getClientId());
+                expense.setDepartmentName(deal.getDepartment());
+                expense.setStageCode(deal.getStageCode());
+                log.info("[EXPENSE SAVE] After deal derivation: clientId={} dept='{}' stage='{}'",
+                    deal.getClientId(), deal.getDepartment(), deal.getStageCode());
+                // Derive clientName from client entity if not already set
+                if (expense.getClientName() == null || expense.getClientName().isBlank()) {
+                    clientRepository.findById(deal.getClientId()).ifPresent(client -> {
+                        expense.setClientName(client.getName());
+                        log.info("[EXPENSE SAVE] clientName resolved: '{}'", client.getName());
+                    });
                 }
-                if (expense.getDepartmentName() == null || expense.getDepartmentName().isEmpty()) {
-                    expense.setDepartmentName(deptName);
-                    System.out.println("🔥 [EXPENSE SERVICE] Auto-filled department: " + expense.getDepartmentName());
-                }
-            } else {
-                System.out.println("🔥 [EXPENSE SERVICE] Employee not found for ID: " + expense.getEmployeeId());
-            }
+            });
+        } else {
+            log.info("[EXPENSE SAVE] No dealId — saving as-is: clientId={} dept='{}' stage='{}'",
+                expense.getClientId(), expense.getDepartmentName(), expense.getStageCode());
         }
-        
-        Expense saved = expenseRepository.save(expense);
-        System.out.println("🔥 [EXPENSE SERVICE] Saved expense with ID: " + saved.getId());
-        return saved;
+
+        return expenseRepository.save(expense);
     }
 
     public List<Expense> findAll() {
         List<Expense> expenses = expenseRepository.findAllWithEmployee();
-        // Populate employee details for each expense
         for (Expense expense : expenses) {
             if (expense.getEmployee() != null) {
-                String fullName = expense.getEmployee().getFirstName() + " " + expense.getEmployee().getLastName();
-                expense.setEmployeeName(fullName);
-                
-                // Try to get department from multiple sources
-                String deptName = null;
-                if (expense.getEmployee().getDepartment() != null) {
-                    deptName = expense.getEmployee().getDepartment().getName();
-                } else if (expense.getEmployee().getDepartmentName() != null && !expense.getEmployee().getDepartmentName().isEmpty()) {
-                    deptName = expense.getEmployee().getDepartmentName();
-                } else if (expense.getEmployee().getTl() != null && expense.getEmployee().getTl().getDepartmentName() != null) {
-                    deptName = expense.getEmployee().getTl().getDepartmentName();
+                // Always refresh employeeName from employee record
+                expense.setEmployeeName(
+                    expense.getEmployee().getFirstName() + " " + expense.getEmployee().getLastName());
+                // departmentName: NEVER overwrite — deal dept always wins
+                // Only set if completely missing AND no deal linked
+                if (expense.getDepartmentName() == null && expense.getDealId() == null) {
+                    // leave null — no employee dept fallback
                 }
-                expense.setDepartmentName(deptName);
             }
         }
         return expenses;
@@ -105,18 +93,19 @@ public class ExpenseService {
         return expenseRepository.findByEmployeeId(employeeId);
     }
 
-    // 🔥 NEW: Find expenses by clientId for CRM integration
     public List<Expense> findByClientId(Long clientId) {
         return expenseRepository.findByClientId(clientId);
     }
 
-    // 🔥 NEW: Get total expenses by clientId for CRM accounting
+    public List<Expense> findByDealId(Long dealId) {
+        return expenseRepository.findByDealId(dealId);
+    }
+
     public BigDecimal getTotalByClientId(Long clientId) {
-        List<Expense> expenses = findByClientId(clientId);
-        return expenses.stream()
+        return findByClientId(clientId).stream()
             .map(Expense::getAmount)
             .filter(Objects::nonNull)
-            .map(BigDecimal::valueOf)          // Double → BigDecimal
+            .map(BigDecimal::valueOf)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
@@ -125,21 +114,29 @@ public class ExpenseService {
     }
 
     public Expense getById(Long id) {
-        return expenseRepository.findById(id).orElseThrow(() -> new RuntimeException("Expense not found"));
+        return expenseRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Expense not found: " + id));
     }
 
     public Expense update(Long id, Expense updated) {
         Expense existing = getById(id);
-
-        if (updated.getEmployeeId() != null) existing.setEmployeeId(updated.getEmployeeId());
-        if (updated.getAmount() != null) existing.setAmount(updated.getAmount());
-        if (updated.getCategory() != null) existing.setCategory(updated.getCategory());
-        if (updated.getDescription() != null) existing.setDescription(updated.getDescription());
-        if (updated.getExpenseDate() != null) existing.setExpenseDate(updated.getExpenseDate());
-        if (updated.getReceiptUrl() != null) existing.setReceiptUrl(updated.getReceiptUrl());
-        if (updated.getApprovedBy() != null) existing.setApprovedBy(updated.getApprovedBy());
-        if (updated.getStatus() != null) existing.setStatus(updated.getStatus());
-
+        if (updated.getEmployeeId()   != null) existing.setEmployeeId(updated.getEmployeeId());
+        if (updated.getAmount()       != null) existing.setAmount(updated.getAmount());
+        if (updated.getCategory()     != null) existing.setCategory(updated.getCategory());
+        if (updated.getDescription()  != null) existing.setDescription(updated.getDescription());
+        if (updated.getExpenseDate()  != null) existing.setExpenseDate(updated.getExpenseDate());
+        if (updated.getReceiptUrl()   != null) existing.setReceiptUrl(updated.getReceiptUrl());
+        if (updated.getApprovedBy()   != null) existing.setApprovedBy(updated.getApprovedBy());
+        if (updated.getStatus()       != null) existing.setStatus(updated.getStatus());
+        if (updated.getClientId()     != null) existing.setClientId(updated.getClientId());
+        if (updated.getClientName()   != null) existing.setClientName(updated.getClientName());
+        if (updated.getDealId()       != null) existing.setDealId(updated.getDealId());
+        if (updated.getStageCode()    != null) existing.setStageCode(updated.getStageCode());
+        if (updated.getExpenseType()  != null) existing.setExpenseType(updated.getExpenseType());
+        // client/deal department always wins
+        if (updated.getDepartmentName() != null && !updated.getDepartmentName().isBlank()) {
+            existing.setDepartmentName(updated.getDepartmentName());
+        }
         return expenseRepository.save(existing);
     }
 
@@ -147,4 +144,3 @@ public class ExpenseService {
         expenseRepository.deleteById(id);
     }
 }
-

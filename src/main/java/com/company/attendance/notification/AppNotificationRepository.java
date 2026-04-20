@@ -22,7 +22,6 @@ public interface AppNotificationRepository extends JpaRepository<AppNotification
         SELECT n FROM AppNotification n
         WHERE n.recipientRole = :role
            OR n.recipientEmployeeId = :employeeId
-           OR (n.recipientDepartment IS NOT NULL AND n.recipientRole IS NULL AND n.recipientEmployeeId IS NULL)
         ORDER BY n.createdAt DESC
         """)
     Page<AppNotification> findAdminNotifications(
@@ -53,7 +52,7 @@ public interface AppNotificationRepository extends JpaRepository<AppNotification
     
     @Modifying
     @Transactional
-    @Query("DELETE FROM AppNotification n WHERE n.recipientRole = :role")
+    @Query("DELETE FROM AppNotification n WHERE n.recipientRole = :role OR n.recipientEmployeeId IN (SELECT e.id FROM Employee e WHERE e.role.name = :role)")
     void deleteAllByRecipientRole(@Param("role") String role);
     
     @Modifying

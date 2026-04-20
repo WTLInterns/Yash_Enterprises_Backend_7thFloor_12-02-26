@@ -4,11 +4,15 @@ import com.company.attendance.entity.Expense;
 import com.company.attendance.mapper.ExpenseMapper;
 import com.company.attendance.service.ExpenseService;
 import com.company.attendance.crm.service.AuditService;
-import com.company.attendance.util.FileUploadUtil;
+import com.company.attendance.crm.repository.StageMasterRepository;
+import com.company.attendance.repository.ClientRepository;
+import com.company.attendance.crm.repository.DealRepository;
+import com.company.attendance.repository.ExpenseRepository;
 import com.company.attendance.util.UploadUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,22 +27,83 @@ import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
+
 @RestController
 @RequestMapping("/api/expenses")
 @RequiredArgsConstructor
 public class ExpenseController {
+    private static final Logger log = LoggerFactory.getLogger(ExpenseController.class);
+
     private final ExpenseService expenseService;
     private final ExpenseMapper expenseMapper;
     private final UploadUtil uploadUtil;
     private final ObjectMapper objectMapper;
     private final AuditService auditService;
+    private final StageMasterRepository stageMasterRepository;
+    private final ClientRepository clientRepository;
+    private final DealRepository dealRepository;
+    private final com.company.attendance.repository.ExpenseRepository expenseRepository;
 
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
 
+    // ── Validate based on expenseType ──────────────────────────────────────
+    // NOTE: For DEAL type, clientId/dept/stage are derived from deal in ExpenseService.save()
+    // so we only validate stage here if dept is already present (not required at this point)
+    private void validateByType(ExpenseDto dto) {
+        String type = dto.getExpenseType();
+        if (type == null || type.isBlank()) return;
+        switch (type) {
+            case "DEAL" -> {
+                // dealId is the only hard requirement — clientId/dept/stage derived in service
+                if (dto.getDealId() == null)
+                    throw new RuntimeException("DEAL expense requires dealId");
+                // If dept already present, validate stage belongs to it
+                if (dto.getDepartmentName() != null && !dto.getDepartmentName().isBlank())
+                    validateStage(dto.getDepartmentName(), dto.getStageCode());
+            }
+            case "CLIENT" -> {
+                if (dto.getClientId() == null)
+                    throw new RuntimeException("CLIENT expense requires clientId");
+            }
+            case "COMPANY" -> {
+                dto.setClientId(null);
+                dto.setClientName(null);
+                dto.setDepartmentName(null);
+                dto.setStageCode(null);
+            }
+            default -> validateStage(dto.getDepartmentName(), dto.getStageCode());
+        }
+    }
+
+    // ── Validate that stageCode belongs to department ──────────────────────
+    private void validateStage(String department, String stageCode) {
+        if (department == null || department.isBlank() || stageCode == null || stageCode.isBlank()) return;
+        boolean valid = stageMasterRepository
+                .findByDepartmentOrderByStageOrder(department)
+                .stream()
+                .anyMatch(s -> s.getStageCode().equalsIgnoreCase(stageCode));
+        if (!valid) {
+            throw new RuntimeException("Stage '" + stageCode + "' is not valid for department '" + department + "'");
+        }
+    }
+
+    // ── Apply client/department/stage from DTO onto entity ─────────────────
+    private void applyClientFields(Expense expense, ExpenseDto dto) {
+        if (dto.getClientId() != null)     expense.setClientId(dto.getClientId());
+        if (dto.getClientName() != null)   expense.setClientName(dto.getClientName());
+        if (dto.getDepartmentName() != null && !dto.getDepartmentName().isBlank())
+            expense.setDepartmentName(dto.getDepartmentName());
+        if (dto.getStageCode() != null)    expense.setStageCode(dto.getStageCode());
+        if (dto.getDealId() != null)       expense.setDealId(dto.getDealId());
+        if (dto.getExpenseType() != null)  expense.setExpenseType(dto.getExpenseType());
+    }
+
     @GetMapping
     public ResponseEntity<List<ExpenseDto>> listExpenses(
             @RequestParam(required = false) Long employeeId,
+            @RequestParam(required = false) Long clientId,
+            @RequestParam(required = false) Long dealId,
             @RequestParam(required = false) Integer month,
             @RequestParam(required = false) Integer year,
             @RequestParam(required = false) String status,
@@ -54,49 +119,40 @@ public class ExpenseController {
         }
 
         List<Expense> expenses;
-        
-        // Role-based filtering
-        if (userRoleHeader != null) {
+
+        // dealId filter — used when expense was created from /expenses page with a deal selected
+        if (dealId != null) {
+            expenses = expenseService.findByDealId(dealId);
+        } else if (clientId != null) {
+            // clientId filter — used by /customers/[id] page
+            expenses = expenseService.findByClientId(clientId);
+        } else if (userRoleHeader != null) {
             String role = userRoleHeader;
             String department = userDepartmentHeader;
-            
+
             if (role.equals("ADMIN") || role.equals("MANAGER") || "ACCOUNT".equals(department)) {
-                // Admin / Manager / Account see all
                 expenses = (employeeId != null || status != null || startDate != null || endDate != null)
                         ? expenseService.findFiltered(employeeId, status, startDate, endDate)
                         : expenseService.findAll();
             } else if (role.equals("TL") && department != null) {
-                // TL sees only their department
                 expenses = expenseService.findByDepartment(department);
             } else if (userIdHeader != null) {
-                // Employee sees only their own expenses
-                Long currentUserId = Long.valueOf(userIdHeader);
-                expenses = expenseService.findByEmployeeId(currentUserId);
+                expenses = expenseService.findByEmployeeId(Long.valueOf(userIdHeader));
             } else {
-                // Fallback - no filtering
                 expenses = (employeeId != null || status != null || startDate != null || endDate != null)
                         ? expenseService.findFiltered(employeeId, status, startDate, endDate)
                         : expenseService.findAll();
             }
         } else {
-            // No role header - fallback to original logic
             expenses = (employeeId != null || status != null || startDate != null || endDate != null)
                     ? expenseService.findFiltered(employeeId, status, startDate, endDate)
                     : expenseService.findAll();
         }
-        
+
         var dtos = expenses.stream().map(expenseMapper::toDto).collect(Collectors.toList());
         return ResponseEntity.ok(dtos);
     }
-    
-    // 🔥 NEW: Get expenses by clientId for CRM integration
-    @GetMapping(params = "clientId")
-    public ResponseEntity<List<ExpenseDto>> getExpensesByClient(@RequestParam Long clientId) {
-        List<Expense> expenses = expenseService.findByClientId(clientId);
-        var dtos = expenses.stream().map(expenseMapper::toDto).collect(Collectors.toList());
-        return ResponseEntity.ok(dtos);
-    }
-    
+
     @GetMapping("/{id}")
     public ResponseEntity<ExpenseDto> getExpense(@PathVariable Long id) {
         return expenseService.findById(id)
@@ -104,6 +160,7 @@ public class ExpenseController {
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
+
     @PostMapping(consumes = "multipart/form-data")
     public ResponseEntity<ExpenseDto> createExpense(
             @RequestPart("expense") String expenseJson,
@@ -112,64 +169,68 @@ public class ExpenseController {
             @RequestHeader(value = "X-User-Role", required = false) String userRoleHeader,
             @RequestHeader(value = "X-User-Department", required = false) String userDepartmentHeader
     ) throws IOException {
-        
+
         ExpenseDto dto = objectMapper.readValue(expenseJson, ExpenseDto.class);
-        
-        // Security fix: Force employeeId to current user for non-admin roles
+        log.info("[EXPENSE CREATE] Received: dealId={} clientId={} dept={} stage={} type={} amount={}",
+            dto.getDealId(), dto.getClientId(), dto.getDepartmentName(), dto.getStageCode(),
+            dto.getExpenseType(), dto.getAmount());
+
+        // Non-admin: force employeeId to current user
         if (userIdHeader != null && userRoleHeader != null) {
-            String role = userRoleHeader;
-            if (!role.equals("ADMIN") && !role.equals("MANAGER") && !"ACCOUNT".equals(userDepartmentHeader)) {
-                // For TL and EMPLOYEE roles, force employeeId to current user
+            if (!userRoleHeader.equals("ADMIN") && !userRoleHeader.equals("MANAGER")
+                    && !"ACCOUNT".equals(userDepartmentHeader)) {
                 dto.setEmployeeId(Long.valueOf(userIdHeader));
             }
         }
-        
-        // 🔥 DEBUG: Check clientId
-        System.out.println("CLIENT ID: " + dto.getClientId());
-        
+
+        // Validate by expense type
+        validateByType(dto);
+
         Expense expense = expenseMapper.toEntity(dto);
-        
-        // 🔥 IMPORTANT: Set clientId from DTO
-        expense.setClientId(dto.getClientId());
-        expense.setClientName(dto.getClientName());
-        
+        applyClientFields(expense, dto);
         expense = expenseService.save(expense);
-        
-        // 🔥 NEW: Log expense to timeline if clientId exists
-        if (dto.getClientId() != null) {
+        log.info("[EXPENSE CREATE] Saved: id={} dealId={} clientId={} dept={} stage={}",
+            expense.getId(), expense.getDealId(), expense.getClientId(),
+            expense.getDepartmentName(), expense.getStageCode());
+
+        // Use saved entity's clientId (may have been derived from deal in service)
+        Long auditClientId = expense.getClientId() != null ? expense.getClientId() : dto.getClientId();
+        if (auditClientId != null) {
             auditService.logActivity(
-                dto.getClientId(),
+                auditClientId,
                 "EXPENSE_ADDED",
                 "Expense added: ₹" + dto.getAmount() + " for " + dto.getCategory(),
                 dto.getEmployeeId()
             );
         }
-        
-        if(file != null && !file.isEmpty()){
-            String receiptUrl = uploadUtil.saveFile(file, "expenses");
-            expense.setReceiptUrl(receiptUrl);
+
+        if (file != null && !file.isEmpty()) {
+            expense.setReceiptUrl(uploadUtil.saveFile(file, "expenses"));
             expense = expenseService.save(expense);
         }
-        
+
         return ResponseEntity.ok(expenseMapper.toDto(expense));
     }
+
     @PutMapping(path = "/{id}", consumes = "multipart/form-data")
     public ResponseEntity<ExpenseDto> updateExpense(
             @PathVariable Long id,
             @RequestPart("expense") String expenseJson,
             @RequestPart(value = "file", required = false) MultipartFile file
     ) throws IOException {
-        
+
         ExpenseDto dto = objectMapper.readValue(expenseJson, ExpenseDto.class);
+        validateByType(dto);
+
         Expense expense = expenseMapper.toEntity(dto);
+        applyClientFields(expense, dto);
         Expense updated = expenseService.update(id, expense);
-        
-        if(file != null && !file.isEmpty()){
-            String receiptUrl = uploadUtil.saveFile(file, "expenses");
-            updated.setReceiptUrl(receiptUrl);
+
+        if (file != null && !file.isEmpty()) {
+            updated.setReceiptUrl(uploadUtil.saveFile(file, "expenses"));
             updated = expenseService.save(updated);
         }
-        
+
         return ResponseEntity.ok(expenseMapper.toDto(updated));
     }
 
@@ -178,48 +239,29 @@ public class ExpenseController {
             @PathVariable Long id,
             @RequestParam("file") MultipartFile file
     ) throws IOException {
-        if (file == null || file.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
-        }
+        if (file == null || file.isEmpty()) return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
 
-        // Create upload directory if it doesn't exist
         String uploadDir = "C:/uploads/expenses/";
         Path uploadPath = Paths.get(uploadDir);
-        
-        if (!Files.exists(uploadPath)) {
-            Files.createDirectories(uploadPath);
-        }
+        if (!Files.exists(uploadPath)) Files.createDirectories(uploadPath);
 
-        // Generate filename using timestamp (no UUID)
         long timestamp = System.currentTimeMillis();
         String originalFilename = file.getOriginalFilename();
-        String extension = originalFilename != null && originalFilename.contains(".") 
-            ? originalFilename.substring(originalFilename.lastIndexOf(".")) 
-            : "";
-        String fileName = timestamp + "_" + id + extension;
-        
-        Path filePath = uploadPath.resolve(fileName);
-        
-        // Save file
+        String extension = (originalFilename != null && originalFilename.contains("."))
+                ? originalFilename.substring(originalFilename.lastIndexOf(".")) : "";
+        Path filePath = uploadPath.resolve(timestamp + "_" + id + extension);
         Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-        
-        // Store relative URL in database
-        String receiptUrl = "/uploads/expenses/" + fileName;
 
         Expense expense = expenseService.getById(id);
-        expense.setReceiptUrl(receiptUrl);
-        Expense saved = expenseService.save(expense);
-        return ResponseEntity.ok(expenseMapper.toDto(saved));
+        expense.setReceiptUrl("/uploads/expenses/" + filePath.getFileName());
+        return ResponseEntity.ok(expenseMapper.toDto(expenseService.save(expense)));
     }
 
     @PostMapping("/{id}/approve")
     public ResponseEntity<ExpenseDto> approveExpense(@PathVariable Long id) {
         Expense expense = expenseService.getById(id);
         expense.setStatus("APPROVED");
-        // You might want to set approvedBy from current user context
-        // expense.setApprovedBy(getCurrentUserId());
-        Expense saved = expenseService.save(expense);
-        return ResponseEntity.ok(expenseMapper.toDto(saved));
+        return ResponseEntity.ok(expenseMapper.toDto(expenseService.save(expense)));
     }
 
     @PostMapping("/{id}/reject")
@@ -231,24 +273,38 @@ public class ExpenseController {
         if (body != null && body.get("reason") != null && !body.get("reason").isBlank()) {
             expense.setRejectionReason(body.get("reason"));
         }
-        Expense saved = expenseService.save(expense);
-        return ResponseEntity.ok(expenseMapper.toDto(saved));
+        return ResponseEntity.ok(expenseMapper.toDto(expenseService.save(expense)));
     }
 
     @PostMapping("/{id}/mark-paid")
     public ResponseEntity<ExpenseDto> markAsPaid(@PathVariable Long id) {
         Expense expense = expenseService.getById(id);
         expense.setStatus("PAID");
-        // expense.setApprovedBy(getCurrentUserId());
-        Expense saved = expenseService.save(expense);
-        return ResponseEntity.ok(expenseMapper.toDto(saved));
+        return ResponseEntity.ok(expenseMapper.toDto(expenseService.save(expense)));
     }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteExpense(@PathVariable Long id) {
         expenseService.delete(id);
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * Bulk upload — template columns:
+     * 0: Employee Name
+     * 1: Deal Code  (PPE1, PPO2 — PRIMARY; resolves dealId, clientId, dept, stage from deal at time of upload)
+     * 2: Client Name (fallback if no dealCode)
+     * 3: Department  (PPE / PPO / ACCOUNT / HLC — fallback)
+     * 4: Stage Code  (must match department — fallback)
+     * 5: Category
+     * 6: Description
+     * 7: Amount
+     * 8: Expense Date (YYYY-MM-DD)
+     * 9: Status
+     *
+     * IMPORTANT: Uses expenseRepository.save() directly to preserve dept/stage set from deal.
+     * Do NOT route through expenseService.save() which re-derives from current deal state.
+     */
     @PostMapping("/bulk-upload")
     public ResponseEntity<java.util.Map<String, Object>> bulkUpload(
             @RequestParam("file") MultipartFile file
@@ -262,49 +318,115 @@ public class ExpenseController {
             for (int i = 1; i <= sheet.getLastRowNum(); i++) {
                 org.apache.poi.ss.usermodel.Row row = sheet.getRow(i);
                 if (row == null) continue;
-                // Skip completely empty rows
                 boolean allEmpty = true;
-                for (int c = 0; c <= 7; c++) {
+                for (int c = 0; c <= 9; c++) {
                     if (!getCellStr(row, c).isEmpty()) { allEmpty = false; break; }
                 }
                 if (allEmpty) continue;
                 try {
-                    Expense e = new Expense();
+                    com.company.attendance.entity.Expense e = new com.company.attendance.entity.Expense();
                     e.setEmployeeName(getCellStr(row, 0));
-                    e.setClientName(getCellStr(row, 1));
-                    e.setDepartmentName(getCellStr(row, 2));
-                    e.setCategory(getCellStr(row, 3));
-                    e.setDescription(getCellStr(row, 4));
-                    // Amount
-                    String amtStr = getCellStr(row, 5);
-                    if (amtStr != null && !amtStr.isEmpty()) {
-                        // Remove trailing .0 from numeric cells
-                        amtStr = amtStr.replaceAll("\\.0$", "");
-                        e.setAmount(Double.parseDouble(amtStr));
+
+                    // Col 1: Deal Code — PRIMARY source of truth
+                    String dealCodeStr = getCellStr(row, 1).trim();
+                    log.info("[BULK ROW {}] employeeName='{}' dealCode='{}'", i + 1, getCellStr(row, 0), dealCodeStr);
+                    if (!dealCodeStr.isBlank()) {
+                        var dealOpt = dealRepository.findByDealCodeIgnoreCase(dealCodeStr);
+                        if (dealOpt.isEmpty()) {
+                            log.warn("[BULK ROW {}] Deal code NOT FOUND in DB: '{}'", i + 1, dealCodeStr);
+                            errors.add("Row " + (i + 1) + ": Deal code not found: '" + dealCodeStr + "'");
+                            continue;
+                        }
+                        var deal = dealOpt.get();
+                        log.info("[BULK ROW {}] Deal found: id={} code='{}' dept='{}' dealStage='{}' clientId={}",
+                            i + 1, deal.getId(), deal.getDealCode(), deal.getDepartment(),
+                            deal.getStageCode(), deal.getClientId());
+                        e.setDealId(deal.getId());
+                        e.setClientId(deal.getClientId());
+                        // Excel col 3 dept takes priority over deal's DB department
+                        String excelDept = getCellStr(row, 3).trim();
+                        String resolvedDept = !excelDept.isBlank() ? excelDept : deal.getDepartment();
+                        e.setDepartmentName(resolvedDept);
+                        log.info("[BULK ROW {}] Dept: excel='{}' deal='{}' resolved='{}'",
+                            i + 1, excelDept, deal.getDepartment(), resolvedDept);
+                        // Excel col 4 stage takes priority over deal's current stage
+                        String excelStage = getCellStr(row, 4).trim();
+                        if (!excelStage.isBlank()) {
+                            e.setStageCode(excelStage);
+                            log.info("[BULK ROW {}] Stage from Excel: '{}'", i + 1, excelStage);
+                        } else {
+                            e.setStageCode(deal.getStageCode());
+                            log.info("[BULK ROW {}] Stage from Deal (fallback): '{}'", i + 1, deal.getStageCode());
+                        }
+                        var cl=clientRepository.findById(deal.getClientId()).orElse(null); if(cl!=null){e.setClientName(cl.getName()); log.info("[BULK ROW {}] Client: id={} name={}",i+1,cl.getId(),cl.getName());}
+
+
+
+
+
+                    } else {
+                        // Col 2: Client Name fallback
+                        String clientName = getCellStr(row, 2).trim();
+                        if (!clientName.isBlank()) {
+                            var clientOpt = clientRepository.findByName(clientName);
+                            if (clientOpt.isEmpty()) {
+                                errors.add("Row " + (i + 1) + ": Client not found: '" + clientName + "'");
+                                continue;
+                            }
+                            e.setClientId(clientOpt.get().getId());
+                            e.setClientName(clientName);
+                        }
+                        // Col 3: Department, Col 4: Stage (fallback when no deal code)
+                        String dept = getCellStr(row, 3).trim();
+                        String stageCode = getCellStr(row, 4).trim();
+                        if (!dept.isBlank()) {
+                            if (stageCode.isBlank()) {
+                                errors.add("Row " + (i + 1) + ": Stage code required when department provided");
+                                continue;
+                            }
+                            boolean valid = stageMasterRepository
+                                    .findByDepartmentOrderByStageOrder(dept)
+                                    .stream()
+                                    .anyMatch(s -> s.getStageCode().equalsIgnoreCase(stageCode));
+                            if (!valid) {
+                                errors.add("Row " + (i + 1) + ": Stage '" + stageCode + "' invalid for dept '" + dept + "'");
+                                continue;
+                            }
+                            e.setDepartmentName(dept);
+                            e.setStageCode(stageCode);
+                        }
+                        e.setExpenseType("DEAL");
                     }
-                    // Date - handle both string "YYYY-MM-DD" and Excel numeric date
-                    org.apache.poi.ss.usermodel.Cell dateCell = row.getCell(6);
+
+                    e.setCategory(getCellStr(row, 5));
+                    e.setDescription(getCellStr(row, 6));
+
+                    String amtStr = getCellStr(row, 7).replaceAll("\\.0$", "");
+                    if (!amtStr.isEmpty()) e.setAmount(Double.parseDouble(amtStr));
+
+                    org.apache.poi.ss.usermodel.Cell dateCell = row.getCell(8);
                     if (dateCell != null) {
                         if (dateCell.getCellType() == org.apache.poi.ss.usermodel.CellType.NUMERIC
                                 && org.apache.poi.ss.usermodel.DateUtil.isCellDateFormatted(dateCell)) {
-                            // Excel stores dates as numeric - convert directly
                             java.util.Date d = dateCell.getDateCellValue();
                             e.setExpenseDate(d.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate());
                         } else {
-                            String dateStr = getCellStr(row, 6);
-                            if (dateStr != null && !dateStr.isEmpty()) {
-                                // Remove trailing .0 if numeric was read as string
-                                dateStr = dateStr.replaceAll("\\.0$", "");
-                                e.setExpenseDate(java.time.LocalDate.parse(dateStr));
-                            }
+                            String dateStr = getCellStr(row, 8).replaceAll("\\.0$", "");
+                            if (!dateStr.isEmpty()) e.setExpenseDate(LocalDate.parse(dateStr));
                         }
                     }
-                    // Status
-                    String status = getCellStr(row, 7);
-                    e.setStatus(status != null && !status.isEmpty() ? status.toUpperCase() : "PENDING");
-                    expenseService.save(e);
+                    if (e.getExpenseDate() == null) e.setExpenseDate(LocalDate.now());
+
+                    String status = getCellStr(row, 9).trim();
+                    e.setStatus(status.isEmpty() ? "PENDING" : status.toUpperCase());
+
+                    // Save directly — bypass expenseService.save() to preserve dept/stage from deal snapshot
+                    expenseRepository.save(e);
+                    log.info("[BULK ROW {}] SAVED: dealId={} clientId={} dept='{}' stage='{}' amount={}",
+                        i + 1, e.getDealId(), e.getClientId(), e.getDepartmentName(), e.getStageCode(), e.getAmount());
                     count++;
                 } catch (Exception ex) {
+                    log.error("[BULK ROW {}] ERROR: {}", i + 1, ex.getMessage(), ex);
                     errors.add("Row " + (i + 1) + ": " + ex.getMessage());
                 }
             }
@@ -326,13 +448,11 @@ public class ExpenseController {
         return switch (cell.getCellType()) {
             case STRING -> cell.getStringCellValue().trim();
             case NUMERIC -> {
-                // Check if it's a date cell
                 if (org.apache.poi.ss.usermodel.DateUtil.isCellDateFormatted(cell)) {
                     java.util.Date d = cell.getDateCellValue();
                     yield d.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate().toString();
                 }
                 double val = cell.getNumericCellValue();
-                // Return as integer string if it's a whole number
                 yield val == Math.floor(val) ? String.valueOf((long) val) : String.valueOf(val);
             }
             case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
@@ -340,4 +460,3 @@ public class ExpenseController {
         };
     }
 }
-

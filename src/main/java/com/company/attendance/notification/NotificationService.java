@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 
@@ -21,6 +23,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Slf4j
 public class NotificationService {
+    private static final ZoneId APP_ZONE = ZoneId.of("Asia/Kolkata");
 
     private final AppNotificationRepository notificationRepository;
     private final EmployeeRepository employeeRepository;
@@ -171,7 +174,7 @@ public class NotificationService {
                         .refType(type)
                         .refId(refId)
                         .channel("WEB")
-                        .createdAt(LocalDateTime.now())
+                        .createdAt(LocalDateTime.now(APP_ZONE))
                         .build();
                 notificationRepository.save(notification);
 
@@ -189,7 +192,7 @@ public class NotificationService {
                 "type", type,
                 "refId", refId != null ? refId : 0L,
                 "role", role,
-                "timestamp", LocalDateTime.now().toString()
+                "timestamp", OffsetDateTime.now(APP_ZONE).toString()
             ));
 
             log.info("✅ sendRoleBasedNotification complete: role={}, {} employees notified", role, employees.size());
@@ -224,7 +227,7 @@ public class NotificationService {
                     .refType(type) // Use the type parameter dynamically
                     .refId(refId)
                     .channel("WEB")
-                    .createdAt(LocalDateTime.now())
+                    .createdAt(LocalDateTime.now(APP_ZONE))
                     .build();
             
             notificationRepository.save(notification);
@@ -244,7 +247,7 @@ public class NotificationService {
                 "type", type,
                 "refId", refId,
                 "department", department,
-                "timestamp", LocalDateTime.now().toString()
+                "timestamp", OffsetDateTime.now(APP_ZONE).toString()
             ));
             
             log.info("✅ [DEPARTMENT NOTIFICATION] Department notification sent: {} - {} department ({} employees notified via Firebase)", 
@@ -277,7 +280,7 @@ public class NotificationService {
                     .refType(type)
                     .refId(refId)
                     .channel("WEB")
-                    .createdAt(LocalDateTime.now())
+                    .createdAt(LocalDateTime.now(APP_ZONE))
                     .build();
             notificationRepository.save(notification);
 
@@ -291,7 +294,7 @@ public class NotificationService {
                 "body", message,
                 "type", type,
                 "refId", refId != null ? refId : 0L,
-                "timestamp", LocalDateTime.now().toString()
+                "timestamp", OffsetDateTime.now(APP_ZONE).toString()
             ));
 
             log.info("✅ sendUserNotification sent to userId={}", userId);
