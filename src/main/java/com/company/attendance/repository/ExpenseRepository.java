@@ -36,6 +36,18 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
     @Query("SELECT e FROM Expense e LEFT JOIN FETCH e.employee LEFT JOIN FETCH e.employee.tl WHERE e.dealId = :dealId")
     List<Expense> findByDealId(@Param("dealId") Long dealId);
 
+    // Find expenses by clientName (for re-linking after Excel re-import)
+    @Query("SELECT e FROM Expense e WHERE LOWER(TRIM(e.clientName)) = LOWER(TRIM(:clientName))")
+    List<Expense> findByClientNameIgnoreCase(@Param("clientName") String clientName);
+
+    // Find expenses by clientName AND department (for department-wise re-linking)
+    @Query("SELECT e FROM Expense e WHERE LOWER(TRIM(e.clientName)) = LOWER(TRIM(:clientName)) AND e.departmentName = :department")
+    List<Expense> findByClientNameAndDepartment(@Param("clientName") String clientName, @Param("department") String department);
+
+    // Batch-load expenses for multiple clients (for /clients/with-deals calculatedValue)
+    @Query("SELECT e FROM Expense e WHERE e.clientId IN :clientIds")
+    List<Expense> findAllByClientIdIn(@Param("clientIds") List<Long> clientIds);
+
     void deleteByEmployeeId(Long employeeId);
 }
 

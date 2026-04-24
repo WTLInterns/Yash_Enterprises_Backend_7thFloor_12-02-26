@@ -14,6 +14,7 @@ import com.company.attendance.entity.Client;
 import com.company.attendance.entity.CustomerAddress;
 import com.company.attendance.repository.ClientRepository;
 import com.company.attendance.repository.CustomerAddressRepository;
+import com.company.attendance.repository.ExpenseRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,6 +43,7 @@ public class DealExcelImportService {
     private final DealProductRepository  dealProductRepository;
     private final CustomerAddressRepository customerAddressRepository;
     private final StageMasterRepository  stageMasterRepository;
+    private final ExpenseRepository      expenseRepository;
 
     // ── Services (only for deal code generation) ─────────────────────────────
     private final DealService dealService;
@@ -210,6 +212,9 @@ public class DealExcelImportService {
 
         deal = dealRepository.save(deal);
         log.info("✅ Deal created: id={}, code={}, client={}", deal.getId(), deal.getDealCode(), customerName);
+
+        // ── Re-link existing expenses by client name + department ──────────────
+        relinkExpenses(customerName.trim(), department, client.getId(), deal.getId());
 
         // ── 8. CREATE / FIND PRODUCT ──────────────────────────────────────────
         Product product = findOrCreateProduct(productName.trim(), ownerUserId, productCache);
@@ -406,10 +411,34 @@ public class DealExcelImportService {
     // ADDRESS
     // ─────────────────────────────────────────────────────────────────────────
 
+    private void relinkExpenses(String clientName, String department, Long newClientId, Long newDealId) {
+        try {
+            List<com.company.attendance.entity.Expense> orphaned =
+                expenseRepository.findByClientNameAndDepartment(clientName, department);
+            if (orphaned.isEmpty()) return;
+            int relinked = 0;
+            for (com.company.attendance.entity.Expense exp : orphaned) {
+                boolean needsUpdate = false;
+                if (exp.getClientId() == null || !clientRepository.existsById(exp.getClientId())) {
+                    exp.setClientId(newClientId);
+                    needsUpdate = true;
+                }
+                if (exp.getDealId() == null || !dealRepository.existsById(exp.getDealId())) {
+                    exp.setDealId(newDealId);
+                    needsUpdate = true;
+                }
+                if (needsUpdate) { expenseRepository.save(exp); relinked++; }
+            }
+            if (relinked > 0)
+                log.info("\u2705 Re-linked {} expense(s) for client='{}' dept='{}' -> clientId={} dealId={}",
+                    relinked, clientName, department, newClientId, newDealId);
+        } catch (Exception e) {
+            log.warn("\u26a0\ufe0f Failed to re-link expenses for client='{}': {}", clientName, e.getMessage());
+        }
+    }
+
     private void saveAddress(Long clientId, String village, String taluka,
                              String district, CustomerAddress.AddressType type) {
-        // Only create address if one doesn't already exist for this client+type
-        // Never overwrite existing address data from a previous upload
         boolean exists = customerAddressRepository
             .findByClientIdAndAddressType(clientId, type).isPresent();
         if (exists) return;
@@ -418,8 +447,10 @@ public class DealExcelImportService {
         addr.setClientId(clientId);
         addr.setAddressType(type);
         addr.setAddressLine(blank(village)  ? "N/A" : village.trim());
-        addr.setCity(blank(taluka)          ? "N/A" : taluka.trim());
-        addr.setState(blank(district)       ? "N/A" : district.trim());
+        addr.setCity(blank(district)        ? null  : district.trim());   // district = city-level in Maharashtra
+        addr.setState(blank(district)       ? "Maharashtra" : "Maharashtra"); // always Maharashtra
+        addr.setTaluka(blank(taluka)        ? null  : taluka.trim());
+        addr.setDistrict(blank(district)    ? null  : district.trim());
         addr.setCountry("India");
         customerAddressRepository.save(addr);
     }

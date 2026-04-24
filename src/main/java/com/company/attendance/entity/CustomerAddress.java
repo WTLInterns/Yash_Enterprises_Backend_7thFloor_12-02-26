@@ -38,9 +38,15 @@ public class CustomerAddress {
     
     @Column(name = "pincode")
     private String pincode;
-    
+
+    @Column(name = "taluka")
+    private String taluka;
+
+    @Column(name = "district")
+    private String district;
+
     @Column(name = "country")
-    private String country;      // ✅ ADD COUNTRY
+    private String country;
     
     @Column(name = "latitude")
     private Double latitude;
