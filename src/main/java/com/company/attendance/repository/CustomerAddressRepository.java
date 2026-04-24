@@ -14,6 +14,9 @@ import java.util.Optional;
 public interface CustomerAddressRepository extends JpaRepository<CustomerAddress, Long> {
     
     List<CustomerAddress> findByClientIdOrderByAddressType(Long clientId);
+
+    @Query("SELECT ca FROM CustomerAddress ca WHERE ca.clientId IN :clientIds")
+    List<CustomerAddress> findAllByClientIdIn(@Param("clientIds") List<Long> clientIds);
     
     Optional<CustomerAddress> findByClientIdAndAddressType(Long clientId, CustomerAddress.AddressType addressType);
     

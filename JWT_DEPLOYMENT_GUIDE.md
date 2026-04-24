@@ -23,7 +23,7 @@ mvn spring-boot:run
 ### 2️⃣ TEST LOGIN ENDPOINT
 ```bash
 # Test JWT login
-curl -X POST "https://api.yashrajent.com/api/auth/login" \
+curl -X POST "http://localhost:8080/api/auth/login" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "your-email@company.com",
@@ -48,11 +48,11 @@ curl -X POST "https://api.yashrajent.com/api/auth/login" \
 TOKEN="eyJhbGciOiJIUzI1NiJ9..."
 
 # Test tasks endpoint (should work now)
-curl -X GET "https://api.yashrajent.com/api/tasks" \
+curl -X GET "http://localhost:8080/api/tasks" \
   -H "Authorization: Bearer $TOKEN"
 
 # Test location endpoint (should work now)
-curl -X POST "https://api.yashrajent.com/api/employee-locations/2/location" \
+curl -X POST "http://localhost:8080/api/employee-locations/2/location" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"latitude": 19.0760, "longitude": 72.8777}'
@@ -61,7 +61,7 @@ curl -X POST "https://api.yashrajent.com/api/employee-locations/2/location" \
 ### 4️⃣ TEST DEBUG ENDPOINT
 ```bash
 # Check authentication details
-curl -X GET "https://api.yashrajent.com/api/debug/role" \
+curl -X GET "http://localhost:8080/api/debug/role" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -83,7 +83,7 @@ curl -X GET "https://api.yashrajent.com/api/debug/role" \
 ```javascript
 // Update API calls to include JWT token
 const api = axios.create({
-  baseURL: 'https://api.yashrajent.com/api',
+  baseURL: 'http://localhost:8080/api',
   headers: {
     'Authorization': `Bearer ${localStorage.getItem('token')}`
   }
@@ -99,7 +99,7 @@ localStorage.setItem('token', loginResponse.data.token);
 // Add JWT token to all API calls
 final token = prefs.getString('jwt_token');
 final response = await http.get(
-  Uri.parse('https://api.yashrajent.com/api/tasks'),
+  Uri.parse('http://localhost:8080/api/tasks'),
   headers: {
     'Authorization': 'Bearer $token',
     'Content-Type': 'application/json',

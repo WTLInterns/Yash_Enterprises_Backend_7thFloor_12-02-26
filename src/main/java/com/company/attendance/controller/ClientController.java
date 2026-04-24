@@ -1,14 +1,19 @@
 package com.company.attendance.controller;
 
+import com.company.attendance.crm.dto.ClientWithDealsDto;
 import com.company.attendance.crm.dto.DealDetailDTO;
+import com.company.attendance.crm.entity.Bank;
 import com.company.attendance.crm.entity.Deal;
-import com.company.attendance.entity.Client;
-import com.company.attendance.crm.repository.DealRepository;
 import com.company.attendance.crm.mapper.CrmMapper;
+import com.company.attendance.crm.repository.BankRepository;
+import com.company.attendance.crm.repository.DealRepository;
 import com.company.attendance.crm.service.AuditService;
-import com.company.attendance.dto.ClientDto;
-import com.company.attendance.service.ClientService;
+import com.company.attendance.entity.Client;
+import com.company.attendance.entity.CustomerAddress;
+import com.company.attendance.repository.CustomerAddressRepository;
+import com.company.attendance.repository.ExpenseRepository;
 import com.company.attendance.repository.EmployeeRepository;
+import com.company.attendance.service.ClientService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,7 +24,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
-import java.util.List;
+import org.springframework.transaction.annotation.Transactional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
@@ -34,6 +40,158 @@ public class ClientController {
     private final CrmMapper crmMapper;
     private final AuditService auditService;
     private final EmployeeRepository employeeRepository;
+    private final CustomerAddressRepository customerAddressRepository;
+    private final BankRepository bankRepository;
+    private final ExpenseRepository expenseRepository;
+
+    /**
+     * Single endpoint: returns all clients + all their deals + all addresses.
+     * Replaces 3 separate API calls (clients + deals + addresses) on the frontend.
+     * Uses batch queries — no N+1.
+     */
+    @GetMapping("/with-deals")
+    @Transactional(readOnly = true)
+    public ResponseEntity<List<ClientWithDealsDto>> listClientsWithDeals() {
+        try {
+            // 1. All active clients
+            List<Client> clients = clientService.getAllClientEntities().stream()
+                .filter(c -> c.getIsActive() == null || c.getIsActive())
+                .collect(Collectors.toList());
+
+            if (clients.isEmpty()) return ResponseEntity.ok(List.of());
+
+            List<Long> clientIds = clients.stream().map(Client::getId).toList();
+
+            // 2. Batch-load owner names
+            List<Long> ownerIds = clients.stream().map(Client::getOwnerId)
+                .filter(Objects::nonNull).distinct().toList();
+            Map<Long, String> ownerNames = new HashMap<>();
+            if (!ownerIds.isEmpty()) {
+                employeeRepository.findAllById(ownerIds)
+                    .forEach(e -> ownerNames.put(e.getId(), e.getFullName()));
+            }
+
+            // 3. Batch-load ALL deals with products eagerly fetched (avoids LazyInitializationException)
+            List<Deal> allDeals = dealRepository.findAllWithClientAndProductsFull().stream()
+                .filter(d -> clientIds.contains(d.getClientId()))
+                .collect(Collectors.toList());
+
+            // 4. Batch-load ALL banks referenced by deals
+            List<Long> bankIds = allDeals.stream().map(Deal::getBankId)
+                .filter(Objects::nonNull).distinct().toList();
+            Map<Long, Bank> banksMap = new HashMap<>();
+            if (!bankIds.isEmpty()) {
+                bankRepository.findAllById(bankIds).forEach(b -> banksMap.put(b.getId(), b));
+            }
+
+            // 5. Batch-load ALL addresses
+            List<CustomerAddress> allAddresses = customerAddressRepository.findAllByClientIdIn(clientIds);
+            Map<Long, List<CustomerAddress>> addressesByClient = allAddresses.stream()
+                .collect(Collectors.groupingBy(CustomerAddress::getClientId));
+
+            // 5b. Batch-load ALL expenses by clientId for calculatedValue
+            List<com.company.attendance.entity.Expense> allExpenses =
+                expenseRepository.findAllByClientIdIn(clientIds);
+            Map<Long, java.math.BigDecimal> expenseTotalByDeal = new HashMap<>();
+            allExpenses.forEach(e -> {
+                if (e.getDealId() != null && e.getAmount() != null) {
+                    expenseTotalByDeal.merge(e.getDealId(),
+                        java.math.BigDecimal.valueOf(e.getAmount()),
+                        java.math.BigDecimal::add);
+                }
+            });
+
+            // 6. Group deals by clientId
+            Map<Long, List<Deal>> dealsByClient = allDeals.stream()
+                .collect(Collectors.groupingBy(Deal::getClientId));
+
+            // 7. Assemble DTOs
+            List<ClientWithDealsDto> result = clients.stream().map(c -> {
+                ClientWithDealsDto dto = new ClientWithDealsDto();
+                dto.setId(c.getId());
+                dto.setName(c.getName());
+                dto.setEmail(c.getEmail());
+                dto.setContactPhone(c.getContactPhone());
+                dto.setContactName(c.getContactName());
+                dto.setContactNumber(c.getContactNumber());
+                dto.setOwnerId(c.getOwnerId());
+                dto.setOwnerName(c.getOwnerId() != null ? ownerNames.get(c.getOwnerId()) : null);
+                dto.setCreatedAt(c.getCreatedAt());
+                dto.setUpdatedAt(c.getUpdatedAt());
+
+                // Addresses
+                List<CustomerAddress> addrs = addressesByClient.getOrDefault(c.getId(), List.of());
+                dto.setAddresses(addrs.stream().map(a -> {
+                    ClientWithDealsDto.AddressDto ad = new ClientWithDealsDto.AddressDto();
+                    ad.setId(a.getId());
+                    ad.setAddressType(a.getAddressType() != null ? a.getAddressType().name() : null);
+                    ad.setAddressLine(a.getAddressLine());
+                    ad.setCity(a.getCity());
+                    ad.setState(a.getState());
+                    ad.setPincode(a.getPincode());
+                    ad.setTaluka(a.getTaluka());
+                    ad.setDistrict(a.getDistrict());
+                    ad.setLatitude(a.getLatitude());
+                    ad.setLongitude(a.getLongitude());
+                    ad.setIsPrimary(a.getIsPrimary());
+                    return ad;
+                }).collect(Collectors.toList()));
+
+                // Deals
+                List<Deal> clientDeals = dealsByClient.getOrDefault(c.getId(), List.of());
+                dto.setDeals(clientDeals.stream().map(d -> {
+                    ClientWithDealsDto.DealSummaryDto dd = new ClientWithDealsDto.DealSummaryDto();
+                    dd.setId(d.getId());
+                    dd.setDealCode(d.getDealCode());
+                    dd.setStageCode(d.getStageCode());
+                    dd.setDepartment(d.getDepartment());
+                    dd.setBankId(d.getBankId());
+                    dd.setBranchName(d.getBranchName());
+                    dd.setValueAmount(d.getValueAmount());
+                    // calculatedValue = sum(products) - sum(expenses), same as /customers/[id] finalAmount
+                    java.math.BigDecimal productTotal = java.math.BigDecimal.ZERO;
+                    if (d.getDealProducts() != null) {
+                        for (var dp : d.getDealProducts()) {
+                            if (dp.getTotal() != null) productTotal = productTotal.add(dp.getTotal());
+                        }
+                    }
+                    java.math.BigDecimal expenseTotal = expenseTotalByDeal.getOrDefault(d.getId(), java.math.BigDecimal.ZERO);
+                    java.math.BigDecimal computed = productTotal.subtract(expenseTotal);
+                    // Use computed if products exist, else fall back to valueAmount
+                    dd.setCalculatedValue(productTotal.compareTo(java.math.BigDecimal.ZERO) > 0
+                        ? computed
+                        : d.getValueAmount());
+                    dd.setClosingDate(d.getClosingDate());
+                    dd.setDescription(d.getDescription());
+                    dd.setMovedToApproval(d.getMovedToApproval());
+                    dd.setCreatedAt(d.getCreatedAt());
+                    dd.setUpdatedAt(d.getUpdatedAt());
+                    // Bank details
+                    Bank bank = d.getBankId() != null ? banksMap.get(d.getBankId()) : null;
+                    dd.setBankName(d.getRelatedBankName() != null ? d.getRelatedBankName() : (bank != null ? bank.getName() : null));
+                    dd.setTaluka(bank != null ? bank.getTaluka() : null);
+                    dd.setDistrict(bank != null ? bank.getDistrict() : null);
+                    // Product names
+                    if (d.getDealProducts() != null) {
+                        dd.setProductNames(d.getDealProducts().stream()
+                            .filter(dp -> dp.getProduct() != null)
+                            .map(dp -> dp.getProduct().getName())
+                            .collect(Collectors.toList()));
+                    } else {
+                        dd.setProductNames(List.of());
+                    }
+                    return dd;
+                }).collect(Collectors.toList()));
+
+                return dto;
+            }).collect(Collectors.toList());
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("Error in /clients/with-deals: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
 
     @GetMapping
     public ResponseEntity<List<com.company.attendance.crm.dto.ClientDto>> listClients(

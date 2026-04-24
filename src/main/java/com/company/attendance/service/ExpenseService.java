@@ -90,15 +90,23 @@ public class ExpenseService {
 
     public List<Expense> findAll() {
         List<Expense> expenses = expenseRepository.findAllWithEmployee();
+        // Batch-load all deals referenced by expenses to resolve current clientId
+        List<Long> dealIds = expenses.stream()
+            .map(Expense::getDealId).filter(Objects::nonNull).distinct().toList();
+        java.util.Map<Long, com.company.attendance.crm.entity.Deal> dealsById = new java.util.HashMap<>();
+        if (!dealIds.isEmpty()) {
+            dealRepository.findAllById(dealIds).forEach(d -> dealsById.put(d.getId(), d));
+        }
         for (Expense expense : expenses) {
             if (expense.getEmployee() != null) {
-                // Always refresh employeeName from employee record
                 expense.setEmployeeName(
                     expense.getEmployee().getFirstName() + " " + expense.getEmployee().getLastName());
-                // departmentName: NEVER overwrite — deal dept always wins
-                // Only set if completely missing AND no deal linked
-                if (expense.getDepartmentName() == null && expense.getDealId() == null) {
-                    // leave null — no employee dept fallback
+            }
+            // Always resolve clientId from deal (fixes stale clientId from deleted/re-imported clients)
+            if (expense.getDealId() != null) {
+                com.company.attendance.crm.entity.Deal deal = dealsById.get(expense.getDealId());
+                if (deal != null && deal.getClientId() != null) {
+                    expense.setClientId(deal.getClientId());
                 }
             }
         }
