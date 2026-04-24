@@ -2,17 +2,22 @@ package com.company.attendance.controller;
 
 import com.company.attendance.entity.CustomerAddress;
 import com.company.attendance.repository.CustomerAddressRepository;
+import com.company.attendance.repository.TaskRepository;
 import com.company.attendance.service.GeocodingService;
 import com.company.attendance.exception.GeocodingException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * Customer Address Controller with multi-address support
@@ -26,6 +31,7 @@ public class CustomerAddressController {
 
     private final CustomerAddressRepository customerAddressRepository;
     private final GeocodingService geocodingService;
+    private final TaskRepository taskRepository;
 
     /**
      * Get ALL addresses for ALL customers in one call — used by the customers list page
@@ -81,22 +87,80 @@ public class CustomerAddressController {
                     "error", "Primary address must have latitude and longitude"
                 ));
             }
-            
-            // Delete existing addresses first (UPSERT pattern)
-            customerAddressRepository.deleteByClientId(clientId);
-            
-            // Save all new addresses
-            addresses.forEach(addr -> {
+
+            List<CustomerAddress> existing = customerAddressRepository.findByClientIdOrderByAddressType(clientId);
+            Set<Long> existingIds = new HashSet<>();
+            for (CustomerAddress e : existing) {
+                if (e.getId() != null) existingIds.add(e.getId());
+            }
+
+            Set<Long> incomingIds = new HashSet<>();
+            for (CustomerAddress addr : addresses) {
+                if (addr.getId() != null) incomingIds.add(addr.getId());
+            }
+
+            // Delete removed addresses only if not referenced by tasks
+            for (CustomerAddress e : existing) {
+                Long existingId = e.getId();
+                if (existingId == null) continue;
+
+                if (!incomingIds.contains(existingId)) {
+                    if (taskRepository.existsByCustomerAddressId(existingId)) {
+                        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                            "error", "Cannot remove an address that is referenced by tasks",
+                            "addressId", existingId
+                        ));
+                    }
+                    customerAddressRepository.delete(e);
+                }
+            }
+
+            // Upsert incoming addresses (update if id exists, else insert)
+            for (CustomerAddress addr : addresses) {
                 addr.setClientId(clientId);
-                // Ensure only one is primary
                 if (addr.getAddressType() != CustomerAddress.AddressType.PRIMARY) {
                     addr.setIsPrimary(false);
                 }
-            });
-            
-            List<CustomerAddress> savedAddresses = customerAddressRepository.saveAll(addresses);
+
+                if (addr.getId() != null && existingIds.contains(addr.getId())) {
+                    CustomerAddress db = customerAddressRepository.findById(addr.getId())
+                        .orElseThrow(() -> new RuntimeException("Address not found"));
+
+                    if (!Objects.equals(db.getClientId(), clientId)) {
+                        return ResponseEntity.badRequest().body(Map.of(
+                            "error", "Address does not belong to customer",
+                            "addressId", addr.getId()
+                        ));
+                    }
+
+                    db.setAddressType(addr.getAddressType());
+                    db.setAddressLine(addr.getAddressLine());
+                    db.setCity(addr.getCity());
+                    db.setState(addr.getState());
+                    db.setPincode(addr.getPincode());
+                    db.setTaluka(addr.getTaluka());
+                    db.setDistrict(addr.getDistrict());
+                    db.setCountry(addr.getCountry());
+                    db.setLatitude(addr.getLatitude());
+                    db.setLongitude(addr.getLongitude());
+                    db.setIsPrimary(addr.getIsPrimary());
+
+                    customerAddressRepository.save(db);
+                } else {
+                    addr.setId(null);
+                    customerAddressRepository.save(addr);
+                }
+            }
+
+            List<CustomerAddress> savedAddresses = customerAddressRepository.findByClientIdOrderByAddressType(clientId);
             return ResponseEntity.ok(savedAddresses);
             
+        } catch (DataIntegrityViolationException e) {
+            log.error("Failed to save addresses for customer {} due to data integrity violation: {}", clientId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                "error", "Cannot save addresses due to existing references (tasks/deals/etc)",
+                "details", e.getMostSpecificCause() != null ? e.getMostSpecificCause().getMessage() : e.getMessage()
+            ));
         } catch (Exception e) {
             log.error("Failed to save addresses for customer {}: {}", clientId, e.getMessage(), e);
             return ResponseEntity.internalServerError().body(Map.of("error", "Failed to save addresses"));
@@ -166,10 +230,23 @@ public class CustomerAddressController {
             if (address.getIsPrimary() != null && address.getIsPrimary()) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Cannot delete primary address"));
             }
+
+            if (taskRepository.existsByCustomerAddressId(addressId)) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                    "error", "Cannot delete an address that is referenced by tasks",
+                    "addressId", addressId
+                ));
+            }
             
             customerAddressRepository.delete(address);
             return ResponseEntity.ok(Map.of("success", true));
             
+        } catch (DataIntegrityViolationException e) {
+            log.error("Failed to delete address {} due to data integrity violation: {}", addressId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                "error", "Cannot delete address due to existing references",
+                "addressId", addressId
+            ));
         } catch (Exception e) {
             log.error("Failed to delete address {}: {}", addressId, e.getMessage(), e);
             return ResponseEntity.internalServerError().body(Map.of("error", "Failed to delete address"));

@@ -6,7 +6,6 @@ import com.company.attendance.entity.Employee;
 import com.company.attendance.repository.ClientRepository;
 import com.company.attendance.repository.ExpenseRepository;
 import com.company.attendance.repository.EmployeeRepository;
-import com.company.attendance.repository.ClientRepository;
 import com.company.attendance.crm.repository.DealRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -28,6 +27,7 @@ public class ExpenseService {
     private final ExpenseRepository expenseRepository;
     private final EmployeeRepository employeeRepository;
     private final ClientRepository clientRepository;
+    private final DealRepository dealRepository;
 
     public Expense save(Expense expense) {
         // Debug logging

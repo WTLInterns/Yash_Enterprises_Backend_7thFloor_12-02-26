@@ -249,7 +249,7 @@ public class DealController {
 
   @PutMapping("/{id}")
   public ResponseEntity<DealDto> update(@PathVariable Long id, @RequestBody DealDto dealDto) {
-    Optional<Deal> existing = dealRepository.findById(id);
+    Optional<Deal> existing = dealRepository.findByIdWithRelations(id);
     if (existing.isEmpty()) {
       return ResponseEntity.notFound().build();
     }
@@ -275,7 +275,8 @@ public class DealController {
     deal.setActive(dealDto.getActive());
 
     Deal updated = dealService.update(deal);
-    return ResponseEntity.ok(mapper.toDealDto(updated));
+    Deal hydrated = dealRepository.findByIdWithRelations(updated.getId()).orElse(updated);
+    return ResponseEntity.ok(mapper.toDealDto(hydrated));
   }
 
   @DeleteMapping("/{id}")
