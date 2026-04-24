@@ -1,19 +1,22 @@
 package com.company.attendance.controller;
+
 import com.company.attendance.dto.ExpenseDto;
 import com.company.attendance.entity.Expense;
+import com.company.attendance.crm.repository.DealRepository;
+import com.company.attendance.crm.repository.StageMasterRepository;
 import com.company.attendance.mapper.ExpenseMapper;
+import com.company.attendance.repository.ClientRepository;
 import com.company.attendance.service.ExpenseService;
 import com.company.attendance.crm.service.AuditService;
-import com.company.attendance.crm.repository.StageMasterRepository;
-import com.company.attendance.repository.ClientRepository;
-import com.company.attendance.crm.repository.DealRepository;
-import com.company.attendance.repository.ExpenseRepository;
+import com.company.attendance.util.FileUploadUtil;
 import com.company.attendance.util.UploadUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -27,7 +30,6 @@ import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
-
 @RestController
 @RequestMapping("/api/expenses")
 @RequiredArgsConstructor
@@ -119,17 +121,12 @@ public class ExpenseController {
         }
 
         List<Expense> expenses;
-
-        // dealId filter — used when expense was created from /expenses page with a deal selected
-        if (dealId != null) {
-            expenses = expenseService.findByDealId(dealId);
-        } else if (clientId != null) {
-            // clientId filter — used by /customers/[id] page
-            expenses = expenseService.findByClientId(clientId);
-        } else if (userRoleHeader != null) {
+        
+        // Role-based filtering
+        if (userRoleHeader != null) {
             String role = userRoleHeader;
             String department = userDepartmentHeader;
-
+            
             if (role.equals("ADMIN") || role.equals("MANAGER") || "ACCOUNT".equals(department)) {
                 expenses = (employeeId != null || status != null || startDate != null || endDate != null)
                         ? expenseService.findFiltered(employeeId, status, startDate, endDate)
@@ -148,7 +145,15 @@ public class ExpenseController {
                     ? expenseService.findFiltered(employeeId, status, startDate, endDate)
                     : expenseService.findAll();
         }
-
+        
+        var dtos = expenses.stream().map(expenseMapper::toDto).collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
+    }
+    
+    // 🔥 NEW: Get expenses by clientId for CRM integration
+    @GetMapping(params = "clientId")
+    public ResponseEntity<List<ExpenseDto>> getExpensesByClient(@RequestParam Long clientId) {
+        List<Expense> expenses = expenseService.findByClientId(clientId);
         var dtos = expenses.stream().map(expenseMapper::toDto).collect(Collectors.toList());
         return ResponseEntity.ok(dtos);
     }
@@ -160,77 +165,134 @@ public class ExpenseController {
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
-
     @PostMapping(consumes = "multipart/form-data")
     public ResponseEntity<ExpenseDto> createExpense(
+            @Valid @RequestBody ExpenseDto dto,
+            @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
+            @RequestHeader(value = "X-User-Role", required = false) String userRoleHeader,
+            @RequestHeader(value = "X-User-Department", required = false) String userDepartmentHeader
+    ) {
+        try {
+            // Security fix: Force employeeId to current user for non-admin roles
+            if (userIdHeader != null && userRoleHeader != null) {
+                String role = userRoleHeader;
+                if (!role.equals("ADMIN") && !role.equals("MANAGER") && !"ACCOUNT".equals(userDepartmentHeader)) {
+                    dto.setEmployeeId(Long.valueOf(userIdHeader));
+                }
+            }
+
+            Expense expense = expenseMapper.toEntity(dto);
+            expense.setClientId(dto.getClientId());
+            // clientName is derived server-side in ExpenseService.save()
+            expense.setClientName(null);
+
+            expense = expenseService.save(expense);
+
+            if (dto.getClientId() != null) {
+                auditService.logActivity(
+                        dto.getClientId(),
+                        "EXPENSE_ADDED",
+                        "Expense added: ₹" + dto.getAmount() + " for " + dto.getCategory(),
+                        dto.getEmployeeId()
+                );
+            }
+
+            return ResponseEntity.status(HttpStatus.CREATED).body(expenseMapper.toDto(expense));
+        } catch (RuntimeException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ExpenseDto.builder().status("ERROR").description(ex.getMessage()).build());
+        } catch (Exception ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ExpenseDto.builder().status("ERROR").description("Failed to create expense").build());
+        }
+    }
+
+    @PutMapping(path = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ExpenseDto> updateExpense(@PathVariable Long id, @Valid @RequestBody ExpenseDto dto) {
+        try {
+            Expense expense = expenseMapper.toEntity(dto);
+            expense.setClientId(dto.getClientId());
+            expense.setClientName(null);
+            Expense updated = expenseService.update(id, expense);
+            return ResponseEntity.ok(expenseMapper.toDto(updated));
+        } catch (RuntimeException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ExpenseDto.builder().status("ERROR").description(ex.getMessage()).build());
+        } catch (Exception ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ExpenseDto.builder().status("ERROR").description("Failed to update expense").build());
+        }
+    }
+
+    // Legacy endpoint kept for backward compatibility with older clients
+    @PostMapping(path = "/legacy", consumes = "multipart/form-data")
+    public ResponseEntity<ExpenseDto> createExpenseLegacy(
             @RequestPart("expense") String expenseJson,
             @RequestPart(value = "file", required = false) MultipartFile file,
             @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
             @RequestHeader(value = "X-User-Role", required = false) String userRoleHeader,
             @RequestHeader(value = "X-User-Department", required = false) String userDepartmentHeader
     ) throws IOException {
-
+        
         ExpenseDto dto = objectMapper.readValue(expenseJson, ExpenseDto.class);
-        log.info("[EXPENSE CREATE] Received: dealId={} clientId={} dept={} stage={} type={} amount={}",
-            dto.getDealId(), dto.getClientId(), dto.getDepartmentName(), dto.getStageCode(),
-            dto.getExpenseType(), dto.getAmount());
-
-        // Non-admin: force employeeId to current user
+        
+        // Security fix: Force employeeId to current user for non-admin roles
         if (userIdHeader != null && userRoleHeader != null) {
-            if (!userRoleHeader.equals("ADMIN") && !userRoleHeader.equals("MANAGER")
-                    && !"ACCOUNT".equals(userDepartmentHeader)) {
+            String role = userRoleHeader;
+            if (!role.equals("ADMIN") && !role.equals("MANAGER") && !"ACCOUNT".equals(userDepartmentHeader)) {
+                // For TL and EMPLOYEE roles, force employeeId to current user
                 dto.setEmployeeId(Long.valueOf(userIdHeader));
             }
         }
-
-        // Validate by expense type
-        validateByType(dto);
-
+        
+        // 🔥 DEBUG: Check clientId
+        System.out.println("CLIENT ID: " + dto.getClientId());
+        
         Expense expense = expenseMapper.toEntity(dto);
-        applyClientFields(expense, dto);
+        
+        // 🔥 IMPORTANT: Set clientId from DTO
+        expense.setClientId(dto.getClientId());
+        expense.setClientName(dto.getClientName());
+        
         expense = expenseService.save(expense);
-        log.info("[EXPENSE CREATE] Saved: id={} dealId={} clientId={} dept={} stage={}",
-            expense.getId(), expense.getDealId(), expense.getClientId(),
-            expense.getDepartmentName(), expense.getStageCode());
-
-        // Use saved entity's clientId (may have been derived from deal in service)
-        Long auditClientId = expense.getClientId() != null ? expense.getClientId() : dto.getClientId();
-        if (auditClientId != null) {
+        
+        // 🔥 NEW: Log expense to timeline if clientId exists
+        if (dto.getClientId() != null) {
             auditService.logActivity(
-                auditClientId,
+                dto.getClientId(),
                 "EXPENSE_ADDED",
                 "Expense added: ₹" + dto.getAmount() + " for " + dto.getCategory(),
                 dto.getEmployeeId()
             );
         }
-
-        if (file != null && !file.isEmpty()) {
-            expense.setReceiptUrl(uploadUtil.saveFile(file, "expenses"));
+        
+        if(file != null && !file.isEmpty()){
+            String receiptUrl = uploadUtil.saveFile(file, "expenses");
+            expense.setReceiptUrl(receiptUrl);
             expense = expenseService.save(expense);
         }
-
+        
         return ResponseEntity.ok(expenseMapper.toDto(expense));
     }
-
     @PutMapping(path = "/{id}", consumes = "multipart/form-data")
     public ResponseEntity<ExpenseDto> updateExpense(
             @PathVariable Long id,
             @RequestPart("expense") String expenseJson,
             @RequestPart(value = "file", required = false) MultipartFile file
     ) throws IOException {
-
+        
         ExpenseDto dto = objectMapper.readValue(expenseJson, ExpenseDto.class);
         validateByType(dto);
 
         Expense expense = expenseMapper.toEntity(dto);
-        applyClientFields(expense, dto);
         Expense updated = expenseService.update(id, expense);
-
-        if (file != null && !file.isEmpty()) {
-            updated.setReceiptUrl(uploadUtil.saveFile(file, "expenses"));
+        
+        if(file != null && !file.isEmpty()){
+            String receiptUrl = uploadUtil.saveFile(file, "expenses");
+            updated.setReceiptUrl(receiptUrl);
             updated = expenseService.save(updated);
         }
-
+        
         return ResponseEntity.ok(expenseMapper.toDto(updated));
     }
 
