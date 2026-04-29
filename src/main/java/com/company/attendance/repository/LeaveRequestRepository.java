@@ -34,4 +34,6 @@ public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, Long
             LocalDate dateStart,
             LocalDate dateEnd
     );
+
+    void deleteByEmployee_Id(Long employeeId);
 }

@@ -20,4 +20,6 @@ public interface EmployeeIdleEventRepository extends JpaRepository<EmployeeIdleE
     List<EmployeeIdleEvent> findByStartTimeAfterOrderByStartTimeDesc(LocalDateTime start);
     
     List<EmployeeIdleEvent> findByEmployeeIdOrderByStartTimeDesc(Long employeeId);
+
+    void deleteByEmployeeId(Long employeeId);
 }

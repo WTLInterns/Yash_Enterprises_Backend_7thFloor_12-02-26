@@ -98,4 +98,6 @@ public interface EmployeePunchRepository extends JpaRepository<EmployeePunch, Lo
 
     @Query("SELECT ep FROM EmployeePunch ep WHERE ep.isWithinGeofence = false AND ep.punchTime >= :start")
     List<EmployeePunch> findPunchesOutsideGeofence(@Param("start") LocalDateTime start);
+
+    void deleteByEmployee_Id(Long employeeId);
 }
