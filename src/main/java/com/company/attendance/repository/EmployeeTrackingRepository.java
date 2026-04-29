@@ -59,6 +59,8 @@ public interface EmployeeTrackingRepository extends JpaRepository<EmployeeTracki
     // Latest two records for an employee, used to compute movement/idle status
     List<EmployeeTracking> findTop2ByEmployee_IdOrderByTimestampDesc(Long employeeId);
 
+    void deleteByEmployee_Id(Long employeeId);
+
     @Query("""
             SELECT DISTINCT et.employee.id as employeeId
             FROM EmployeeTracking et 

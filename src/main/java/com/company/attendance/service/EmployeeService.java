@@ -8,6 +8,7 @@ import com.company.attendance.entity.Organization;
 import com.company.attendance.entity.Department;
 import com.company.attendance.entity.Shift;
 import com.company.attendance.repository.AttendanceRepository;
+import com.company.attendance.repository.EmployeeTrackingRepository;
 import com.company.attendance.repository.ExpenseRepository;
 import com.company.attendance.repository.EmployeeRepository;
 import com.company.attendance.repository.RoleRepository;
@@ -41,6 +42,7 @@ public class EmployeeService {
     private final ShiftRepository shiftRepository;
     private final AttendanceRepository attendanceRepository;
     private final ExpenseRepository expenseRepository;
+    private final EmployeeTrackingRepository employeeTrackingRepository;
 
     public Employee save(Employee employee) {
         if (employee.getId() == null) {
@@ -487,11 +489,13 @@ public class EmployeeService {
             if (sub.getReportingManager() != null && sub.getReportingManager().getId().equals(id)) sub.setReportingManager(null);
             employeeRepository.save(sub);
         }
-        // 2. Delete attendance records
+        // 2. Delete tracking records
+        employeeTrackingRepository.deleteByEmployee_Id(id);
+        // 3. Delete attendance records
         attendanceRepository.deleteByEmployeeId(id);
-        // 3. Delete expense records
+        // 4. Delete expense records
         expenseRepository.deleteByEmployeeId(id);
-        // 4. Delete the employee
+        // 5. Delete the employee
         employeeRepository.deleteById(id);
     }
 
