@@ -58,17 +58,14 @@ public class ProductController {
     }
 
     @GetMapping
-    public Page<ProductDto> list(@RequestParam(value = "active", required = false) Boolean active,
+    public List<ProductDto> list(@RequestParam(value = "active", required = false) Boolean active,
                               @RequestParam(value = "category", required = false) String category,
                               @RequestParam(value = "ownerId", required = false) Integer ownerId,
                               @RequestParam(value = "q", required = false) String q,
-                              @RequestParam(value = "categoryId", required = false) Long categoryId,
-                              Pageable pageable){
-        // Default to active=true unless explicitly requested otherwise
-        Boolean effectiveActive = (active == null ? Boolean.TRUE : active);
+                              @RequestParam(value = "categoryId", required = false) Long categoryId) {
         if (active == null && category == null && ownerId == null && q == null && categoryId == null) {
-            Page<Product> products = productService.list(pageable);
-            List<ProductDto> dtos = products.getContent().stream()
+            return productRepository.findAllWithCategory(org.springframework.data.domain.Pageable.unpaged())
+                .getContent().stream()
                 .map(product -> {
                     ProductDto dto = crmMapper.toProductDto(product);
                     dto.setCreatedByName(getUserName(product.getCreatedBy()));
@@ -76,10 +73,10 @@ public class ProductController {
                     return dto;
                 })
                 .collect(Collectors.toList());
-            return new PageImpl<>(dtos, pageable, products.getTotalElements());
         }
-        Page<Product> products = productService.search(effectiveActive, category, ownerId, q, categoryId, pageable);
-        List<ProductDto> dtos = products.getContent().stream()
+        Boolean effectiveActive = (active == null ? Boolean.TRUE : active);
+        return productService.search(effectiveActive, category, ownerId, q, categoryId, org.springframework.data.domain.Pageable.unpaged())
+            .getContent().stream()
             .map(product -> {
                 ProductDto dto = crmMapper.toProductDto(product);
                 dto.setCreatedByName(getUserName(product.getCreatedBy()));
@@ -87,7 +84,6 @@ public class ProductController {
                 return dto;
             })
             .collect(Collectors.toList());
-        return new PageImpl<>(dtos, pageable, products.getTotalElements());
     }
 
     @GetMapping("/search")

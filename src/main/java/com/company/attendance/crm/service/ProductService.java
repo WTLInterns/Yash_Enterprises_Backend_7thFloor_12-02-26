@@ -36,11 +36,12 @@ public class ProductService {
         if (productRepository.existsByNameIgnoreCase(product.getName())){
             throw new IllegalArgumentException("Product name already exists");
         }
+        product.setActive(true); // always active on create
         return productRepository.save(product);
     }
 
     public Page<Product> list(Pageable pageable){
-        return productRepository.findByActiveTrue(pageable);
+        return productRepository.findAllWithCategory(pageable);
     }
 
     public Page<Product> search(Boolean active, String category, Integer ownerId, String q, Long categoryId, Pageable pageable){
@@ -53,7 +54,7 @@ public class ProductService {
     }
 
     public Optional<Product> get(Long id){
-        return productRepository.findById(id);
+        return productRepository.findByIdWithCategory(id);
     }
 
     public Product update(Long id, Product incoming){

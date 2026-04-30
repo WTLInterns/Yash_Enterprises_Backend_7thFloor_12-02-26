@@ -16,4 +16,11 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     @Query(value = "SELECT p FROM Product p LEFT JOIN FETCH p.category WHERE p.active = true",
            countQuery = "SELECT COUNT(p) FROM Product p WHERE p.active = true")
     Page<Product> findByActiveTrue(Pageable pageable);
+
+    @Query(value = "SELECT p FROM Product p LEFT JOIN FETCH p.category",
+           countQuery = "SELECT COUNT(p) FROM Product p")
+    Page<Product> findAllWithCategory(Pageable pageable);
+
+    @Query(value = "SELECT p FROM Product p LEFT JOIN FETCH p.category WHERE p.id = :id")
+    Optional<Product> findByIdWithCategory(@org.springframework.data.repository.query.Param("id") Long id);
 }
