@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -167,26 +168,32 @@ public class ExpenseController {
     }
     @PostMapping(consumes = "multipart/form-data")
     public ResponseEntity<ExpenseDto> createExpense(
-            @Valid @RequestBody ExpenseDto dto,
+            @RequestPart("expense") String expenseJson,
+            @RequestPart(value = "file", required = false) MultipartFile file,
             @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
             @RequestHeader(value = "X-User-Role", required = false) String userRoleHeader,
             @RequestHeader(value = "X-User-Department", required = false) String userDepartmentHeader
-    ) {
+    ) throws IOException {
         try {
+            ExpenseDto dto = objectMapper.readValue(expenseJson, ExpenseDto.class);
+
             // Security fix: Force employeeId to current user for non-admin roles
             if (userIdHeader != null && userRoleHeader != null) {
-                String role = userRoleHeader;
-                if (!role.equals("ADMIN") && !role.equals("MANAGER") && !"ACCOUNT".equals(userDepartmentHeader)) {
+                if (!userRoleHeader.equals("ADMIN") && !userRoleHeader.equals("MANAGER") && !"ACCOUNT".equals(userDepartmentHeader)) {
                     dto.setEmployeeId(Long.valueOf(userIdHeader));
                 }
             }
 
             Expense expense = expenseMapper.toEntity(dto);
             expense.setClientId(dto.getClientId());
-            // clientName is derived server-side in ExpenseService.save()
             expense.setClientName(null);
-
             expense = expenseService.save(expense);
+
+            if (file != null && !file.isEmpty()) {
+                String receiptUrl = uploadUtil.saveFile(file, "expenses");
+                expense.setReceiptUrl(receiptUrl);
+                expense = expenseService.save(expense);
+            }
 
             if (dto.getClientId() != null) {
                 auditService.logActivity(
@@ -201,26 +208,6 @@ public class ExpenseController {
         } catch (RuntimeException ex) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(ExpenseDto.builder().status("ERROR").description(ex.getMessage()).build());
-        } catch (Exception ex) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ExpenseDto.builder().status("ERROR").description("Failed to create expense").build());
-        }
-    }
-
-    @PutMapping(path = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<ExpenseDto> updateExpense(@PathVariable Long id, @Valid @RequestBody ExpenseDto dto) {
-        try {
-            Expense expense = expenseMapper.toEntity(dto);
-            expense.setClientId(dto.getClientId());
-            expense.setClientName(null);
-            Expense updated = expenseService.update(id, expense);
-            return ResponseEntity.ok(expenseMapper.toDto(updated));
-        } catch (RuntimeException ex) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(ExpenseDto.builder().status("ERROR").description(ex.getMessage()).build());
-        } catch (Exception ex) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ExpenseDto.builder().status("ERROR").description("Failed to update expense").build());
         }
     }
 
@@ -280,19 +267,17 @@ public class ExpenseController {
             @RequestPart("expense") String expenseJson,
             @RequestPart(value = "file", required = false) MultipartFile file
     ) throws IOException {
-        
         ExpenseDto dto = objectMapper.readValue(expenseJson, ExpenseDto.class);
         validateByType(dto);
-
         Expense expense = expenseMapper.toEntity(dto);
+        expense.setClientId(dto.getClientId());
+        expense.setClientName(null);
         Expense updated = expenseService.update(id, expense);
-        
-        if(file != null && !file.isEmpty()){
+        if (file != null && !file.isEmpty()) {
             String receiptUrl = uploadUtil.saveFile(file, "expenses");
             updated.setReceiptUrl(receiptUrl);
             updated = expenseService.save(updated);
         }
-        
         return ResponseEntity.ok(expenseMapper.toDto(updated));
     }
 
