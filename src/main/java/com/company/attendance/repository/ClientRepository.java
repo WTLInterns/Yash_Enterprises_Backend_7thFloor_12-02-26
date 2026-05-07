@@ -1,6 +1,7 @@
 package com.company.attendance.repository;
 
 import com.company.attendance.entity.Client;
+import com.company.attendance.entity.Task;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -37,5 +38,14 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
     
     @Query("SELECT COUNT(c) FROM Client c WHERE c.isActive = true OR c.isActive IS NULL")
     long countActiveClients();
-}
 
+    @Query("""
+        SELECT DISTINCT c
+        FROM Client c
+        JOIN Task t ON t.clientId = c.id
+        WHERE t.assignedToEmployeeId = :employeeId
+          AND t.clientId IS NOT NULL
+          AND (c.isActive = true OR c.isActive IS NULL)
+        """)
+    List<Client> findDistinctActiveClientsAssignedToEmployee(@Param("employeeId") Long employeeId);
+}

@@ -4,9 +4,11 @@ import com.company.attendance.dto.LeaveRequestDto;
 import com.company.attendance.entity.LeaveRequest;
 import com.company.attendance.entity.Employee;
 import com.company.attendance.mapper.LeaveRequestMapper;
+import com.company.attendance.notification.NotificationService;
 import com.company.attendance.repository.EmployeeRepository;
 import com.company.attendance.repository.LeaveRequestRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,16 +17,75 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class LeaveRequestService {
     private final LeaveRequestRepository leaveRequestRepository;
     private final EmployeeRepository employeeRepository;
     private final LeaveRequestMapper leaveRequestMapper;
+    private final NotificationService notificationService;
+
+    private void notifyLeaveApply(Employee employee, LeaveRequest saved) {
+        try {
+            final Long leaveId = saved != null ? saved.getId() : null;
+            final Long employeeId = employee != null ? employee.getId() : null;
+            final String employeeName = employee != null ? employee.getFullName() : "Employee";
+
+            final String title = "New Leave Request";
+            final String body = employeeName + " applied for leave";
+            final Map<String, String> data = new HashMap<>();
+            data.put("type", "LEAVE_APPLY");
+            if (leaveId != null) data.put("leaveId", String.valueOf(leaveId));
+            if (employeeId != null) data.put("employeeId", String.valueOf(employeeId));
+            data.put("message", body);
+
+            log.info("[LeaveNotification] event=LEAVE_APPLY employeeId={} leaveId={} recipients=ADMIN+MANAGER", employeeId, leaveId);
+
+            notificationService.sendRoleBasedNotification("ADMIN", title, body, "LEAVE_APPLY", leaveId);
+            notificationService.sendRoleBasedNotification("MANAGER", title, body, "LEAVE_APPLY", leaveId);
+        } catch (Exception e) {
+            log.error("[LeaveNotification] event=LEAVE_APPLY failed: {}", e.getMessage(), e);
+        }
+    }
+
+    private void notifyLeaveDecision(LeaveRequest saved, String type) {
+        try {
+            final Long leaveId = saved != null ? saved.getId() : null;
+            final Long requesterId = saved != null && saved.getEmployee() != null ? saved.getEmployee().getId() : null;
+
+            final String title;
+            final String body;
+            if ("LEAVE_APPROVED".equals(type)) {
+                title = "Leave Approved";
+                body = "Your leave request has been approved";
+            } else {
+                title = "Leave Rejected";
+                body = "Your leave request has been rejected";
+            }
+
+            final Map<String, String> data = new HashMap<>();
+            data.put("type", type);
+            if (leaveId != null) data.put("leaveId", String.valueOf(leaveId));
+            if (requesterId != null) data.put("employeeId", String.valueOf(requesterId));
+            data.put("message", body);
+
+            log.info("[LeaveNotification] event={} leaveId={} recipientEmployeeId={}", type, leaveId, requesterId);
+
+            if (requesterId != null) {
+                notificationService.notifyEmployeeMobile(requesterId, title, body, type, "LEAVE", leaveId, data);
+                notificationService.notifyEmployeeWeb(requesterId, title, body, type, "LEAVE", leaveId, data);
+            }
+        } catch (Exception e) {
+            log.error("[LeaveNotification] event={} failed: {}", type, e.getMessage(), e);
+        }
+    }
 
     public LeaveRequest save(LeaveRequest leave) {
         return leaveRequestRepository.save(leave);
@@ -118,6 +179,7 @@ public class LeaveRequestService {
         leave.setApprovalRole(null);
 
         LeaveRequest saved = leaveRequestRepository.save(leave);
+        notifyLeaveApply(employee, saved);
         return leaveRequestMapper.toDto(saved);
     }
 
@@ -206,6 +268,13 @@ public class LeaveRequestService {
         leave.setApprovedAt(OffsetDateTime.now(ZoneOffset.UTC));
         leave.setApprovalRole(role);
         LeaveRequest saved = leaveRequestRepository.save(leave);
+
+        if (targetStatus == LeaveRequest.Status.APPROVED) {
+            notifyLeaveDecision(saved, "LEAVE_APPROVED");
+        } else if (targetStatus == LeaveRequest.Status.REJECTED) {
+            notifyLeaveDecision(saved, "LEAVE_REJECTED");
+        }
+
         return leaveRequestMapper.toDto(saved);
     }
 

@@ -61,6 +61,14 @@ public class ClientService {
         return clientRepository.findAll();
     }
 
+    public List<Client> getDistinctActiveClientsAssignedToEmployee(Long employeeId) {
+        log.info("Fetching distinct active assigned clients for employeeId={}", employeeId);
+        if (employeeId == null) {
+            return List.of();
+        }
+        return clientRepository.findDistinctActiveClientsAssignedToEmployee(employeeId);
+    }
+
     public List<Client> getActiveClientEntities() {
         log.info("Fetching active client entities");
         List<Client> clients = clientRepository.findAllActive();

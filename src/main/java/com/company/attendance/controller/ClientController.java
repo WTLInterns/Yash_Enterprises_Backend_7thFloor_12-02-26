@@ -13,6 +13,7 @@ import com.company.attendance.entity.CustomerAddress;
 import com.company.attendance.repository.CustomerAddressRepository;
 import com.company.attendance.repository.ExpenseRepository;
 import com.company.attendance.repository.EmployeeRepository;
+import com.company.attendance.repository.TaskRepository;
 import com.company.attendance.service.ClientService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -43,6 +44,96 @@ public class ClientController {
     private final CustomerAddressRepository customerAddressRepository;
     private final BankRepository bankRepository;
     private final ExpenseRepository expenseRepository;
+    private final TaskRepository taskRepository;
+
+    @GetMapping("/assigned")
+    @Transactional(readOnly = true)
+    public ResponseEntity<List<com.company.attendance.crm.dto.ClientDto>> listAssignedClients(
+            @RequestParam(value = "employeeId", required = false) Long employeeIdParam,
+            @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
+            @RequestHeader(value = "X-User-Role", required = false) String userRoleHeader) {
+        final long startedNs = System.nanoTime();
+        try {
+            final String role = userRoleHeader != null ? userRoleHeader : "";
+            Long employeeId = employeeIdParam;
+            if (employeeId == null && userIdHeader != null) {
+                try {
+                    employeeId = Long.valueOf(userIdHeader);
+                } catch (NumberFormatException ignored) {
+                    employeeId = null;
+                }
+            }
+
+            if (role.equalsIgnoreCase("ADMIN") || role.equalsIgnoreCase("MANAGER")) {
+                List<Client> clients = clientService.getAllClientEntities().stream()
+                        .filter(c -> c.getIsActive() == null || c.getIsActive())
+                        .collect(Collectors.toList());
+
+                List<Long> ownerIds = clients.stream()
+                        .map(Client::getOwnerId)
+                        .filter(Objects::nonNull)
+                        .distinct().toList();
+
+                Map<Long, String> ownerNames = new HashMap<>();
+                if (!ownerIds.isEmpty()) {
+                    employeeRepository.findAllById(ownerIds)
+                            .forEach(e -> ownerNames.put(e.getId(), e.getFullName()));
+                }
+
+                List<com.company.attendance.crm.dto.ClientDto> dtos = clients.stream()
+                        .map(c -> {
+                            com.company.attendance.crm.dto.ClientDto dto = crmMapper.toClientDto(c);
+                            if (c.getOwnerId() != null) dto.setOwnerName(ownerNames.get(c.getOwnerId()));
+                            return dto;
+                        })
+                        .collect(Collectors.toList());
+
+                final long tookMs = (System.nanoTime() - startedNs) / 1_000_000;
+                log.info("[AssignedClientsAPI] role={} employeeId={} matchedTasks={} uniqueClients={} responseSize={} tookMs={}",
+                        role, employeeId, -1, dtos.size(), dtos.size(), tookMs);
+                return ResponseEntity.ok(dtos);
+            }
+
+            if (employeeId == null) {
+                final long tookMs = (System.nanoTime() - startedNs) / 1_000_000;
+                log.warn("[AssignedClientsAPI] missing employeeId role={} userIdHeader={} employeeIdParam={} tookMs={}",
+                        role, userIdHeader, employeeIdParam, tookMs);
+                return ResponseEntity.badRequest().body(List.of());
+            }
+
+            final long matchedTasks = taskRepository.countByAssignedToEmployeeIdAndClientIdIsNotNull(employeeId);
+            List<Client> assigned = clientService.getDistinctActiveClientsAssignedToEmployee(employeeId);
+
+            List<Long> ownerIds = assigned.stream()
+                    .map(Client::getOwnerId)
+                    .filter(Objects::nonNull)
+                    .distinct().toList();
+            Map<Long, String> ownerNames = new HashMap<>();
+            if (!ownerIds.isEmpty()) {
+                employeeRepository.findAllById(ownerIds)
+                        .forEach(e -> ownerNames.put(e.getId(), e.getFullName()));
+            }
+
+            List<com.company.attendance.crm.dto.ClientDto> dtos = assigned.stream()
+                    .map(c -> {
+                        com.company.attendance.crm.dto.ClientDto dto = crmMapper.toClientDto(c);
+                        if (c.getOwnerId() != null) dto.setOwnerName(ownerNames.get(c.getOwnerId()));
+                        return dto;
+                    })
+                    .collect(Collectors.toList());
+
+            final long tookMs = (System.nanoTime() - startedNs) / 1_000_000;
+            log.info("[AssignedClientsAPI] role={} employeeId={} matchedTasks={} uniqueClients={} responseSize={} tookMs={}",
+                    role, employeeId, matchedTasks, dtos.size(), dtos.size(), tookMs);
+
+            return ResponseEntity.ok(dtos);
+        } catch (Exception e) {
+            final long tookMs = (System.nanoTime() - startedNs) / 1_000_000;
+            log.error("[AssignedClientsAPI] error role={} employeeIdParam={} userIdHeader={} tookMs={} err={}",
+                    userRoleHeader, employeeIdParam, userIdHeader, tookMs, e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
 
     /**
      * Single endpoint: returns all clients + all their deals + all addresses.
