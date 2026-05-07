@@ -160,9 +160,25 @@ public class TaskService {
                 .orElseThrow(() -> new RuntimeException("Task not found"));
     }
 
+    private String taskScheduleSnapshot(Task t) {
+        if (t == null) return "null";
+        return String.format(
+                "id=%s taskName=%s startDate=%s endDate=%s scheduledStartTime=%s scheduledEndTime=%s",
+                t.getId(),
+                t.getTaskName(),
+                t.getStartDate(),
+                t.getEndDate(),
+                t.getScheduledStartTime(),
+                t.getScheduledEndTime()
+        );
+    }
+
     @Transactional
     public Task update(Long id, Task updated) {
         Task existing = getById(id);
+
+        log.info("[TaskUpdate] BEFORE: {}", taskScheduleSnapshot(existing));
+        log.info("[TaskUpdate] INCOMING: {}", taskScheduleSnapshot(updated));
 
         Long oldAssignee = existing.getAssignedToEmployeeId();
         TaskStatus oldStatus = existing.getStatus();
@@ -175,8 +191,22 @@ public class TaskService {
         existing.setAssignedToEmployeeId(updated.getAssignedToEmployeeId());
         existing.setCreatedByEmployeeId(updated.getCreatedByEmployeeId());
 
-        existing.setScheduledStartTime(updated.getScheduledStartTime());
-        existing.setScheduledEndTime(updated.getScheduledEndTime());
+        // Scheduling fields
+        // Persist LocalDate fields (were missing earlier)
+        if (updated.getStartDate() != null) {
+            existing.setStartDate(updated.getStartDate());
+        }
+        if (updated.getEndDate() != null) {
+            existing.setEndDate(updated.getEndDate());
+        }
+
+        // Avoid accidental null-overwrites unless explicitly provided
+        if (updated.getScheduledStartTime() != null) {
+            existing.setScheduledStartTime(updated.getScheduledStartTime());
+        }
+        if (updated.getScheduledEndTime() != null) {
+            existing.setScheduledEndTime(updated.getScheduledEndTime());
+        }
         existing.setRepeatTask(updated.getRepeatTask());
 
         existing.setTaskAgainst(updated.getTaskAgainst());
@@ -190,6 +220,8 @@ public class TaskService {
 
         existing.setUpdatedAt(LocalDateTime.now());
 
+        log.info("[TaskUpdate] AFTER_APPLY: {}", taskScheduleSnapshot(existing));
+
         validateCustomerAddressLink(existing);
 
         // Replace dynamic values
@@ -202,6 +234,8 @@ public class TaskService {
         }
 
         Task saved = taskRepository.save(existing);
+
+        log.info("[TaskUpdate] SAVED: {}", taskScheduleSnapshot(saved));
 
         if (saved.getAssignedToEmployeeId() != null && (oldAssignee == null || !oldAssignee.equals(saved.getAssignedToEmployeeId()))) {
             // Get client name and address for notification

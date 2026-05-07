@@ -366,6 +366,17 @@ public class TaskController {
             @RequestHeader(value = "X-User-Role", required = false) String userRole,
             @RequestHeader(value = "X-User-Department", required = false) String userDepartment) {
         try {
+            log.info(
+                    "[TaskUpdate] DTO: id={} taskName={} startDate={} endDate={} scheduledStartTime={} scheduledEndTime={} assignedToEmployeeId={} status={}",
+                    dto.getId(),
+                    dto.getTaskName(),
+                    dto.getStartDate(),
+                    dto.getEndDate(),
+                    dto.getScheduledStartTime(),
+                    dto.getScheduledEndTime(),
+                    dto.getAssignedToEmployeeId(),
+                    dto.getStatus()
+            );
             // 🔥 HEADER FALLBACK: Derive from employeeId if headers missing
             String derivedUserRole = userRole;
             String derivedUserDepartment = userDepartment;
